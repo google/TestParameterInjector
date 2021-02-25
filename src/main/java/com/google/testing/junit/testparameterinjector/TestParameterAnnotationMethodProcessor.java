@@ -66,7 +66,6 @@ import org.junit.runners.model.TestClass;
  *
  * @see TestParameterAnnotation
  */
-/* copybara:strip_begin(advanced usage) */ public /* copybara:strip_end */
 class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
 
   /**

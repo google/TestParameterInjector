@@ -18,7 +18,6 @@ import com.google.common.base.Optional;
 import java.lang.annotation.Annotation;
 
 /** Interface to retrieve the {@link TestParameterAnnotation} values for a test. */
-/* copybara:strip_begin(advanced usage) */ public /* copybara:strip_end */
 interface TestParameterValues {
   /**
    * Returns a {@link TestParameterAnnotation} value for the current test as specified by {@code

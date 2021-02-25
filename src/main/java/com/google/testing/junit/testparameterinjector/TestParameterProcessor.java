@@ -22,7 +22,6 @@ package com.google.testing.junit.testparameterinjector;
  * declaration order, starting with annotations defined at the class, field, method, and finally
  * parameter level.
  */
-/* copybara:strip_begin(advanced usage) */ public /* copybara:strip_end */
 interface TestParameterProcessor {
   /** Executes code in the context of a running test statement before the statement starts. */
   void before(Object testParameterValue);

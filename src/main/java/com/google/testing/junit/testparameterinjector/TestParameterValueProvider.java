@@ -22,7 +22,6 @@ import java.util.Optional;
  * Interface which allows {@link TestParameterAnnotation} annotations to provide the values to test
  * in a dynamic way.
  */
-/* copybara:strip_begin(advanced usage) */ public /* copybara:strip_end */
 interface TestParameterValueProvider {
 
   /**

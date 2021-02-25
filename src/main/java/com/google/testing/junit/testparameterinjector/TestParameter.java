@@ -78,13 +78,6 @@ public @interface TestParameter {
    *   <li>long and int: Specified as YAML integer
    *   <li>float and double: Specified as YAML floating point or integer
    *   <li>Enum value: Specified as a String that can be parsed by {@code Enum.valueOf()}
-   *   <li>Protobuf messages: Specified as a YAML mapping or as textproto string:
-   *       <ul>
-   *         <li>As YAML mapping: The mapping keys are the proto field names and their values are
-   *             parsed in the same way as the parameter values
-   *         <li>Textproto string: Formatted according to go/textformat-spec
-   *       </ul>
-   *   <li>
    * </ul>
    *
    * <p>For dynamic sets of parameters or parameter types that are not supported here, use {@link

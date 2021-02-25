@@ -28,7 +28,6 @@ import org.junit.runners.model.TestClass;
  * <p>Note: Implementations of this interface are expected to be immutable, i.e. they no longer
  * change after construction.
  */
-/* copybara:strip_begin(advanced usage) */ public /* copybara:strip_end */
 interface TestMethodProcessor {
 
   /** Allows to transform the test information (name and annotations). */

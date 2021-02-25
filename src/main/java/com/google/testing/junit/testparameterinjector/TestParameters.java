@@ -66,12 +66,6 @@ public @interface TestParameters {
    *   <li>Parsed types:
    *       <ul>
    *         <li>Enum value: Specified as a String that can be parsed by {@code Enum.valueOf()}
-   *         <li>Protobuf messages: Specified as a YAML mapping or as textproto string:
-   *             <ul>
-   *               <li>As YAML mapping: The mapping keys are the proto field names and their values
-   *                   are parsed in the same way as the parameter values
-   *               <li>Textproto string: A YAML string formatted according to go/textformat-spec
-   *             </ul>
    *       </ul>
    *   <li>
    * </ul>

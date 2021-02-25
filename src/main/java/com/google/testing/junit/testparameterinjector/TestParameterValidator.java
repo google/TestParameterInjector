@@ -22,7 +22,6 @@ import java.util.List;
  * Validator interface which allows {@link TestParameterAnnotation} annotations to validate the set
  * of annotation values for a given test instance, and to selectively skip the test.
  */
-/* copybara:strip_begin(advanced usage) */ public /* copybara:strip_end */
 interface TestParameterValidator {
 
   /**
