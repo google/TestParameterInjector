@@ -164,9 +164,6 @@
           <testSource>1.8</testSource>
           <testTarget>1.8</testTarget>
           <parameters>true</parameters> 
-          <compilerArgs>
-            <arg>-parameters</arg>
-          </compilerArgs>
         </configuration>
       </plugin>
       <plugin>
