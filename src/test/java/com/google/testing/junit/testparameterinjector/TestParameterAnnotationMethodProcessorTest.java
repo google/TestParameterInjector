@@ -47,7 +47,6 @@ import org.junit.runners.model.TestClass;
  * Test class to test the PluggableTestRunner test harness works with {@link
  * TestParameterAnnotation}s.
  */
-// TODO(sergebeauchamp): Test error handling edge cases.
 @RunWith(Parameterized.class)
 public class TestParameterAnnotationMethodProcessorTest {
 
