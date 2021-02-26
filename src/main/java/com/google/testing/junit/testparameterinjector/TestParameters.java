@@ -73,7 +73,7 @@ public @interface TestParameters {
    * <p>For dynamic sets of parameters or parameter types that are not supported here, use {@link
    * #valuesProvider()} and leave this field empty.
    *
-   * <h3>Examples</h3>
+   * <p><b>Examples</b>
    *
    * <pre>
    * {@literal @}Test
@@ -99,7 +99,7 @@ public @interface TestParameters {
    *
    * <p>If this field is set, {@link #value()} must be empty and vice versa.
    *
-   * <h3>Example</h3>
+   * <p><b>Example</b>
    *
    * <pre>
    * {@literal @}Test
@@ -107,7 +107,7 @@ public @interface TestParameters {
    * public void personIsAdult(int age, boolean expectIsAdult) { ... }
    *
    * private static final class IsAdultValueProvider implements TestParametersValuesProvider {
-   *   {@literal @}Override public List<TestParametersValues> provideValues() {
+   *   {@literal @}Override public {@literal List<TestParametersValues>} provideValues() {
    *     return ImmutableList.of(
    *       TestParametersValues.builder()
    *         .name("teenager")

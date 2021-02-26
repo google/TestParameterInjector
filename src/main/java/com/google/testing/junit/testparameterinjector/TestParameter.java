@@ -92,19 +92,19 @@ public @interface TestParameter {
    *
    * <p>If this field is set, {@link #value()} must be empty and vice versa.
    *
-   * <h3>Example</h3>
+   * <p><b>Example</b>
    *
    * <pre>
    * {@literal @}Test
    * public void matchesAllOf_throwsOnNull(
    *     {@literal @}TestParameter(valuesProvider = CharMatcherProvider.class)
    *         CharMatcher charMatcher) {
-   *   assertThrows(NullPointerException.class, () -> charMatcher.matchesAllOf(null));
+   *   assertThrows(NullPointerException.class, () -&gt; charMatcher.matchesAllOf(null));
    * }
    *
    * private static final class CharMatcherProvider implements TestParameterValuesProvider {
    *   {@literal @}Override
-   *   public List<CharMatcher> provideValues() {
+   *   public {@literal List<CharMatcher>} provideValues() {
    *     return ImmutableList.of(CharMatcher.any(), CharMatcher.ascii(), CharMatcher.whitespace());
    *   }
    * }
