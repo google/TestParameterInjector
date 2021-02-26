@@ -71,6 +71,17 @@
       </roles>
       <timezone>+0</timezone>
     </developer>
+    <developer>
+      <id>ajurkowski</id>
+      <name>Alex Jurkowski</name>
+      <email>ajurkowski@google.com</email>
+      <organization>Google Inc.</organization>
+      <organizationUrl>http://www.google.com/</organizationUrl>
+      <roles>
+        <role>developer</role>
+      </roles>
+      <timezone>-6</timezone>
+    </developer>
   </developers>
 
   <scm>
