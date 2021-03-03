@@ -14,12 +14,8 @@
 
 package com.google.testing.junit.testparameterinjector;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
-import org.junit.rules.TestRule;
-import org.junit.runner.Description;
 import org.junit.runners.model.InitializationError;
-import org.junit.runners.model.Statement;
 
 /**
  * A JUnit test runner which knows how to instantiate and run test classes where each test case may
@@ -34,35 +30,7 @@ public final class TestParameterInjector extends PluggableTestRunner {
   }
 
   @Override
-  protected List<TestRule> getInnerTestRules() {
-    return ImmutableList.of(new TestNamePrinterRule());
-  }
-
-  @Override
   protected List<TestMethodProcessor> createTestMethodProcessorList() {
     return TestMethodProcessors.createNewParameterizedProcessorsWithLegacyFeatures(getTestClass());
-  }
-
-  /** A {@link TestRule} that prints the current test name before and after the test. */
-  private static final class TestNamePrinterRule implements TestRule {
-
-    @Override
-    public Statement apply(final Statement originalStatement, final Description testDescription) {
-      return new Statement() {
-        @Override
-        public void evaluate() throws Throwable {
-          String testName =
-              testDescription.getTestClass().getSimpleName()
-                  + "."
-                  + testDescription.getMethodName();
-          System.out.println("\n\nBeginning test: " + testName);
-          try {
-            originalStatement.evaluate();
-          } finally {
-            System.out.println("\nEnd of test: " + testName);
-          }
-        }
-      };
-    }
   }
 }
