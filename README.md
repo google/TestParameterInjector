@@ -11,8 +11,8 @@ promote high test coverage for data-driven tests.
 To start using `TestParameterInjector` right away, copy the following snippet:
 
 ```java
-import com.google.testing.junit.TestParameterInjector.TestParameterInjector;
-import com.google.testing.junit.TestParameterInjector.TestParameter;
+import com.google.testing.junit.testparameterinjector.TestParameterInjector;
+import com.google.testing.junit.testparameterinjector.TestParameter;
 
 @RunWith(TestParameterInjector.class)
 public class MyTest {
