@@ -290,7 +290,18 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
         parametersList.stream().allMatch(Parameter::isNamePresent),
         ""
             + "Parameter name is not present for method or constructor: %s.  Please ensure that"
-            + " this test was built with the -parameters compiler option",
+            + " this test was built with the -parameters compiler option.\n"
+            + "\n"
+            + "In Maven, you do this by adding <parameters>true</parameters> to the"
+            + " maven-compiler-plugin's configuration. For example:\n"
+            + "\n"
+            + "<plugin>\n"
+            + "  <artifactId>maven-compiler-plugin</artifactId>\n"
+            + "  <version>3.8.1</version>\n"
+            + "  <configuration>\n"
+            + "    <parameters>true</parameters>\n"
+            + "  </configuration>\n"
+            + "</plugin>",
         methodOrConstructor);
     if (valueIsSet) {
       return stream(annotation.value())
