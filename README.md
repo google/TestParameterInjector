@@ -3,8 +3,17 @@ TestParameterInjector
 
 ## Introduction
 
+`TestParameterInjector` is a JUnit4 test runner that runs its test methods for
+different combinations of field/parameter values.
+
 Parameterized tests are a great way to avoid code duplication between tests and
 promote high test coverage for data-driven tests.
+
+There are a lot of alternative parameterized test frameworks, such as
+[junit.runners.Parameterized](https://github.com/junit-team/junit4/wiki/parameterized-tests)
+and [JUnitParams](https://github.com/Pragmatists/JUnitParams). We believe
+`TestParameterInjector` is an improvement of those because it is more powerful
+and simpler to use.
 
 ## Getting started
 
@@ -30,6 +39,21 @@ public class MyTest {
   enum MyEnum { VALUE_A, VALUE_B, VALUE_C }
 }
 ```
+
+And add the following dependency to your `.pom` file:
+
+```xml
+<dependency>
+  <groupId>com.google.testparameterinjector</groupId>
+  <artifactId>test-parameter-injector</artifactId>
+  <version>1.0-rc1</version>
+</dependency>
+```
+
+or see [this maven.org
+page](https://search.maven.org/artifact/com.google.testparameterinjector/test-parameter-injector)
+for instructions for other build tools.
+
 
 ## Basics
 
