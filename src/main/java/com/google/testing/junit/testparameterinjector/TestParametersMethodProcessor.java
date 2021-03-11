@@ -289,19 +289,29 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
     checkState(
         parametersList.stream().allMatch(Parameter::isNamePresent),
         ""
-            + "Parameter name is not present for method or constructor: %s.  Please ensure that"
-            + " this test was built with the -parameters compiler option.\n"
+            + "No parameter name could be found for %s, which likely means that parameter names"
+            + " aren't available at runtime. Please ensure that the this test was built with the"
+            + " -parameters compiler option.\n"
             + "\n"
             + "In Maven, you do this by adding <parameters>true</parameters> to the"
             + " maven-compiler-plugin's configuration. For example:\n"
             + "\n"
-            + "<plugin>\n"
-            + "  <artifactId>maven-compiler-plugin</artifactId>\n"
-            + "  <version>3.8.1</version>\n"
-            + "  <configuration>\n"
-            + "    <parameters>true</parameters>\n"
-            + "  </configuration>\n"
-            + "</plugin>",
+            + "<build>\n"
+            + "  <plugins>\n"
+            + "    <plugin>\n"
+            + "      <groupId>org.apache.maven.plugins</groupId>\n"
+            + "      <artifactId>maven-compiler-plugin</artifactId>\n"
+            + "      <version>3.8.1</version>\n"
+            + "      <configuration>\n"
+            + "        <compilerArgs>\n"
+            + "          <arg>-parameters</arg>\n"
+            + "        </compilerArgs>\n"
+            + "      </configuration>\n"
+            + "    </plugin>\n"
+            + "  </plugins>\n"
+            + "</build>\n"
+            + "\n"
+            + "Don't forget to run `mvn clean` after making this change.",
         methodOrConstructor);
     if (valueIsSet) {
       return stream(annotation.value())
