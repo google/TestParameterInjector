@@ -106,7 +106,7 @@ public class TestParameterAnnotationMethodProcessorTest {
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class MultipleAllEnumValueseAnnotationClass {
+  public static class MultipleAllEnumValuesAnnotationClass {
 
     private static List<String> testedParameters;
 
