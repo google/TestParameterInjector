@@ -78,6 +78,8 @@ public @interface TestParameter {
    *   <li>long and int: Specified as YAML integer
    *   <li>float and double: Specified as YAML floating point or integer
    *   <li>Enum value: Specified as a String that can be parsed by {@code Enum.valueOf()}
+   *   <li>Byte array or com.google.protobuf.ByteString: Specified as an UTF8 String or YAML bytes
+   *       (example: "!!binary 'ZGF0YQ=='")
    * </ul>
    *
    * <p>For dynamic sets of parameters or parameter types that are not supported here, use {@link

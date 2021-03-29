@@ -66,6 +66,8 @@ public @interface TestParameters {
    *   <li>Parsed types:
    *       <ul>
    *         <li>Enum value: Specified as a String that can be parsed by {@code Enum.valueOf()}
+   *         <li>Byte array or com.google.protobuf.ByteString: Specified as an UTF8 String or YAML
+   *             bytes (example: "!!binary 'ZGF0YQ=='")
    *       </ul>
    *   <li>
    * </ul>

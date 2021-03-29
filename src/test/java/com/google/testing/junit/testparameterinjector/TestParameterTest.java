@@ -110,23 +110,29 @@ public class TestParameterTest {
 
     @Test
     public void test(
-        @TestParameter TestEnum enumParameterA, @TestParameter TestEnum enumParameterB) {
-      testedParameters.add(String.format("%s:%s", enumParameterA, enumParameterB));
+        @TestParameter TestEnum enumParameterA,
+        @TestParameter({"TWO", "THREE"}) TestEnum enumParameterB,
+        @TestParameter({"!!binary 'ZGF0YQ=='", "data2"}) byte[] bytes) {
+      testedParameters.add(
+          String.format("%s:%s:%s", enumParameterA, enumParameterB, new String(bytes)));
     }
 
     @AfterClass
     public static void completedAllParameterizedTests() {
       assertThat(testedParameters)
           .containsExactly(
-              "ONE:ONE",
-              "ONE:TWO",
-              "ONE:THREE",
-              "TWO:ONE",
-              "TWO:TWO",
-              "TWO:THREE",
-              "THREE:ONE",
-              "THREE:TWO",
-              "THREE:THREE");
+              "ONE:TWO:data",
+              "ONE:THREE:data",
+              "TWO:TWO:data",
+              "TWO:THREE:data",
+              "THREE:TWO:data",
+              "THREE:THREE:data",
+              "ONE:TWO:data2",
+              "ONE:THREE:data2",
+              "TWO:TWO:data2",
+              "TWO:THREE:data2",
+              "THREE:TWO:data2",
+              "THREE:THREE:data2");
     }
   }
 

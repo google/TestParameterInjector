@@ -118,6 +118,9 @@ The following examples show most of the supported types. See the `@TestParameter
 @TestParameter boolean b; // Implies {true, false}
 @TestParameter({"1", "2", "3"}) int i;
 @TestParameter({"1", "1.5", "2"}) double d;
+
+// Bytes
+@TestParameter({"!!binary 'ZGF0YQ=='", "some_string"}) byte[] bytes;
 ```
 
 #### Multiple parameters: All combinations are run

@@ -16,6 +16,7 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.protobuf.ByteString;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -82,7 +83,27 @@ public class ParameterValueParsingTest {
     STRING_TO_ENUM(
         /* yamlString= */ "AAA",
         /* javaClass= */ TestEnum.class,
-        /* expectedResult= */ TestEnum.AAA);
+        /* expectedResult= */ TestEnum.AAA),
+
+    STRING_TO_BYTES(
+        /* yamlString= */ "data",
+        /* javaClass= */ byte[].class,
+        /* expectedResult= */ "data".getBytes()),
+
+    BYTES_TO_BYTES(
+        /* yamlString= */ "!!binary 'ZGF0YQ=='",
+        /* javaClass= */ byte[].class,
+        /* expectedResult= */ "data".getBytes()),
+
+    STRING_TO_BYTESTRING(
+        /* yamlString= */ "'data'",
+        /* javaClass= */ ByteString.class,
+        /* expectedResult= */ ByteString.copyFromUtf8("data")),
+
+    BINARY_TO_BYTESTRING(
+        /* yamlString= */ "!!binary 'ZGF0YQ=='",
+        /* javaClass= */ ByteString.class,
+        /* expectedResult= */ ByteString.copyFromUtf8("data"));
 
     final String yamlString;
     final Class<?> javaClass;

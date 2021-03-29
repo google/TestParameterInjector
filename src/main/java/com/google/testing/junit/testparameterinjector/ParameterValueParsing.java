@@ -23,8 +23,10 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.MessageLite;
 import java.lang.reflect.ParameterizedType;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -68,10 +70,10 @@ final class ParameterValueParsing {
       return null;
     }
 
-    YamlValueTransfomer yamlValueTransfomer =
-        new YamlValueTransfomer(parsedYaml, javaType.getRawType());
+    YamlValueTransformer yamlValueTransformer =
+        new YamlValueTransformer(parsedYaml, javaType.getRawType());
 
-    yamlValueTransfomer
+    yamlValueTransformer
         .ifJavaType(String.class)
         .supportParsedType(String.class, identity())
         // Also support other primitives because it's easy to accidentally write e.g. a number when
@@ -81,33 +83,33 @@ final class ParameterValueParsing {
         .supportParsedType(Long.class, Object::toString)
         .supportParsedType(Double.class, Object::toString);
 
-    yamlValueTransfomer.ifJavaType(Boolean.class).supportParsedType(Boolean.class, identity());
+    yamlValueTransformer.ifJavaType(Boolean.class).supportParsedType(Boolean.class, identity());
 
-    yamlValueTransfomer.ifJavaType(Integer.class).supportParsedType(Integer.class, identity());
+    yamlValueTransformer.ifJavaType(Integer.class).supportParsedType(Integer.class, identity());
 
-    yamlValueTransfomer
+    yamlValueTransformer
         .ifJavaType(Long.class)
         .supportParsedType(Long.class, identity())
         .supportParsedType(Integer.class, Integer::longValue);
 
-    yamlValueTransfomer
+    yamlValueTransformer
         .ifJavaType(Float.class)
         .supportParsedType(Float.class, identity())
         .supportParsedType(Double.class, Double::floatValue)
         .supportParsedType(Integer.class, Integer::floatValue);
 
-    yamlValueTransfomer
+    yamlValueTransformer
         .ifJavaType(Double.class)
         .supportParsedType(Double.class, identity())
         .supportParsedType(Integer.class, Integer::doubleValue)
         .supportParsedType(Long.class, Long::doubleValue);
 
-    yamlValueTransfomer
+    yamlValueTransformer
         .ifJavaType(Enum.class)
         .supportParsedType(
             String.class, str -> ParameterValueParsing.parseEnum(str, javaType.getRawType()));
 
-    yamlValueTransfomer
+    yamlValueTransformer
         .ifJavaType(MessageLite.class)
         .supportParsedType(String.class, str -> parseTextprotoMessage(str, javaType.getRawType()))
         .supportParsedType(
@@ -116,8 +118,18 @@ final class ParameterValueParsing {
                 getProtoValueParser()
                     .parseProtobufMessage((Map<String, Object>) map, javaType.getRawType()));
 
+    yamlValueTransformer
+        .ifJavaType(byte[].class)
+        .supportParsedType(byte[].class, identity())
+        .supportParsedType(String.class, s -> s.getBytes(StandardCharsets.UTF_8));
+
+    yamlValueTransformer
+        .ifJavaType(ByteString.class)
+        .supportParsedType(String.class, ByteString::copyFromUtf8)
+        .supportParsedType(byte[].class, ByteString::copyFrom);
+
     // Added mainly for protocol buffer parsing
-    yamlValueTransfomer
+    yamlValueTransformer
         .ifJavaType(List.class)
         .supportParsedType(
             List.class,
@@ -127,7 +139,7 @@ final class ParameterValueParsing {
                     e ->
                         parseYamlObjectToJavaType(
                             e, getGenericParameterType(javaType, /* parameterIndex= */ 0))));
-    yamlValueTransfomer
+    yamlValueTransformer
         .ifJavaType(Map.class)
         .supportParsedType(
             Map.class,
@@ -138,7 +150,7 @@ final class ParameterValueParsing {
                         parseYamlObjectToJavaType(
                             v, getGenericParameterType(javaType, /* parameterIndex= */ 1))));
 
-    return yamlValueTransfomer.transformedJavaValue();
+    return yamlValueTransformer.transformedJavaValue();
   }
 
   private static TypeToken<?> getGenericParameterType(TypeToken<?> typeToken, int parameterIndex) {
@@ -151,12 +163,12 @@ final class ParameterValueParsing {
     return TypeToken.of(parameterizedType.getActualTypeArguments()[parameterIndex]);
   }
 
-  private static final class YamlValueTransfomer {
+  private static final class YamlValueTransformer {
     private final Object parsedYaml;
     private final Class<?> javaType;
     @Nullable private Object transformedJavaValue;
 
-    YamlValueTransfomer(Object parsedYaml, Class<?> javaType) {
+    YamlValueTransformer(Object parsedYaml, Class<?> javaType) {
       this.parsedYaml = parsedYaml;
       this.javaType = javaType;
     }
