@@ -41,7 +41,7 @@ import java.util.Optional;
  * example:
  *
  * <pre>{@code
- * @RunWith(ParameterizedTestRunner.class)
+ * @RunWith(TestParameterInjector.class)
  * public class ColorTest {
  *     @Retention(RUNTIME)
  *     @Target({TYPE, METHOD, FIELD})
@@ -62,7 +62,7 @@ import java.util.Optional;
  * <p>An alternative is to use a method parameter for injection:
  *
  * <pre>{@code
- * @RunWith(ParameterizedTestRunner.class)
+ * @RunWith(TestParameterInjector.class)
  * public class ColorTest {
  *     @Retention(RUNTIME)
  *     @Target({TYPE, METHOD, FIELD})
@@ -84,7 +84,7 @@ import java.util.Optional;
  * same @TestParameterAnnotation annotation.
  *
  * <pre>{@code
- * @RunWith(ParameterizedTestRunner.class)
+ * @RunWith(TestParameterInjector.class)
  * public class ColorTest {
  *     @Retention(RUNTIME)
  *     @Target({TYPE, METHOD, FIELD})
@@ -105,7 +105,7 @@ import java.util.Optional;
  * below:
  *
  * <pre>{@code
- * @RunWith(ParameterizedTestRunner.class)
+ * @RunWith(TestParameterInjector.class)
  * public class ColorTest {
  *     @Retention(RUNTIME)
  *     @Target({TYPE, METHOD, FIELD})
