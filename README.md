@@ -15,6 +15,10 @@ and [JUnitParams](https://github.com/Pragmatists/JUnitParams). We believe
 `TestParameterInjector` is an improvement of those because it is more powerful
 and simpler to use.
 
+[This blogpost](https://opensource.googleblog.com/2021/03/introducing-testparameterinjector.html)
+goes into a bit more detail about how `TestParameterInjector` compares to other
+frameworks used at Google.
+
 ## Getting started
 
 To start using `TestParameterInjector` right away, copy the following snippet:
