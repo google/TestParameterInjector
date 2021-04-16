@@ -40,7 +40,6 @@ import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -842,7 +841,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
     if (origin == Origin.CONSTRUCTOR_PARAMETER) {
       Constructor<?> constructor = getOnlyConstructor(testClass);
       List<AnnotationWithMetadata> annotations =
-          getAnnotationWithMetadataListWithType(constructor.getParameters(), annotationType);
+          getAnnotationWithMetadataListWithType(ParameterWrapper.get(constructor), annotationType);
 
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
@@ -856,7 +855,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
 
     } else if (origin == Origin.METHOD_PARAMETER) {
       List<AnnotationWithMetadata> annotations =
-          getAnnotationWithMetadataListWithType(method.getParameters(), annotationType);
+          getAnnotationWithMetadataListWithType(ParameterWrapper.get(method), annotationType);
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
       }
@@ -899,13 +898,8 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
         .collect(toImmutableList());
   }
 
-  // Parameter is not available on old Android SDKs, and isn't desugared. Many (most?) Android tests
-  // will run against a more recent Java SDK, so this will work fine. If it proves problematic for
-  // users trying to run, say, emulator tests, it would be possible to just not provide parameter
-  // names on Android.
-  @SuppressWarnings("AndroidJdkLibsChecker")
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Parameter[] parameters, Class<? extends Annotation> annotationType) {
+      ParameterWrapper[] parameters, Class<? extends Annotation> annotationType) {
     return stream(parameters)
         .map(
             parameter -> {
