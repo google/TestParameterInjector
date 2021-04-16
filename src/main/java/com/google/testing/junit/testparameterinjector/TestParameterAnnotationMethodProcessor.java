@@ -14,6 +14,7 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -40,6 +41,7 @@ import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -841,7 +843,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
     if (origin == Origin.CONSTRUCTOR_PARAMETER) {
       Constructor<?> constructor = getOnlyConstructor(testClass);
       List<AnnotationWithMetadata> annotations =
-          getAnnotationWithMetadataListWithType(ParameterWrapper.get(constructor), annotationType);
+          getAnnotationWithMetadataListWithType(constructor, annotationType);
 
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
@@ -855,7 +857,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
 
     } else if (origin == Origin.METHOD_PARAMETER) {
       List<AnnotationWithMetadata> annotations =
-          getAnnotationWithMetadataListWithType(ParameterWrapper.get(method), annotationType);
+          getAnnotationWithMetadataListWithType(method, annotationType);
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
       }
@@ -899,7 +901,31 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
   }
 
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      ParameterWrapper[] parameters, Class<? extends Annotation> annotationType) {
+      Method callable, Class<? extends Annotation> annotationType) {
+    try {
+      return getAnnotationWithMetadataListWithType(callable.getParameters(), annotationType);
+    } catch (NoSuchMethodError ignored) {
+      return getAnnotationWithMetadataListWithType(
+          callable.getParameterTypes(), callable.getParameterAnnotations(), annotationType);
+    }
+  }
+
+  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
+      Constructor<?> callable, Class<? extends Annotation> annotationType) {
+    try {
+      return getAnnotationWithMetadataListWithType(callable.getParameters(), annotationType);
+    } catch (NoSuchMethodError ignored) {
+      return getAnnotationWithMetadataListWithType(
+          callable.getParameterTypes(), callable.getParameterAnnotations(), annotationType);
+    }
+  }
+
+  // Parameter is not available on old Android SDKs, and isn't desugared. That's why this method
+  // has a fallback that takes the parameter types and annotations (without the parameter names,
+  // which are optional anyway).
+  @SuppressWarnings("AndroidJdkLibsChecker")
+  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
+      Parameter[] parameters, Class<? extends Annotation> annotationType) {
     return stream(parameters)
         .map(
             parameter -> {
@@ -910,10 +936,30 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
                       annotation, parameter.getType(), parameter.getName());
             })
         .filter(Objects::nonNull)
-        .filter(
-            annotationWithMetadata ->
-                annotationWithMetadata.annotation().annotationType().equals(annotationType))
         .collect(toImmutableList());
+  }
+
+  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
+      Class<?>[] parameterTypes,
+      Annotation[][] annotations,
+      Class<? extends Annotation> annotationType) {
+    checkArgument(parameterTypes.length == annotations.length);
+
+    ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
+    for (int i = 0; i < annotations.length; i++) {
+      Class<?> parameterType = parameterTypes[i];
+      // Per j.l.r.Parameter.getName(), "argN" is the synthetic name format used when a class
+      //  file does not actually contain parameter name information.
+      String parameterName = "arg" + i;
+
+      for (Annotation annotation : annotations[i]) {
+        if (annotation.annotationType().equals(annotationType)) {
+          resultBuilder.add(
+              AnnotationWithMetadata.withMetadata(annotation, parameterType, parameterName));
+        }
+      }
+    }
+    return resultBuilder.build();
   }
 
   private ImmutableList<Annotation> getAnnotationListWithType(
