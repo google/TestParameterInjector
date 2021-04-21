@@ -247,6 +247,11 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
           annotation, Optional.of(paramClass), Optional.of(paramName));
     }
 
+    public static AnnotationWithMetadata withMetadata(Annotation annotation, Class<?> paramClass) {
+      return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
+          annotation, Optional.of(paramClass), Optional.absent());
+    }
+
     public static AnnotationWithMetadata withoutMetadata(Annotation annotation) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
           annotation, Optional.absent(), Optional.absent());
@@ -932,8 +937,10 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
               Annotation annotation = parameter.getAnnotation(annotationType);
               return annotation == null
                   ? null
-                  : AnnotationWithMetadata.withMetadata(
-                      annotation, parameter.getType(), parameter.getName());
+                  : parameter.isNamePresent()
+                      ? AnnotationWithMetadata.withMetadata(
+                          annotation, parameter.getType(), parameter.getName())
+                      : AnnotationWithMetadata.withMetadata(annotation, parameter.getType());
             })
         .filter(Objects::nonNull)
         .collect(toImmutableList());
@@ -947,15 +954,9 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
 
     ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
     for (int i = 0; i < annotations.length; i++) {
-      Class<?> parameterType = parameterTypes[i];
-      // Per j.l.r.Parameter.getName(), "argN" is the synthetic name format used when a class
-      //  file does not actually contain parameter name information.
-      String parameterName = "arg" + i;
-
       for (Annotation annotation : annotations[i]) {
         if (annotation.annotationType().equals(annotationType)) {
-          resultBuilder.add(
-              AnnotationWithMetadata.withMetadata(annotation, parameterType, parameterName));
+          resultBuilder.add(AnnotationWithMetadata.withMetadata(annotation, parameterTypes[i]));
         }
       }
     }
