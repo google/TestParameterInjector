@@ -180,9 +180,9 @@ public @interface TestParameter {
 
     private static Object parseStringValue(String value, Class<?> parameterClass) {
       if (parameterClass.equals(String.class)) {
-        return value;
+        return value.equals("null") ? null : value;
       } else if (Enum.class.isAssignableFrom(parameterClass)) {
-        return ParameterValueParsing.parseEnum(value, parameterClass);
+        return value.equals("null") ? null : ParameterValueParsing.parseEnum(value, parameterClass);
       } else if (MessageLite.class.isAssignableFrom(parameterClass)) {
         if (ParameterValueParsing.isValidYamlString(value)) {
           return ParameterValueParsing.parseYamlStringToJavaType(value, parameterClass);
