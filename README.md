@@ -127,6 +127,8 @@ The following examples show most of the supported types. See the `@TestParameter
 @TestParameter({"!!binary 'ZGF0YQ=='", "some_string"}) byte[] bytes;
 ```
 
+For non-primitive types (e.g. String, enums, bytes), `"null"` is always parsed as the `null` reference.
+
 #### Multiple parameters: All combinations are run
 
 If there are multiple `@TestParameter`-annotated values applicable to one test
