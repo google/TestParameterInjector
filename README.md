@@ -1,7 +1,7 @@
 TestParameterInjector
 =====================
 
-[Javadoc](https://google.github.io/TestParameterInjector/docs/latest/)
+[Link to Javadoc.](https://google.github.io/TestParameterInjector/docs/latest/)
 
 ## Introduction
 
