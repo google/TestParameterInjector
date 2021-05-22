@@ -1,6 +1,8 @@
 TestParameterInjector
 =====================
 
+[Javadoc](https://google.github.io/TestParameterInjector/docs/latest/)
+
 ## Introduction
 
 `TestParameterInjector` is a JUnit4 test runner that runs its test methods for
