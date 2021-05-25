@@ -174,7 +174,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
           .provideValues(
               annotation,
               java.util.Optional.ofNullable(annotationWithMetadata.paramClass().orNull()));
-    } catch (Exception e) {
+    } catch (ReflectiveOperationException e) {
       throw new RuntimeException(
           "Unexpected exception while invoking value provider " + valueProvider, e);
     }

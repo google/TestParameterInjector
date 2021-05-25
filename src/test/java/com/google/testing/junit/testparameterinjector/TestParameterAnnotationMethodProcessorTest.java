@@ -21,6 +21,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 import com.google.common.collect.ImmutableList;
+import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.util.ArrayList;
@@ -774,6 +775,21 @@ public class TestParameterAnnotationMethodProcessorTest {
     @AfterClass
     public static void completedAllParameterizedTests() {
       assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO);
+    }
+  }
+
+  @ClassTestResult(Result.FAILURE)
+  public static class ErrorNonStaticProviderClass {
+
+    @Test
+    public void test(@TestParameter(valuesProvider = NonStaticProvider.class) int i) {}
+
+    @SuppressWarnings("ClassCanBeStatic")
+    class NonStaticProvider implements TestParameterValuesProvider {
+      @Override
+      public List<?> provideValues() {
+        return ImmutableList.of();
+      }
     }
   }
 

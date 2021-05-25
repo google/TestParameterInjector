@@ -29,6 +29,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -201,6 +202,20 @@ public @interface TestParameter {
             valuesProvider.getDeclaredConstructor();
         constructor.setAccessible(true);
         return new ArrayList<>(constructor.newInstance().provideValues());
+      } catch (NoSuchMethodException e) {
+        if (!Modifier.isStatic(valuesProvider.getModifiers()) && valuesProvider.isMemberClass()) {
+          throw new IllegalStateException(
+              String.format(
+                  "Could not find a no-arg constructor for %s, probably because it is a not-static"
+                      + " inner class. You can fix this by making %s static.",
+                  valuesProvider.getSimpleName(), valuesProvider.getSimpleName()),
+              e);
+        } else {
+          throw new IllegalStateException(
+              String.format(
+                  "Could not find a no-arg constructor for %s.", valuesProvider.getSimpleName()),
+              e);
+        }
       } catch (ReflectiveOperationException e) {
         throw new IllegalStateException(e);
       }

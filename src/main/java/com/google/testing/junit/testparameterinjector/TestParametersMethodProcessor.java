@@ -35,6 +35,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.util.List;
 import java.util.Map;
@@ -331,6 +332,20 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
       return constructor.newInstance().provideValues().stream()
           .peek(values -> validateThatValuesMatchParameters(values, parameters))
           .collect(toImmutableList());
+    } catch (NoSuchMethodException e) {
+      if (!Modifier.isStatic(valuesProvider.getModifiers()) && valuesProvider.isMemberClass()) {
+        throw new IllegalStateException(
+            String.format(
+                "Could not find a no-arg constructor for %s, probably because it is a not-static"
+                    + " inner class. You can fix this by making %s static.",
+                valuesProvider.getSimpleName(), valuesProvider.getSimpleName()),
+            e);
+      } else {
+        throw new IllegalStateException(
+            String.format(
+                "Could not find a no-arg constructor for %s.", valuesProvider.getSimpleName()),
+            e);
+      }
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException(e);
     }
