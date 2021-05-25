@@ -472,6 +472,14 @@ public class TestParameterAnnotationMethodProcessorTest {
     public void testInBase(@TestParameter({"ONE", "TWO"}) TestEnum enumInBase) {
       allTestNames.add(testName.getMethodName());
     }
+
+    @Test
+    public abstract void abstractTestInBase();
+
+    @Test
+    public void overridableTestInBase() {
+      throw new UnsupportedOperationException("Expected the base class to override this");
+    }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
@@ -481,6 +489,16 @@ public class TestParameterAnnotationMethodProcessorTest {
 
     @Test
     public void testInChild(@TestParameter({"TWO", "THREE"}) TestEnum enumInChild) {
+      allTestNames.add(testName.getMethodName());
+    }
+
+    @Override
+    public void abstractTestInBase() {
+      allTestNames.add(testName.getMethodName());
+    }
+
+    @Override
+    public void overridableTestInBase() {
       allTestNames.add(testName.getMethodName());
     }
 
@@ -503,7 +521,15 @@ public class TestParameterAnnotationMethodProcessorTest {
               "testInChild[boolInChild=true,boolInBase=false,TWO]",
               "testInChild[boolInChild=true,boolInBase=false,THREE]",
               "testInChild[boolInChild=true,boolInBase=true,TWO]",
-              "testInChild[boolInChild=true,boolInBase=true,THREE]");
+              "testInChild[boolInChild=true,boolInBase=true,THREE]",
+              "abstractTestInBase[boolInChild=false,boolInBase=false]",
+              "abstractTestInBase[boolInChild=false,boolInBase=true]",
+              "abstractTestInBase[boolInChild=true,boolInBase=false]",
+              "abstractTestInBase[boolInChild=true,boolInBase=true]",
+              "overridableTestInBase[boolInChild=false,boolInBase=false]",
+              "overridableTestInBase[boolInChild=false,boolInBase=true]",
+              "overridableTestInBase[boolInChild=true,boolInBase=false]",
+              "overridableTestInBase[boolInChild=true,boolInBase=true]");
     }
   }
 

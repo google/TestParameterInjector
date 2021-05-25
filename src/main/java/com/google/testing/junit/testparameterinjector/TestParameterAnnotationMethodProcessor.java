@@ -647,8 +647,8 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
                   .addAll(originalTest.getAnnotations())
                   .add(
                       TestIndexHolderFactory.create(
-                          /* methodIndex= */ ImmutableList.copyOf(testClass.getMethods())
-                              .indexOf(originalTest.getMethod()),
+                          /* methodIndex= */ strictIndexOf(
+                              getMethodsIncludingParents(testClass), originalTest.getMethod()),
                           parametersIndex,
                           testClass.getName()))
                   .build()));
@@ -740,7 +740,8 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
             + " class that this runner is handling (%s)",
         testIndexHolder.testClassName(),
         testClass.getName());
-    Method testMethod = testClass.getJavaClass().getMethods()[testIndexHolder.methodIndex()];
+    Method testMethod =
+        getMethodsIncludingParents(testClass.getJavaClass()).get(testIndexHolder.methodIndex());
     return getParameterValuesForMethod(testMethod).get(testIndexHolder.parametersIndex());
   }
 
@@ -1209,7 +1210,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
   @Retention(RUNTIME)
   @interface TestIndexHolder {
 
-    /** The index of the test method in the {@code testClass.getMethods()} */
+    /** The index of the test method in {@code getMethodsIncludingParents(testClass)} */
     int methodIndex();
 
     /**
@@ -1360,6 +1361,21 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
                 testClass.isAnnotationPresent(annotationType)
                     || methodOrConstructor.isAnnotationPresent(annotationType))
         .collect(toImmutableList());
+  }
+
+  private <T> int strictIndexOf(List<T> haystack, T needle) {
+    int index = haystack.indexOf(needle);
+    checkArgument(index >= 0, "Could not find '%s' in %s", needle, haystack);
+    return index;
+  }
+
+  private ImmutableList<Method> getMethodsIncludingParents(Class<?> clazz) {
+    ImmutableList.Builder<Method> resultBuilder = ImmutableList.builder();
+    while (clazz != null) {
+      resultBuilder.add(clazz.getMethods());
+      clazz = clazz.getSuperclass();
+    }
+    return resultBuilder.build();
   }
 
   private static Stream<Class<?>> streamWithParents(Class<?> clazz) {

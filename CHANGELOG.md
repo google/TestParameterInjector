@@ -1,3 +1,8 @@
+## 1.4
+
+- Bugfix: Run test methods declared in a base class (instead of throwing an
+  exception)
+
 ## 1.3
 
 - Treat 'null' as a magic string that results in a null value
