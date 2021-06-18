@@ -15,6 +15,7 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.junit.Assert.assertThrows;
@@ -299,6 +300,48 @@ public class TestParameterAnnotationMethodProcessorTest {
     @AfterClass
     public static void completedAllParameterizedTests() {
       assertThat(allTestNames).containsExactly("test1[1]", "test1[2]");
+    }
+  }
+
+  @ClassTestResult(Result.SUCCESS_ALWAYS)
+  public static class DuplicateTestNames {
+
+    @Rule public TestName testName = new TestName();
+
+    private static List<String> allTestNames;
+    private static List<Object> allTestParameterValues;
+
+    @BeforeClass
+    public static void resetStaticState() {
+      allTestNames = new ArrayList<>();
+      allTestParameterValues = new ArrayList<>();
+    }
+
+    @Test
+    public void test1(@TestParameter({"ABC", "ABC"}) String testString) {
+      allTestNames.add(testName.getMethodName());
+      allTestParameterValues.add(testString);
+    }
+
+    private static final class Test2Provider implements TestParameterValuesProvider {
+      @Override
+      public List<Object> provideValues() {
+        return newArrayList(123, "123", "null", null);
+      }
+    }
+
+    @Test
+    public void test2(@TestParameter(valuesProvider = Test2Provider.class) Object testObject) {
+      allTestNames.add(testName.getMethodName());
+      allTestParameterValues.add(testObject);
+    }
+
+    @AfterClass
+    public static void completedAllParameterizedTests() {
+      assertThat(allTestNames)
+          .containsExactly(
+              "test1[ABC]", "test1[ABC]", "test2[123]", "test2[123]", "test2[null]", "test2[null]");
+      assertThat(allTestParameterValues).containsExactly("ABC", "ABC", 123, "123", "null", null);
     }
   }
 
