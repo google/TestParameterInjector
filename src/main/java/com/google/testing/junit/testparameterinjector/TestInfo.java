@@ -14,6 +14,7 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 import com.google.auto.value.AutoValue;
@@ -41,6 +42,8 @@ abstract class TestInfo {
 
   public abstract String getName();
 
+  abstract ImmutableList<String> getParameterNames();
+
   public abstract ImmutableList<Annotation> getAnnotations();
 
   @Nullable
@@ -53,12 +56,40 @@ abstract class TestInfo {
     return null;
   }
 
-  private TestInfo withName(String otherName) {
-    return TestInfo.create(getMethod(), otherName, getAnnotations());
+  TestInfo withExtraParameters(List<String> parameterNames) {
+    ImmutableList<String> newParameterNames =
+        ImmutableList.<String>builder()
+            .addAll(this.getParameterNames())
+            .addAll(parameterNames)
+            .build();
+    return new AutoValue_TestInfo(
+        getMethod(),
+        TestInfo.getDefaultName(getMethod(), newParameterNames),
+        newParameterNames,
+        getAnnotations());
   }
 
-  public static TestInfo create(Method method, String name, List<Annotation> annotations) {
-    return new AutoValue_TestInfo(method, name, ImmutableList.copyOf(annotations));
+  TestInfo withExtraAnnotation(Annotation annotation) {
+    ImmutableList<Annotation> newAnnotations =
+        ImmutableList.<Annotation>builder().addAll(this.getAnnotations()).add(annotation).build();
+    return new AutoValue_TestInfo(getMethod(), getName(), getParameterNames(), newAnnotations);
+  }
+
+  private TestInfo withName(String otherName) {
+    return new AutoValue_TestInfo(getMethod(), otherName, getParameterNames(), getAnnotations());
+  }
+
+  public static TestInfo legacyCreate(Method method, String name, List<Annotation> annotations) {
+    return new AutoValue_TestInfo(
+        method, name, /* parameterNames= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
+  }
+
+  static TestInfo createWithoutParameters(Method method, List<Annotation> annotations) {
+    return new AutoValue_TestInfo(
+        method,
+        getDefaultName(method, /* parameterNames= */ ImmutableList.of()),
+        /* parameterNames= */ ImmutableList.of(),
+        ImmutableList.copyOf(annotations));
   }
 
   static ImmutableList<TestInfo> shortenNamesIfNecessary(
@@ -70,6 +101,15 @@ abstract class TestInfo {
               .collect(toList()));
     } else {
       return ImmutableList.copyOf(testInfos);
+    }
+  }
+
+  private static String getDefaultName(Method testMethod, List<String> parameterNames) {
+    if (parameterNames.isEmpty()) {
+      return testMethod.getName();
+    } else {
+      return String.format(
+          "%s[%s]", testMethod.getName(), parameterNames.stream().collect(joining(",")));
     }
   }
 }

@@ -19,7 +19,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Arrays.stream;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toSet;
 
@@ -109,6 +108,29 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
      * annotating a method, constructor or class, {@code paramName} is an absent optional.
      */
     abstract Optional<String> paramName();
+
+    /**
+     * Returns a String that represents this value and is fit for use in a test name (between
+     * brackets).
+     */
+    String toTestNameString() {
+      Class<? extends Annotation> annotationType = annotationTypeOrigin().annotationType();
+      String namePattern = annotationType.getAnnotation(TestParameterAnnotation.class).name();
+
+      if (paramName().isPresent()
+          && paramClass().isPresent()
+          && namePattern.equals("{0}")
+          && Primitives.unwrap(paramClass().get()).isPrimitive()) {
+        // If no custom name pattern was set and this parameter is a primitive (e.g.
+        // boolean
+        // or integer), prefix the parameter value with its field name. This is to avoid
+        // test names such as myMethod_success[true,false,2]. Instead, it'll be
+        // myMethod_success[dryRun=true,experimentFlag=false,retries=2].
+        return String.format("%s=%s", paramName().get(), value()).trim().replaceAll("\\s+", " ");
+      } else {
+        return MessageFormat.format(namePattern, value()).trim().replaceAll("\\s+", " ");
+      }
+    }
 
     public static ImmutableList<TestParameterValue> create(
         AnnotationWithMetadata annotationWithMetadata, Origin origin) {
@@ -638,20 +660,18 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
         parametersIndex < parameterValuesForMethod.size();
         ++parametersIndex) {
       List<TestParameterValue> testParameterValues = parameterValuesForMethod.get(parametersIndex);
-      String testNameSuffix = getTestNameSuffix(testParameterValues);
       testInfos.add(
-          TestInfo.create(
-              originalTest.getMethod(),
-              appendParametersToTestName(originalTest.getName(), testNameSuffix),
-              ImmutableList.<Annotation>builder()
-                  .addAll(originalTest.getAnnotations())
-                  .add(
-                      TestIndexHolderFactory.create(
-                          /* methodIndex= */ strictIndexOf(
-                              getMethodsIncludingParents(testClass), originalTest.getMethod()),
-                          parametersIndex,
-                          testClass.getName()))
-                  .build()));
+          originalTest
+              .withExtraParameters(
+                  testParameterValues.stream()
+                      .map(TestParameterValue::toTestNameString)
+                      .collect(toImmutableList()))
+              .withExtraAnnotation(
+                  TestIndexHolderFactory.create(
+                      /* methodIndex= */ strictIndexOf(
+                          getMethodsIncludingParents(testClass), originalTest.getMethod()),
+                      parametersIndex,
+                      testClass.getName())));
     }
 
     return TestInfo.shortenNamesIfNecessary(
@@ -661,36 +681,6 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
                 originalTest.getName(),
                 String.valueOf(
                     testInfo.getAnnotation(TestIndexHolder.class).parametersIndex() + 1)));
-  }
-
-  /**
-   * Returns the suffix of the test given the {@code testParameterValues} that will be appended to
-   * the test name inside bracket, e.g. "testname[suffix]".
-   */
-  private static String getTestNameSuffix(List<TestParameterValue> testParameterValues) {
-    return testParameterValues.stream()
-        .map(
-            value -> {
-              Class<? extends Annotation> annotationType =
-                  value.annotationTypeOrigin().annotationType();
-              String namePattern =
-                  annotationType.getAnnotation(TestParameterAnnotation.class).name();
-              if (value.paramName().isPresent()
-                  && value.paramClass().isPresent()
-                  && namePattern.equals("{0}")
-                  && Primitives.unwrap(value.paramClass().get()).isPrimitive()) {
-                // If no custom name pattern was set and this parameter is a primitive (e.g.
-                // boolean
-                // or integer), prefix the parameter value with its field name. This is to avoid
-                // test names such as myMethod_success[true,false,2]. Instead, it'll be
-                // myMethod_success[dryRun=true,experimentFlag=false,retries=2].
-                return String.format("%s=%s", value.paramName().get(), value.value());
-              } else {
-                return MessageFormat.format(namePattern, value.value());
-              }
-            })
-        .map(string -> string.trim().replaceAll("\\s+", " "))
-        .collect(joining(","));
   }
 
   /**

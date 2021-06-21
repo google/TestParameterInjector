@@ -169,7 +169,7 @@ public @interface TestParameters {
        * name of the resulting test will be "personIsAdult[teenager]".
        */
       public Builder name(String name) {
-        this.name = name;
+        this.name = name.replaceAll("\\s+", " ");
         return this;
       }
 

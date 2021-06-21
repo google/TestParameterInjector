@@ -30,7 +30,6 @@ import com.google.common.reflect.TypeToken;
 import com.google.testing.junit.testparameterinjector.TestParameters.DefaultTestParametersValuesProvider;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
-import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
@@ -39,8 +38,10 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.runner.Description;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.Statement;
@@ -135,15 +136,15 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
         Optional<TestParametersValues> methodParameters =
             methodParametersList.get(methodParametersIndex);
         testInfos.add(
-            TestInfo.create(
-                originalTest.getMethod(),
-                getTestName(originalTest, constructorParameters, methodParameters),
-                new ImmutableList.Builder<Annotation>()
-                    .addAll(originalTest.getAnnotations())
-                    .add(
-                        TestIndexHolderFactory.create(
-                            constructorParametersIndex, methodParametersIndex))
-                    .build()));
+            originalTest
+                .withExtraParameters(
+                    Stream.of(constructorParameters.orNull(), methodParameters.orNull())
+                        .filter(Objects::nonNull)
+                        .map(TestParametersValues::name)
+                        .collect(toImmutableList()))
+                .withExtraAnnotation(
+                    TestIndexHolderFactory.create(
+                        constructorParametersIndex, methodParametersIndex)));
       }
     }
     return TestInfo.shortenNamesIfNecessary(
@@ -176,21 +177,6 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
     return method.isAnnotationPresent(TestParameters.class)
         ? getMethodParameters(method).stream().map(Optional::of).collect(toImmutableList())
         : ImmutableList.of(Optional.absent());
-  }
-
-  private static String getTestName(
-      TestInfo originalTest,
-      Optional<TestParametersValues> constructorParameters,
-      Optional<TestParametersValues> methodParameters) {
-    return maybeAppendParametersToTestName(
-        maybeAppendParametersToTestName(originalTest.getName(), constructorParameters),
-        methodParameters);
-  }
-
-  private static String maybeAppendParametersToTestName(
-      String originalTestName, Optional<TestParametersValues> parameters) {
-    return maybeAppendToTestName(
-        originalTestName, parameters.transform(p -> p.name().replaceAll("\\s+", " ")));
   }
 
   private static String maybeAppendToTestName(

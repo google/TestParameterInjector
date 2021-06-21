@@ -205,29 +205,25 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   private ImmutableList<FrameworkMethod> processMethod(FrameworkMethod initialMethod) {
-    ImmutableList<FrameworkMethod> methods = ImmutableList.of(initialMethod);
-    for (final TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
-      methods =
-          methods.stream()
-              .flatMap(
-                  method -> {
-                    TestInfo originalTest =
-                        TestInfo.create(
-                            method.getMethod(),
-                            method.getName(),
-                            ImmutableList.copyOf(method.getAnnotations()));
-                    List<TestInfo> processedTests =
-                        testMethodProcessor.processTest(
-                            getTestClass().getJavaClass(), originalTest);
+    ImmutableList<TestInfo> testInfos =
+        ImmutableList.of(
+            TestInfo.createWithoutParameters(
+                initialMethod.getMethod(), ImmutableList.copyOf(initialMethod.getAnnotations())));
 
-                    return processedTests.stream()
-                        .map(
-                            processedTest ->
-                                new OverriddenFrameworkMethod(method.getMethod(), processedTest));
-                  })
+    for (final TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
+      testInfos =
+          testInfos.stream()
+              .flatMap(
+                  lastTestInfo ->
+                      testMethodProcessor
+                          .processTest(getTestClass().getJavaClass(), lastTestInfo)
+                          .stream())
               .collect(toImmutableList());
     }
-    return methods;
+
+    return testInfos.stream()
+        .map(testInfo -> new OverriddenFrameworkMethod(testInfo.getMethod(), testInfo))
+        .collect(toImmutableList());
   }
 
   // Note: This is a copy of the parent implementation, except that instead of calling

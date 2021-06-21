@@ -20,7 +20,6 @@ import com.google.auto.value.AutoAnnotation;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
@@ -137,12 +136,11 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
           parametersForOneTest = new Object[] {parameters};
         }
         String namePattern = testNamePattern.get().replace("{index}", Integer.toString(testIndex));
-        String testName = MessageFormat.format(namePattern, parametersForOneTest);
+        String testParametersString = MessageFormat.format(namePattern, parametersForOneTest);
         tests.add(
-            TestInfo.create(
-                originalTest.getMethod(),
-                originalTest.getName() + "[" + testName + "]",
-                updateAnnotationList(originalTest, testIndex)));
+            originalTest
+                .withExtraParameters(ImmutableList.of(testParametersString))
+                .withExtraAnnotation(TestIndexHolderFactory.create(testIndex)));
         testIndex++;
       }
       return tests.build();
@@ -178,19 +176,6 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
       Object testObject,
       Optional<Statement> statement) {
     return statement;
-  }
-
-  /**
-   * Stores into the annotation list of a test method the {@code testIndex} required to identify
-   * which parameter should be used for this test instance.
-   */
-  private ImmutableList<Annotation> updateAnnotationList(
-      TestInfo originalTest, final int testIndex) {
-    Annotation parameterHolder = TestIndexHolderFactory.create(testIndex);
-    return new ImmutableList.Builder<Annotation>()
-        .addAll(originalTest.getAnnotations())
-        .add(parameterHolder)
-        .build();
   }
 
   /**
