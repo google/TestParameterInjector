@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
@@ -53,6 +54,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.junit.runner.Description;
@@ -89,6 +91,9 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
      */
     @Nullable
     abstract Object value();
+
+    /** The index of this value in {@link #specifiedValues()}. */
+    abstract int valueIndex();
 
     /**
      * The list of values specified by the @TestParameterAnnotation annotated annotation's {@code
@@ -139,13 +144,14 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
           !specifiedValues.isEmpty(),
           "The number of parameter values should not be 0"
               + ", otherwise the parameter would cause the test to be skipped.");
-      return specifiedValues.stream()
-          .map(
-              value ->
+      return IntStream.range(0, specifiedValues.size())
+          .mapToObj(
+              valueIndex ->
                   new AutoValue_TestParameterAnnotationMethodProcessor_TestParameterValue(
                       AnnotationTypeOrigin.create(
                           annotationWithMetadata.annotation().annotationType(), origin),
-                      value,
+                      specifiedValues.get(valueIndex),
+                      valueIndex,
                       new ArrayList<>(specifiedValues),
                       annotationWithMetadata.paramClass(),
                       annotationWithMetadata.paramName()))
@@ -664,7 +670,10 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
           originalTest
               .withExtraParameters(
                   testParameterValues.stream()
-                      .map(TestParameterValue::toTestNameString)
+                      .map(
+                          param ->
+                              TestInfoParameter.create(
+                                  param.toTestNameString(), param.value(), param.valueIndex()))
                       .collect(toImmutableList()))
               .withExtraAnnotation(
                   TestIndexHolderFactory.create(
@@ -674,26 +683,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
                       testClass.getName())));
     }
 
-    return TestInfo.shortenNamesIfNecessary(
-        testInfos.build(),
-        testInfo ->
-            appendParametersToTestName(
-                originalTest.getName(),
-                String.valueOf(
-                    testInfo.getAnnotation(TestIndexHolder.class).parametersIndex() + 1)));
-  }
-
-  /**
-   * Appends the given suffix to the given test name in brackets. If the original test name already
-   * has brackets, the suffix is inserted in the existing brackets instead.
-   */
-  private static String appendParametersToTestName(String originalTestName, String testNameSuffix) {
-    if (originalTestName.endsWith("]")) {
-      return String.format(
-          "%s,%s]", originalTestName.substring(0, originalTestName.length() - 1), testNameSuffix);
-    } else {
-      return String.format("%s[%s]", originalTestName, testNameSuffix);
-    }
+    return testInfos.build();
   }
 
   private List<List<TestParameterValue>> getParameterValuesForMethod(Method method) {

@@ -114,20 +114,21 @@ public class TestParametersMethodProcessorTest {
               "TWO,22,true,DEF",
               "test[{testEnum: null, testLong: 33, testBoolean: false, testString: null}]",
               "null,33,false,null",
-              "test2_withLongNames[1]",
+              "test2_withLongNames[1.{testString: ABC}]",
               "ABC",
-              "test2_withLongNames[2]",
+              "test2_withLongNames[2.{testString: 'This is a very long string (240 characters)"
+                  + " that would normally cause Sponge+Tin...]",
               "This is a very long string (240 characters) that would normally cause Sponge+Tin to"
                   + " exceed the filename limit of 255 characters."
                   + " ================================================================================="
                   + "==============",
-              "test3_withRepeatedParams[{testEnums: [ONE, TWO, THREE], testLongs: [11, 4],"
-                  + " testBooleans: [false, true], testStrings: [ABC, '123']}]",
+              "test3_withRepeatedParams[1.{testEnums: [ONE, TWO, THREE], testLongs: [11, 4],"
+                  + " testBooleans: [false, true], testStrings: [...]",
               "[ONE, TWO, THREE],[11, 4],[false, true],[ABC, 123]",
-              "test3_withRepeatedParams[{testEnums: [TWO], testLongs: [22], testBooleans: [true],"
+              "test3_withRepeatedParams[2.{testEnums: [TWO], testLongs: [22], testBooleans: [true],"
                   + " testStrings: ['DEF']}]",
               "[TWO],[22],[true],[DEF]",
-              "test3_withRepeatedParams[{testEnums: [], testLongs: [], testBooleans: [],"
+              "test3_withRepeatedParams[3.{testEnums: [], testLongs: [], testBooleans: [],"
                   + " testStrings: []}]",
               "[],[],[],[]");
     }
@@ -372,10 +373,12 @@ public class TestParametersMethodProcessorTest {
               "test2[{testEnum: ONE},{testString: DEF}]",
               "test2[{testEnum: TWO},{testString: ABC}]",
               "test2[{testEnum: TWO},{testString: DEF}]",
-              "test3_withLongNames[1,1]",
-              "test3_withLongNames[1,2]",
-              "test3_withLongNames[2,1]",
-              "test3_withLongNames[2,2]");
+              "test3_withLongNames[{testEnum: ONE},1.{testString: ABC}]",
+              "test3_withLongNames[{testEnum: ONE},2.{testString: 'This is a very long string"
+                  + " (240 characters) that would normally caus...]",
+              "test3_withLongNames[{testEnum: TWO},1.{testString: ABC}]",
+              "test3_withLongNames[{testEnum: TWO},2.{testString: 'This is a very long string"
+                  + " (240 characters) that would normally caus...]");
 
       assertThat(testNamesThatInvokedBefore).containsExactlyElementsIn(allTestNames).inOrder();
       assertThat(testNamesThatInvokedAfter).containsExactlyElementsIn(allTestNames).inOrder();

@@ -20,6 +20,7 @@ import com.google.auto.value.AutoAnnotation;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
@@ -139,7 +140,10 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
         String testParametersString = MessageFormat.format(namePattern, parametersForOneTest);
         tests.add(
             originalTest
-                .withExtraParameters(ImmutableList.of(testParametersString))
+                .withExtraParameters(
+                    ImmutableList.of(
+                        TestInfoParameter.create(
+                            testParametersString, parametersForOneTest, testIndex)))
                 .withExtraAnnotation(TestIndexHolderFactory.create(testIndex)));
         testIndex++;
       }

@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
+import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import com.google.testing.junit.testparameterinjector.TestParameters.DefaultTestParametersValuesProvider;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
@@ -135,34 +136,39 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
           ++methodParametersIndex) {
         Optional<TestParametersValues> methodParameters =
             methodParametersList.get(methodParametersIndex);
+
+        // Making final copies of non-final integers for use in lambda
+        int constructorParametersIndexCopy = constructorParametersIndex;
+        int methodParametersIndexCopy = methodParametersIndex;
+
         testInfos.add(
             originalTest
                 .withExtraParameters(
-                    Stream.of(constructorParameters.orNull(), methodParameters.orNull())
+                    Stream.of(
+                            constructorParameters
+                                .transform(
+                                    param ->
+                                        TestInfoParameter.create(
+                                            param.name(),
+                                            param.parametersMap(),
+                                            constructorParametersIndexCopy))
+                                .orNull(),
+                            methodParameters
+                                .transform(
+                                    param ->
+                                        TestInfoParameter.create(
+                                            param.name(),
+                                            param.parametersMap(),
+                                            methodParametersIndexCopy))
+                                .orNull())
                         .filter(Objects::nonNull)
-                        .map(TestParametersValues::name)
                         .collect(toImmutableList()))
                 .withExtraAnnotation(
                     TestIndexHolderFactory.create(
                         constructorParametersIndex, methodParametersIndex)));
       }
     }
-    return TestInfo.shortenNamesIfNecessary(
-        testInfos.build(),
-        testInfo -> {
-          TestIndexHolder annotation = testInfo.getAnnotation(TestIndexHolder.class);
-          return maybeAppendToTestName(
-              maybeAppendToTestName(
-                  originalTest.getName(),
-                  maybeParameterIndexString(
-                      annotation.constructorParametersIndex(), constructorParametersList)),
-              maybeParameterIndexString(annotation.methodParametersIndex(), methodParametersList));
-        });
-  }
-
-  private static Optional<String> maybeParameterIndexString(
-      int index, ImmutableList<Optional<TestParametersValues>> parameterList) {
-    return parameterList.get(index).transform(p -> String.valueOf(index + 1));
+    return testInfos.build();
   }
 
   private ImmutableList<Optional<TestParametersValues>>
@@ -177,21 +183,6 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
     return method.isAnnotationPresent(TestParameters.class)
         ? getMethodParameters(method).stream().map(Optional::of).collect(toImmutableList())
         : ImmutableList.of(Optional.absent());
-  }
-
-  private static String maybeAppendToTestName(
-      String originalTestName, Optional<String> maybeSuffix) {
-    if (!maybeSuffix.isPresent()) {
-      return originalTestName;
-    } else {
-      String suffixName = maybeSuffix.get();
-      if (originalTestName.endsWith("]")) {
-        return String.format(
-            "%s,%s]", originalTestName.substring(0, originalTestName.length() - 1), suffixName);
-      } else {
-        return String.format("%s[%s]", originalTestName, suffixName);
-      }
-    }
   }
 
   @Override

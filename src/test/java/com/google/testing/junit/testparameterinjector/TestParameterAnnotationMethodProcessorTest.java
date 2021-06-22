@@ -299,7 +299,11 @@ public class TestParameterAnnotationMethodProcessorTest {
 
     @AfterClass
     public static void completedAllParameterizedTests() {
-      assertThat(allTestNames).containsExactly("test1[1]", "test1[2]");
+      assertThat(allTestNames)
+          .containsExactly(
+              "test1[1.ABC]",
+              "test1[2.This is a very long string (240 characters) that would normally cause"
+                  + " Sponge+Tin to exceed the...]");
     }
   }
 

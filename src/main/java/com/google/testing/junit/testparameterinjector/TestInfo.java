@@ -14,15 +14,22 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.lang.Math.min;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.function.Function;
+import java.util.Set;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 
 /** A POJO containing information about a test (name and anotations). */
@@ -38,11 +45,14 @@ abstract class TestInfo {
    */
   static final int MAX_TEST_NAME_LENGTH = 200;
 
+  /** The maximum amount of characters that a single parameter can take up in {@link #getName()}. */
+  static final int MAX_PARAMETER_NAME_LENGTH = 100;
+
   public abstract Method getMethod();
 
   public abstract String getName();
 
-  abstract ImmutableList<String> getParameterNames();
+  abstract ImmutableList<TestInfoParameter> getParameters();
 
   public abstract ImmutableList<Annotation> getAnnotations();
 
@@ -56,60 +66,149 @@ abstract class TestInfo {
     return null;
   }
 
-  TestInfo withExtraParameters(List<String> parameterNames) {
-    ImmutableList<String> newParameterNames =
-        ImmutableList.<String>builder()
-            .addAll(this.getParameterNames())
-            .addAll(parameterNames)
+  TestInfo withExtraParameters(List<TestInfoParameter> parameters) {
+    ImmutableList<TestInfoParameter> newParameters =
+        ImmutableList.<TestInfoParameter>builder()
+            .addAll(this.getParameters())
+            .addAll(parameters)
             .build();
     return new AutoValue_TestInfo(
         getMethod(),
-        TestInfo.getDefaultName(getMethod(), newParameterNames),
-        newParameterNames,
+        TestInfo.getDefaultName(getMethod(), newParameters),
+        newParameters,
         getAnnotations());
   }
 
   TestInfo withExtraAnnotation(Annotation annotation) {
     ImmutableList<Annotation> newAnnotations =
         ImmutableList.<Annotation>builder().addAll(this.getAnnotations()).add(annotation).build();
-    return new AutoValue_TestInfo(getMethod(), getName(), getParameterNames(), newAnnotations);
+    return new AutoValue_TestInfo(getMethod(), getName(), getParameters(), newAnnotations);
   }
 
-  private TestInfo withName(String otherName) {
-    return new AutoValue_TestInfo(getMethod(), otherName, getParameterNames(), getAnnotations());
+  @VisibleForTesting
+  TestInfo withName(String otherName) {
+    return new AutoValue_TestInfo(getMethod(), otherName, getParameters(), getAnnotations());
   }
 
   public static TestInfo legacyCreate(Method method, String name, List<Annotation> annotations) {
     return new AutoValue_TestInfo(
-        method, name, /* parameterNames= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
+        method, name, /* parameters= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
   }
 
   static TestInfo createWithoutParameters(Method method, List<Annotation> annotations) {
     return new AutoValue_TestInfo(
         method,
-        getDefaultName(method, /* parameterNames= */ ImmutableList.of()),
-        /* parameterNames= */ ImmutableList.of(),
+        getDefaultName(method, /* parameters= */ ImmutableList.of()),
+        /* parameters= */ ImmutableList.of(),
         ImmutableList.copyOf(annotations));
   }
 
-  static ImmutableList<TestInfo> shortenNamesIfNecessary(
-      List<TestInfo> testInfos, Function<TestInfo, String> shorterNameFunction) {
-    if (testInfos.stream().anyMatch(i -> i.getName().length() > MAX_TEST_NAME_LENGTH)) {
-      return ImmutableList.copyOf(
-          testInfos.stream()
-              .map(testInfo -> testInfo.withName(shorterNameFunction.apply(testInfo)))
-              .collect(toList()));
+  static ImmutableList<TestInfo> shortenNamesIfNecessary(List<TestInfo> testInfos) {
+    if (testInfos.stream()
+        .anyMatch(
+            info ->
+                info.getName().length() > MAX_TEST_NAME_LENGTH
+                    || info.getParameters().stream()
+                        .anyMatch(param -> param.getName().length() > MAX_PARAMETER_NAME_LENGTH))) {
+      int numberOfParameters = testInfos.get(0).getParameters().size();
+
+      if (numberOfParameters == 0) {
+        return ImmutableList.copyOf(testInfos);
+      } else {
+        Set<Integer> parameterIndicesThatNeedUpdate =
+            IntStream.range(0, numberOfParameters)
+                .filter(
+                    parameterIndex ->
+                        testInfos.stream()
+                            .anyMatch(
+                                info ->
+                                    info.getParameters().get(parameterIndex).getName().length()
+                                        > getMaxCharactersPerParameter(info, numberOfParameters)))
+                .boxed()
+                .collect(toSet());
+
+        return testInfos.stream()
+            .map(
+                info ->
+                    info.withName(
+                        String.format(
+                            "%s[%s]",
+                            info.getMethod().getName(),
+                            IntStream.range(0, numberOfParameters)
+                                .mapToObj(
+                                    parameterIndex ->
+                                        parameterIndicesThatNeedUpdate.contains(parameterIndex)
+                                            ? getShortenedName(
+                                                info.getParameters().get(parameterIndex),
+                                                getMaxCharactersPerParameter(
+                                                    info, numberOfParameters))
+                                            : info.getParameters().get(parameterIndex).getName())
+                                .collect(joining(",")))))
+            .collect(toImmutableList());
+      }
     } else {
       return ImmutableList.copyOf(testInfos);
     }
   }
 
-  private static String getDefaultName(Method testMethod, List<String> parameterNames) {
-    if (parameterNames.isEmpty()) {
+  private static int getMaxCharactersPerParameter(TestInfo testInfo, int numberOfParameters) {
+    int maxLengthOfAllParameters =
+        // Subtract 2 characters for square brackets
+        MAX_TEST_NAME_LENGTH - testInfo.getMethod().getName().length() - 2;
+    return min(
+        // Subtract 4 characters to leave place for joining commas and the parameter index.
+        maxLengthOfAllParameters / numberOfParameters - 4,
+        // Subtract 3 characters to leave place for the parameter index
+        MAX_PARAMETER_NAME_LENGTH - 3);
+  }
+
+  private static String getShortenedName(
+      TestInfoParameter parameter, int maxCharactersPerParameter) {
+    if (maxCharactersPerParameter < 4) {
+      // Not enough characters for "..." suffix
+      return String.valueOf(parameter.getIndexInValueSource() + 1);
+    } else {
+      String shortenedName =
+          parameter.getName().length() > maxCharactersPerParameter
+              ? parameter.getName().substring(0, maxCharactersPerParameter - 3) + "..."
+              : parameter.getName();
+      return String.format("%s.%s", parameter.getIndexInValueSource() + 1, shortenedName);
+    }
+  }
+
+  private static String getDefaultName(Method testMethod, List<TestInfoParameter> parameters) {
+    if (parameters.isEmpty()) {
       return testMethod.getName();
     } else {
       return String.format(
-          "%s[%s]", testMethod.getName(), parameterNames.stream().collect(joining(",")));
+          "%s[%s]",
+          testMethod.getName(),
+          parameters.stream().map(TestInfoParameter::getName).collect(joining(",")));
+    }
+  }
+
+  private static <E> Collector<E, ?, ImmutableList<E>> toImmutableList() {
+    return Collectors.collectingAndThen(Collectors.toList(), ImmutableList::copyOf);
+  }
+
+  @AutoValue
+  abstract static class TestInfoParameter {
+
+    abstract String getName();
+
+    @Nullable
+    abstract Object getValue();
+
+    /**
+     * The index of this parameter value in the list of all values provided by the provider that
+     * returned this value.
+     */
+    abstract int getIndexInValueSource();
+
+    static TestInfoParameter create(String name, @Nullable Object value, int indexInValueSource) {
+      checkArgument(indexInValueSource >= 0);
+      return new AutoValue_TestInfo_TestInfoParameter(
+          checkNotNull(name), value, indexInValueSource);
     }
   }
 }
