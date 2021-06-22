@@ -22,8 +22,11 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.MultimapBuilder;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -174,6 +177,16 @@ abstract class TestInfo {
         MAX_PARAMETER_NAME_LENGTH - 3);
   }
 
+  static ImmutableList<TestInfo> deduplicateTestNames(List<TestInfo> testInfos) {
+    long uniqueTestNameCount = testInfos.stream().map(TestInfo::getName).distinct().count();
+    if (testInfos.size() == uniqueTestNameCount) {
+      // Return early if there are no duplicates
+      return ImmutableList.copyOf(testInfos);
+    } else {
+      return deduplicateWithNumberPrefixes(maybeAddTypesIfDuplicate(testInfos));
+    }
+  }
+
   private static String getShortenedName(
       TestInfoParameter parameter, int maxCharactersPerParameter) {
     if (maxCharactersPerParameter < 4) {
@@ -185,6 +198,82 @@ abstract class TestInfo {
               ? parameter.getName().substring(0, maxCharactersPerParameter - 3) + "..."
               : parameter.getName();
       return String.format("%s.%s", parameter.getIndexInValueSource() + 1, shortenedName);
+    }
+  }
+
+  private static ImmutableList<TestInfo> maybeAddTypesIfDuplicate(List<TestInfo> testInfos) {
+    Multimap<String, TestInfo> testNameToInfo =
+        MultimapBuilder.linkedHashKeys().arrayListValues().build();
+    for (TestInfo testInfo : testInfos) {
+      testNameToInfo.put(testInfo.getName(), testInfo);
+    }
+
+    return testNameToInfo.keySet().stream()
+        .flatMap(
+            testName -> {
+              Collection<TestInfo> matchedInfos = testNameToInfo.get(testName);
+              if (matchedInfos.size() == 1) {
+                // There was only one method with this name, so no deduplication is necessary
+                return matchedInfos.stream();
+              } else {
+                // Found tests with duplicate test names
+                int numParameters = matchedInfos.iterator().next().getParameters().size();
+                Set<Integer> indicesThatShouldGetSuffix =
+                    // Find parameter indices for which a suffix would allow the reader to
+                    // differentiate
+                    IntStream.range(0, numParameters)
+                        .filter(
+                            parameterIndex ->
+                                matchedInfos.stream()
+                                        .map(
+                                            info ->
+                                                getTypeSuffix(
+                                                    info.getParameters()
+                                                        .get(parameterIndex)
+                                                        .getValue()))
+                                        .distinct()
+                                        .count()
+                                    > 1)
+                        .boxed()
+                        .collect(toSet());
+
+                return matchedInfos.stream()
+                    .map(
+                        testInfo ->
+                            testInfo.withUpdatedParameterNames(
+                                (parameter, parameterIndex) ->
+                                    indicesThatShouldGetSuffix.contains(parameterIndex)
+                                        ? parameter.getName() + getTypeSuffix(parameter.getValue())
+                                        : parameter.getName()));
+              }
+            })
+        .collect(toImmutableList());
+  }
+
+  private static String getTypeSuffix(@Nullable Object value) {
+    if (value == null) {
+      return " (null reference)";
+    } else {
+      return String.format(" (%s)", value.getClass().getSimpleName());
+    }
+  }
+
+  private static ImmutableList<TestInfo> deduplicateWithNumberPrefixes(
+      ImmutableList<TestInfo> testInfos) {
+    long uniqueTestNameCount = testInfos.stream().map(TestInfo::getName).distinct().count();
+    if (testInfos.size() == uniqueTestNameCount) {
+      return ImmutableList.copyOf(testInfos);
+    } else {
+      // There are still duplicates, even after adding type suffixes. As a last resort: add a
+      // counter to all parameters to guarantee that each case is unique.
+      return testInfos.stream()
+          .map(
+              testInfo ->
+                  testInfo.withUpdatedParameterNames(
+                      (parameter, parameterIndex) ->
+                          String.format(
+                              "%s.%s", parameter.getIndexInValueSource() + 1, parameter.getName())))
+          .collect(toImmutableList());
     }
   }
 

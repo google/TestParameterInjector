@@ -42,7 +42,7 @@ public class TestInfoTest {
 
     ImmutableList<TestInfo> result = TestInfo.shortenNamesIfNecessary(givenTestInfos);
 
-    assertThat(result).containsExactlyElementsIn(givenTestInfos);
+    assertThat(result).containsExactlyElementsIn(givenTestInfos).inOrder();
   }
 
   @Test
@@ -60,7 +60,7 @@ public class TestInfoTest {
 
     ImmutableList<TestInfo> result = TestInfo.shortenNamesIfNecessary(givenTestInfos);
 
-    assertThat(result).containsExactlyElementsIn(givenTestInfos);
+    assertThat(result).containsExactlyElementsIn(givenTestInfos).inOrder();
   }
 
   @Test
@@ -80,7 +80,7 @@ public class TestInfoTest {
 
     ImmutableList<TestInfo> result = TestInfo.shortenNamesIfNecessary(givenTestInfos);
 
-    assertThat(result).containsExactlyElementsIn(givenTestInfos);
+    assertThat(result).containsExactlyElementsIn(givenTestInfos).inOrder();
   }
 
   @Test
@@ -108,7 +108,8 @@ public class TestInfoTest {
         .containsExactly(
             "toLowerCase[short,1.shorter]",
             "toLowerCase[short,2.very long parameter name for test "
-                + "0000000000000000000000000000000000000000000000000000...]");
+                + "0000000000000000000000000000000000000000000000000000...]")
+        .inOrder();
   }
 
   @Test
@@ -132,7 +133,8 @@ public class TestInfoTest {
         .containsExactly(
             "toLowerCase[1.shorter]",
             "toLowerCase[2.very long parameter name for test"
-                + " 000000000000000000000000000000000000000000000000000000000000...]");
+                + " 000000000000000000000000000000000000000000000000000000000000...]")
+        .inOrder();
   }
 
   @Test
@@ -153,6 +155,82 @@ public class TestInfoTest {
         .containsExactly(
             "toLowerCase[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,"
                 + "27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50]");
+  }
+
+  @Test
+  public void deduplicateTestNames_noDuplicates() throws Exception {
+    ImmutableList<TestInfo> givenTestInfos =
+        ImmutableList.of(
+            fakeTestInfo(
+                TestInfoParameter.create(
+                    /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                TestInfoParameter.create(
+                    /* name= */ "bbb", /* value= */ null, /* indexInValueSource= */ 3)),
+            fakeTestInfo(
+                TestInfoParameter.create(
+                    /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                TestInfoParameter.create(
+                    /* name= */ "ccc", /* value= */ 1, /* indexInValueSource= */ 0)));
+
+    ImmutableList<TestInfo> result = TestInfo.deduplicateTestNames(givenTestInfos);
+
+    assertThat(result).containsExactlyElementsIn(givenTestInfos).inOrder();
+  }
+
+  @Test
+  public void deduplicateTestNames_duplicateParameterNamesWithDifferentTypes() throws Exception {
+    ImmutableList<TestInfo> result =
+        TestInfo.deduplicateTestNames(
+            ImmutableList.of(
+                fakeTestInfo(
+                    TestInfoParameter.create(
+                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                    TestInfoParameter.create(
+                        /* name= */ "null", /* value= */ null, /* indexInValueSource= */ 3)),
+                fakeTestInfo(
+                    TestInfoParameter.create(
+                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                    TestInfoParameter.create(
+                        /* name= */ "null", /* value= */ "null", /* indexInValueSource= */ 0)),
+                fakeTestInfo(
+                    TestInfoParameter.create(
+                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                    TestInfoParameter.create(
+                        /* name= */ "bbb", /* value= */ "b", /* indexInValueSource= */ 0))));
+
+    assertThatTestNamesOf(result)
+        .containsExactly(
+            "toLowerCase[aaa,null (null reference)]",
+            "toLowerCase[aaa,null (String)]",
+            "toLowerCase[aaa,bbb]")
+        .inOrder();
+  }
+
+  @Test
+  public void deduplicateTestNames_duplicateParameterNamesWithSameTypes() throws Exception {
+    ImmutableList<TestInfo> result =
+        TestInfo.deduplicateTestNames(
+            ImmutableList.of(
+                fakeTestInfo(
+                    TestInfoParameter.create(
+                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
+                    TestInfoParameter.create(
+                        /* name= */ "bbb", /* value= */ 1, /* indexInValueSource= */ 0)),
+                fakeTestInfo(
+                    TestInfoParameter.create(
+                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
+                    TestInfoParameter.create(
+                        /* name= */ "bbb", /* value= */ 1, /* indexInValueSource= */ 1)),
+                fakeTestInfo(
+                    TestInfoParameter.create(
+                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
+                    TestInfoParameter.create(
+                        /* name= */ "ccc", /* value= */ "b", /* indexInValueSource= */ 2))));
+
+    assertThatTestNamesOf(result)
+        .containsExactly(
+            "toLowerCase[1.aaa,1.bbb]", "toLowerCase[1.aaa,2.bbb]", "toLowerCase[1.aaa,3.ccc]")
+        .inOrder();
   }
 
   private static TestInfo fakeTestInfo(TestInfoParameter... parameters)

@@ -344,7 +344,12 @@ public class TestParameterAnnotationMethodProcessorTest {
     public static void completedAllParameterizedTests() {
       assertThat(allTestNames)
           .containsExactly(
-              "test1[ABC]", "test1[ABC]", "test2[123]", "test2[123]", "test2[null]", "test2[null]");
+              "test1[1.ABC]",
+              "test1[2.ABC]",
+              "test2[123 (Integer)]",
+              "test2[123 (String)]",
+              "test2[null (String)]",
+              "test2[null (null reference)]");
       assertThat(allTestParameterValues).containsExactly("ABC", "ABC", 123, "123", "null", null);
     }
   }

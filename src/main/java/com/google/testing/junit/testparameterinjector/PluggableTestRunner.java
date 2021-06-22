@@ -221,7 +221,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
               .collect(toImmutableList());
     }
 
-    testInfos = TestInfo.shortenNamesIfNecessary(testInfos);
+    testInfos = TestInfo.deduplicateTestNames(TestInfo.shortenNamesIfNecessary(testInfos));
 
     return testInfos.stream()
         .map(testInfo -> new OverriddenFrameworkMethod(testInfo.getMethod(), testInfo))

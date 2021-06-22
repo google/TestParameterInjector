@@ -2,6 +2,9 @@
 
 - Bugfix: Run test methods declared in a base class (instead of throwing an
   exception)
+- Test names with very long parameter strings are now abbreviated with a snippet
+  of the shortened parameter
+- Duplicate test names are given a suffix for deduplication 
 
 ## 1.3
 
