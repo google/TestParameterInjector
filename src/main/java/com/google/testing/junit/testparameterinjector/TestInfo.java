@@ -21,12 +21,12 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -50,7 +50,16 @@ abstract class TestInfo {
 
   public abstract Method getMethod();
 
-  public abstract String getName();
+  public String getName() {
+    if (getParameters().isEmpty()) {
+      return getMethod().getName();
+    } else {
+      return String.format(
+          "%s[%s]",
+          getMethod().getName(),
+          getParameters().stream().map(TestInfoParameter::getName).collect(joining(",")));
+    }
+  }
 
   abstract ImmutableList<TestInfoParameter> getParameters();
 
@@ -67,40 +76,50 @@ abstract class TestInfo {
   }
 
   TestInfo withExtraParameters(List<TestInfoParameter> parameters) {
-    ImmutableList<TestInfoParameter> newParameters =
+    return new AutoValue_TestInfo(
+        getMethod(),
         ImmutableList.<TestInfoParameter>builder()
             .addAll(this.getParameters())
             .addAll(parameters)
-            .build();
-    return new AutoValue_TestInfo(
-        getMethod(),
-        TestInfo.getDefaultName(getMethod(), newParameters),
-        newParameters,
+            .build(),
         getAnnotations());
   }
 
   TestInfo withExtraAnnotation(Annotation annotation) {
     ImmutableList<Annotation> newAnnotations =
         ImmutableList.<Annotation>builder().addAll(this.getAnnotations()).add(annotation).build();
-    return new AutoValue_TestInfo(getMethod(), getName(), getParameters(), newAnnotations);
+    return new AutoValue_TestInfo(getMethod(), getParameters(), newAnnotations);
   }
 
-  @VisibleForTesting
-  TestInfo withName(String otherName) {
-    return new AutoValue_TestInfo(getMethod(), otherName, getParameters(), getAnnotations());
+  /**
+   * Returns a new TestInfo instance with updated parameter names.
+   *
+   * @param parameterWithIndexToNewName A function of the parameter and its index in the {@link
+   *     #getParameters()} list to the new name.
+   */
+  private TestInfo withUpdatedParameterNames(
+      BiFunction<TestInfoParameter, Integer, String> parameterWithIndexToNewName) {
+    return new AutoValue_TestInfo(
+        getMethod(),
+        IntStream.range(0, getParameters().size())
+            .mapToObj(
+                parameterIndex -> {
+                  TestInfoParameter parameter = getParameters().get(parameterIndex);
+                  return parameter.withName(
+                      parameterWithIndexToNewName.apply(parameter, parameterIndex));
+                })
+            .collect(toImmutableList()),
+        getAnnotations());
   }
 
   public static TestInfo legacyCreate(Method method, String name, List<Annotation> annotations) {
     return new AutoValue_TestInfo(
-        method, name, /* parameters= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
+        method, /* parameters= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
   }
 
   static TestInfo createWithoutParameters(Method method, List<Annotation> annotations) {
     return new AutoValue_TestInfo(
-        method,
-        getDefaultName(method, /* parameters= */ ImmutableList.of()),
-        /* parameters= */ ImmutableList.of(),
-        ImmutableList.copyOf(annotations));
+        method, /* parameters= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
   }
 
   static ImmutableList<TestInfo> shortenNamesIfNecessary(List<TestInfo> testInfos) {
@@ -130,20 +149,13 @@ abstract class TestInfo {
         return testInfos.stream()
             .map(
                 info ->
-                    info.withName(
-                        String.format(
-                            "%s[%s]",
-                            info.getMethod().getName(),
-                            IntStream.range(0, numberOfParameters)
-                                .mapToObj(
-                                    parameterIndex ->
-                                        parameterIndicesThatNeedUpdate.contains(parameterIndex)
-                                            ? getShortenedName(
-                                                info.getParameters().get(parameterIndex),
-                                                getMaxCharactersPerParameter(
-                                                    info, numberOfParameters))
-                                            : info.getParameters().get(parameterIndex).getName())
-                                .collect(joining(",")))))
+                    info.withUpdatedParameterNames(
+                        (parameter, parameterIndex) ->
+                            parameterIndicesThatNeedUpdate.contains(parameterIndex)
+                                ? getShortenedName(
+                                    parameter,
+                                    getMaxCharactersPerParameter(info, numberOfParameters))
+                                : info.getParameters().get(parameterIndex).getName()))
             .collect(toImmutableList());
       }
     } else {
@@ -176,17 +188,6 @@ abstract class TestInfo {
     }
   }
 
-  private static String getDefaultName(Method testMethod, List<TestInfoParameter> parameters) {
-    if (parameters.isEmpty()) {
-      return testMethod.getName();
-    } else {
-      return String.format(
-          "%s[%s]",
-          testMethod.getName(),
-          parameters.stream().map(TestInfoParameter::getName).collect(joining(",")));
-    }
-  }
-
   private static <E> Collector<E, ?, ImmutableList<E>> toImmutableList() {
     return Collectors.collectingAndThen(Collectors.toList(), ImmutableList::copyOf);
   }
@@ -204,6 +205,10 @@ abstract class TestInfo {
      * returned this value.
      */
     abstract int getIndexInValueSource();
+
+    TestInfoParameter withName(String newName) {
+      return create(newName, getValue(), getIndexInValueSource());
+    }
 
     static TestInfoParameter create(String name, @Nullable Object value, int indexInValueSource) {
       checkArgument(indexInValueSource >= 0);
