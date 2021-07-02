@@ -134,8 +134,8 @@
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-      <version>3.14.0</version>
+      <artifactId>protobuf-lite</artifactId>
+      <version>3.0.1</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
