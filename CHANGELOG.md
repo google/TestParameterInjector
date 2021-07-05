@@ -4,7 +4,8 @@
   exception)
 - Test names with very long parameter strings are now abbreviated with a snippet
   of the shortened parameter
-- Duplicate test names are given a suffix for deduplication 
+- Duplicate test names are given a suffix for deduplication
+- Replaced dependency on `protobuf-java` by a dependency on `protobuf-javalite`
 
 ## 1.3
 
