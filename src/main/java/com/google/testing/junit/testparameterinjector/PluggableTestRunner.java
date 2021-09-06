@@ -83,13 +83,41 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   /**
    * If true, all test methods (across different TestMethodProcessors) will be sorted in a
-   * deterministic way by their test name.
+   * deterministic way.
    *
    * <p>Deterministic means that the order will not change, even when tests are added/removed or
    * between releases.
+   *
+   * @deprecated Override {@link #sortTestMethods} with preferred sorting strategy.
    */
+  @Deprecated
   protected boolean shouldSortTestMethodsDeterministically() {
     return false; // Don't sort methods by default
+  }
+
+  /**
+   * Sort test methods (across different TestMethodProcessors).
+   *
+   * <p>This should be deterministic. The order should not change, even when tests are added/removed
+   * or between releases.
+   */
+  protected Stream<FrameworkMethod> sortTestMethods(Stream<FrameworkMethod> methods) {
+    if (!shouldSortTestMethodsDeterministically()) {
+      return methods;
+    }
+
+    return methods.sorted(
+        comparing((FrameworkMethod method) -> method.getName().hashCode())
+            .thenComparing(FrameworkMethod::getName));
+  }
+
+  /**
+   * Returns classes used as annotations to indicate test methods.
+   *
+   * <p>Defaults to {@link Test}.
+   */
+  protected ImmutableList<Class<? extends Annotation>> getSupportedTestAnnotations() {
+    return ImmutableList.of(Test.class);
   }
 
   /**
@@ -146,14 +174,11 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   @Override
   protected final ImmutableList<FrameworkMethod> computeTestMethods() {
     Stream<FrameworkMethod> processedMethods =
-        super.computeTestMethods().stream().flatMap(method -> processMethod(method).stream());
+        getSupportedTestAnnotations().stream()
+            .flatMap(annotation -> getTestClass().getAnnotatedMethods(annotation).stream())
+            .flatMap(method -> processMethod(method).stream());
 
-    if (shouldSortTestMethodsDeterministically()) {
-      processedMethods =
-          processedMethods.sorted(
-              comparing((FrameworkMethod method) -> method.getName().hashCode())
-                  .thenComparing(FrameworkMethod::getName));
-    }
+    processedMethods = sortTestMethods(processedMethods);
 
     return processedMethods.collect(toImmutableList());
   }
@@ -324,7 +349,10 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   @Override
   protected final void validateTestMethods(List<Throwable> list) {
-    List<FrameworkMethod> testMethods = getTestClass().getAnnotatedMethods(Test.class);
+    List<FrameworkMethod> testMethods =
+        getSupportedTestAnnotations().stream()
+            .flatMap(annotation -> getTestClass().getAnnotatedMethods(annotation).stream())
+            .collect(Collectors.toList());
     for (FrameworkMethod testMethod : testMethods) {
       boolean isHandled = false;
       for (TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
