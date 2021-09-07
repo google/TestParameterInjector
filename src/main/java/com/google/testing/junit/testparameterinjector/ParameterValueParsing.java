@@ -18,9 +18,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
 import com.google.protobuf.ByteString;
@@ -141,16 +141,22 @@ final class ParameterValueParsing {
                             e, getGenericParameterType(javaType, /* parameterIndex= */ 0))));
     yamlValueTransformer
         .ifJavaType(Map.class)
-        .supportParsedType(
-            Map.class,
-            map ->
-                Maps.transformValues(
-                    map,
-                    v ->
-                        parseYamlObjectToJavaType(
-                            v, getGenericParameterType(javaType, /* parameterIndex= */ 1))));
+        .supportParsedType(Map.class, map -> parseYamlMapToJavaMap(map, javaType));
 
     return yamlValueTransformer.transformedJavaValue();
+  }
+
+  private static Map<?, ?> parseYamlMapToJavaMap(Map<?, ?> map, TypeToken<?> javaType) {
+    return map.entrySet().stream()
+        .collect(
+            toMap(
+                entry ->
+                    parseYamlObjectToJavaType(
+                        entry.getKey(), getGenericParameterType(javaType, /* parameterIndex= */ 0)),
+                entry ->
+                    parseYamlObjectToJavaType(
+                        entry.getValue(),
+                        getGenericParameterType(javaType, /* parameterIndex= */ 1))));
   }
 
   private static TypeToken<?> getGenericParameterType(TypeToken<?> typeToken, int parameterIndex) {
