@@ -16,7 +16,6 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static java.lang.Math.min;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 
@@ -47,9 +46,6 @@ abstract class TestInfo {
    * by an additional 24 characters to account for future changes.
    */
   static final int MAX_TEST_NAME_LENGTH = 200;
-
-  /** The maximum amount of characters that a single parameter can take up in {@link #getName()}. */
-  static final int MAX_PARAMETER_NAME_LENGTH = 100;
 
   public abstract Method getMethod();
 
@@ -126,12 +122,7 @@ abstract class TestInfo {
   }
 
   static ImmutableList<TestInfo> shortenNamesIfNecessary(List<TestInfo> testInfos) {
-    if (testInfos.stream()
-        .anyMatch(
-            info ->
-                info.getName().length() > MAX_TEST_NAME_LENGTH
-                    || info.getParameters().stream()
-                        .anyMatch(param -> param.getName().length() > MAX_PARAMETER_NAME_LENGTH))) {
+    if (testInfos.stream().anyMatch(info -> info.getName().length() > MAX_TEST_NAME_LENGTH)) {
       int numberOfParameters = testInfos.get(0).getParameters().size();
 
       if (numberOfParameters == 0) {
@@ -170,11 +161,9 @@ abstract class TestInfo {
     int maxLengthOfAllParameters =
         // Subtract 2 characters for square brackets
         MAX_TEST_NAME_LENGTH - testInfo.getMethod().getName().length() - 2;
-    return min(
-        // Subtract 4 characters to leave place for joining commas and the parameter index.
-        maxLengthOfAllParameters / numberOfParameters - 4,
-        // Subtract 3 characters to leave place for the parameter index
-        MAX_PARAMETER_NAME_LENGTH - 3);
+
+    // Subtract 4 characters to leave place for joining commas and the parameter index.
+    return maxLengthOfAllParameters / numberOfParameters - 4;
   }
 
   static ImmutableList<TestInfo> deduplicateTestNames(List<TestInfo> testInfos) {

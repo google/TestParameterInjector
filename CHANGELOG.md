@@ -1,3 +1,8 @@
+## 1.5
+
+- Test names with very long parameter strings are abbreviated differentily: In
+  some cases, more characters are allowed.
+
 ## 1.4
 
 - Bugfix: Run test methods declared in a base class (instead of throwing an

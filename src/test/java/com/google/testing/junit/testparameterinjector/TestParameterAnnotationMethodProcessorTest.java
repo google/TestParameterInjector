@@ -303,7 +303,8 @@ public class TestParameterAnnotationMethodProcessorTest {
           .containsExactly(
               "test1[1.ABC]",
               "test1[2.This is a very long string (240 characters) that would normally cause"
-                  + " Sponge+Tin to exceed the...]");
+                  + " Sponge+Tin to exceed the filename limit of 255 characters."
+                  + " =========================================================...]");
     }
   }
 

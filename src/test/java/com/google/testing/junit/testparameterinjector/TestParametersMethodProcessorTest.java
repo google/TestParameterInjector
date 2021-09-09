@@ -116,19 +116,20 @@ public class TestParametersMethodProcessorTest {
               "null,33,false,null",
               "test2_withLongNames[1.{testString: ABC}]",
               "ABC",
-              "test2_withLongNames[2.{testString: 'This is a very long string (240 characters)"
-                  + " that would normally cause Sponge+Tin...]",
+              "test2_withLongNames[2.{testString: 'This is a very long string (240 characters) that"
+                  + " would normally cause Sponge+Tin to exceed the filename limit of 255"
+                  + " characters. =============================...]",
               "This is a very long string (240 characters) that would normally cause Sponge+Tin to"
                   + " exceed the filename limit of 255 characters."
                   + " ================================================================================="
                   + "==============",
-              "test3_withRepeatedParams[1.{testEnums: [ONE, TWO, THREE], testLongs: [11, 4],"
-                  + " testBooleans: [false, true], testStrings: [...]",
+              "test3_withRepeatedParams[{testEnums: [ONE, TWO, THREE], testLongs: [11, 4],"
+                  + " testBooleans: [false, true], testStrings: [ABC, '123']}]",
               "[ONE, TWO, THREE],[11, 4],[false, true],[ABC, 123]",
-              "test3_withRepeatedParams[2.{testEnums: [TWO], testLongs: [22], testBooleans: [true],"
+              "test3_withRepeatedParams[{testEnums: [TWO], testLongs: [22], testBooleans: [true],"
                   + " testStrings: ['DEF']}]",
               "[TWO],[22],[true],[DEF]",
-              "test3_withRepeatedParams[3.{testEnums: [], testLongs: [], testBooleans: [],"
+              "test3_withRepeatedParams[{testEnums: [], testLongs: [], testBooleans: [],"
                   + " testStrings: []}]",
               "[],[],[],[]");
     }
