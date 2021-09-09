@@ -366,8 +366,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
         yamlMapObject instanceof Map,
         "Cannot map YAML string '%s' to parameters because it is not a mapping",
         yamlString);
-    @SuppressWarnings("unchecked")
-    Map<String, Object> yamlMap = (Map<String, Object>) yamlMapObject;
+    Map<?, ?> yamlMap = (Map<?, ?>) yamlMapObject;
 
     ImmutableMap<String, Parameter> parametersByName =
         Maps.uniqueIndex(parameters, Parameter::getName);
@@ -377,11 +376,14 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
         yamlString,
         parametersByName.keySet());
 
+    @SuppressWarnings("unchecked")
+    Map<String, Object> checkedYamlMap = (Map<String, Object>) yamlMap;
+
     return TestParametersValues.builder()
         .name(yamlString)
         .addParameters(
             Maps.transformEntries(
-                yamlMap,
+                checkedYamlMap,
                 (parameterName, parsedYaml) ->
                     ParameterValueParsing.parseYamlObjectToJavaType(
                         parsedYaml,
