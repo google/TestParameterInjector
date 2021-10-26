@@ -34,6 +34,7 @@ import com.google.testing.junit.testparameterinjector.TestParameters.TestParamet
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
@@ -54,24 +55,11 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private final TestClass testClass;
 
-  private final LoadingCache<Object, ImmutableList<TestParametersValues>>
+  private final LoadingCache<Executable, ImmutableList<TestParametersValues>>
       parameterValuesByConstructorOrMethodCache =
           CacheBuilder.newBuilder()
               .maximumSize(1000)
-              .build(
-                  CacheLoader.from(
-                      methodOrConstructor ->
-                          (methodOrConstructor instanceof Constructor)
-                              ? toParameterValuesList(
-                                  methodOrConstructor,
-                                  ((Constructor<?>) methodOrConstructor)
-                                      .getAnnotation(TestParameters.class),
-                                  ((Constructor<?>) methodOrConstructor).getParameters())
-                              : toParameterValuesList(
-                                  methodOrConstructor,
-                                  ((Method) methodOrConstructor)
-                                      .getAnnotation(TestParameters.class),
-                                  ((Method) methodOrConstructor).getParameters())));
+              .build(CacheLoader.from(TestParametersMethodProcessor::toParameterValuesList));
 
   public TestParametersMethodProcessor(TestClass testClass) {
     this.testClass = testClass;
@@ -248,8 +236,8 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
     return parameterValuesByConstructorOrMethodCache.getUnchecked(method);
   }
 
-  private static ImmutableList<TestParametersValues> toParameterValuesList(
-      Object methodOrConstructor, TestParameters annotation, Parameter[] invokableParameters) {
+  private static ImmutableList<TestParametersValues> toParameterValuesList(Executable executable) {
+    TestParameters annotation = executable.getAnnotation(TestParameters.class);
     boolean valueIsSet = annotation.value().length > 0;
     boolean valuesProviderIsSet =
         !annotation.valuesProvider().equals(DefaultTestParametersValuesProvider.class);
@@ -263,7 +251,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
         "Either value or valuesProvider must be set on annotation %s",
         annotation);
 
-    ImmutableList<Parameter> parametersList = ImmutableList.copyOf(invokableParameters);
+    ImmutableList<Parameter> parametersList = ImmutableList.copyOf(executable.getParameters());
     checkState(
         parametersList.stream().allMatch(Parameter::isNamePresent),
         ""
@@ -290,7 +278,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
             + "</build>\n"
             + "\n"
             + "Don't forget to run `mvn clean` after making this change.",
-        methodOrConstructor);
+        executable);
     if (valueIsSet) {
       return stream(annotation.value())
           .map(yamlMap -> toParameterValues(yamlMap, parametersList))
