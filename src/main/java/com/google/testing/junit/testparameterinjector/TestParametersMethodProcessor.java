@@ -19,6 +19,7 @@ import static java.util.Arrays.stream;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.common.base.Optional;
+import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -27,6 +28,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import com.google.testing.junit.testparameterinjector.TestParameters.DefaultTestParametersValuesProvider;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
@@ -38,6 +40,7 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -227,11 +230,25 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   private ImmutableList<TestParametersValues> getConstructorParameters() {
-    return parameterValuesByConstructorOrMethodCache.getUnchecked(testClass.getOnlyConstructor());
+    try {
+      return parameterValuesByConstructorOrMethodCache.getUnchecked(testClass.getOnlyConstructor());
+    } catch (UncheckedExecutionException e) {
+      // Rethrow IllegalStateException because they can be caused by user mistakes and the user
+      // doesn't need to know that the caching layer is in between.
+      Throwables.throwIfInstanceOf(e.getCause(), IllegalStateException.class);
+      throw e;
+    }
   }
 
   private ImmutableList<TestParametersValues> getMethodParameters(Method method) {
-    return parameterValuesByConstructorOrMethodCache.getUnchecked(method);
+    try {
+      return parameterValuesByConstructorOrMethodCache.getUnchecked(method);
+    } catch (UncheckedExecutionException e) {
+      // Rethrow IllegalStateException because they can be caused by user mistakes and the user
+      // doesn't need to know that the caching layer is in between.
+      Throwables.throwIfInstanceOf(e.getCause(), IllegalStateException.class);
+      throw e;
+    }
   }
 
   private static ImmutableList<TestParametersValues> toParameterValuesList(Executable executable) {
@@ -242,12 +259,15 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
 
     checkState(
         !(valueIsSet && valuesProviderIsSet),
-        "It is not allowed to specify both value and valuesProvider on annotation %s",
-        annotation);
+        "It is not allowed to specify both value and valuesProvider in @TestParameters(value=%s,"
+            + " valuesProvider=%s) on %s()",
+        Arrays.toString(annotation.value()),
+        annotation.valuesProvider().getSimpleName(),
+        executable.getName());
     checkState(
         valueIsSet || valuesProviderIsSet,
-        "Either value or valuesProvider must be set on annotation %s",
-        annotation);
+        "Either a value or a valuesProvider must be set in @TestParameters on %s()",
+        executable.getName());
 
     ImmutableList<Parameter> parametersList = ImmutableList.copyOf(executable.getParameters());
     checkState(
@@ -276,7 +296,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
             + "</build>\n"
             + "\n"
             + "Don't forget to run `mvn clean` after making this change.",
-        executable);
+        executable.getName());
     if (valueIsSet) {
       return stream(annotation.value())
           .map(yamlMap -> toParameterValues(yamlMap, parametersList))

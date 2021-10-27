@@ -15,8 +15,11 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.truth.OptionalSubject.optionals;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.TruthJUnit.assume;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
@@ -28,6 +31,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -44,12 +48,24 @@ import org.junit.runners.Parameterized.Parameters;
 public class TestParametersMethodProcessorTest {
 
   @Retention(RUNTIME)
-  @interface RunAsTest {}
+  @interface RunAsTest {
+    String failsWithMessage() default "";
+  }
 
   public enum TestEnum {
     ONE,
     TWO,
     THREE;
+  }
+
+  private static final class TestEnumValuesProvider implements TestParametersValuesProvider {
+    @Override
+    public List<TestParametersValues> provideValues() {
+      return ImmutableList.of(
+          TestParametersValues.builder().name("one").addParameter("testEnum", TestEnum.ONE).build(),
+          TestParametersValues.builder().name("two").addParameter("testEnum", TestEnum.TWO).build(),
+          TestParametersValues.builder().name("null-case").addParameter("testEnum", null).build());
+    }
   }
 
   @RunAsTest
@@ -238,25 +254,6 @@ public class TestParametersMethodProcessorTest {
               "test2[two]", TestEnum.TWO,
               "test2[null-case]", null);
     }
-
-    private static final class TestEnumValuesProvider implements TestParametersValuesProvider {
-      @Override
-      public List<TestParametersValues> provideValues() {
-        return ImmutableList.of(
-            TestParametersValues.builder()
-                .name("one")
-                .addParameter("testEnum", TestEnum.ONE)
-                .build(),
-            TestParametersValues.builder()
-                .name("two")
-                .addParameter("testEnum", TestEnum.TWO)
-                .build(),
-            TestParametersValues.builder()
-                .name("null-case")
-                .addParameter("testEnum", null)
-                .build());
-      }
-    }
   }
 
   public abstract static class BaseClassWithMethodAnnotation {
@@ -437,24 +434,77 @@ public class TestParametersMethodProcessorTest {
     }
   }
 
+  @RunAsTest(
+      failsWithMessage =
+          "Either a value or a valuesProvider must be set in @TestParameters on test1()")
+  public static class InvalidTestBecauseEmptyAnnotation {
+    @Test
+    @TestParameters
+    public void test1() {}
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "Either a value or a valuesProvider must be set in @TestParameters on"
+              + " com.google.testing.junit.testparameterinjector.TestParametersMethodProcessorTest"
+              + "$InvalidTestBecauseEmptyAnnotationOnConstructor()")
+  public static class InvalidTestBecauseEmptyAnnotationOnConstructor {
+    @TestParameters
+    public InvalidTestBecauseEmptyAnnotationOnConstructor() {}
+
+    @Test
+    public void test1() {}
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "It is not allowed to specify both value and valuesProvider in"
+              + " @TestParameters(value=[{testEnum: ONE}], valuesProvider=TestEnumValuesProvider)"
+              + " on test1()")
+  public static class InvalidTestBecauseCombiningValueWithProvider {
+    @Test
+    @TestParameters(value = "{testEnum: ONE}", valuesProvider = TestEnumValuesProvider.class)
+    public void test1(TestEnum testEnum) {}
+  }
+
   @Parameters(name = "{0}")
   public static Collection<Object[]> parameters() {
     return Arrays.stream(TestParametersMethodProcessorTest.class.getClasses())
         .filter(cls -> cls.isAnnotationPresent(RunAsTest.class))
-        .map(cls -> new Object[] {cls.getSimpleName(), cls})
+        .map(
+            cls ->
+                new Object[] {
+                  cls.getSimpleName(), cls, cls.getAnnotation(RunAsTest.class).failsWithMessage()
+                })
         .collect(toImmutableList());
   }
 
   private final Class<?> testClass;
+  private final Optional<String> maybeFailureMessage;
 
-  public TestParametersMethodProcessorTest(String name, Class<?> testClass) {
+  public TestParametersMethodProcessorTest(
+      String name, Class<?> testClass, String failsWithMessage) {
     this.testClass = testClass;
+    this.maybeFailureMessage =
+        failsWithMessage.isEmpty() ? Optional.empty() : Optional.of(failsWithMessage);
   }
 
   @Test
-  public void test() throws Exception {
+  public void test_success() throws Exception {
+    assume().about(optionals()).that(maybeFailureMessage).isEmpty();
+
     List<Failure> failures = PluggableTestRunner.run(newTestRunner());
     assertThat(failures).isEmpty();
+  }
+
+  @Test
+  public void test_failure() throws Exception {
+    assume().about(optionals()).that(maybeFailureMessage).isPresent();
+
+    IllegalStateException exception =
+        assertThrows(IllegalStateException.class, () -> PluggableTestRunner.run(newTestRunner()));
+
+    assertThat(exception).hasMessageThat().isEqualTo(maybeFailureMessage.get());
   }
 
   private PluggableTestRunner newTestRunner() throws Exception {
