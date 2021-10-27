@@ -15,7 +15,6 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.truth.OptionalSubject.optionals;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.TruthJUnit.assume;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -547,7 +546,7 @@ public class TestParametersMethodProcessorTest {
 
   @Test
   public void test_success() throws Exception {
-    assume().about(optionals()).that(maybeFailureMessage).isEmpty();
+    assume().that(maybeFailureMessage.isPresent()).isFalse();
 
     List<Failure> failures = PluggableTestRunner.run(newTestRunner());
     assertThat(failures).isEmpty();
@@ -555,7 +554,7 @@ public class TestParametersMethodProcessorTest {
 
   @Test
   public void test_failure() throws Exception {
-    assume().about(optionals()).that(maybeFailureMessage).isPresent();
+    assume().that(maybeFailureMessage.isPresent()).isTrue();
 
     IllegalStateException exception =
         assertThrows(IllegalStateException.class, () -> PluggableTestRunner.run(newTestRunner()));
