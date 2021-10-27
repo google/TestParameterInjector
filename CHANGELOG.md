@@ -1,5 +1,23 @@
 ## 1.5
 
+- `@TestParameters` can now also be used as a repeated annotation:
+
+```java
+// Newly added and recommended for new code
+@Test
+@TestParameters("{age: 17, expectIsAdult: false}")
+@TestParameters("{age: 22, expectIsAdult: true}")
+public void withRepeatedAnnotation(int age,boolean expectIsAdult){...}
+
+// The old way of using @TestParameters is still supported
+@Test
+@TestParameters({
+    "{age: 17, expectIsAdult: false}",
+    "{age: 22, expectIsAdult: true}",
+})
+public void withSingleAnnotation(int age,boolean expectIsAdult){...}
+```
+
 - Test names with very long parameter strings are abbreviated differentily: In
   some cases, more characters are allowed.
 
