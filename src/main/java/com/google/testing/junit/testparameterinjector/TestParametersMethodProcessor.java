@@ -15,6 +15,7 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Verify.verify;
 import static java.util.Arrays.stream;
 
 import com.google.auto.value.AutoAnnotation;
@@ -31,6 +32,7 @@ import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import com.google.testing.junit.testparameterinjector.TestParameters.DefaultTestParametersValuesProvider;
+import com.google.testing.junit.testparameterinjector.TestParameters.RepeatedTestParameters;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
 import java.lang.annotation.Retention;
@@ -252,57 +254,51 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   private static ImmutableList<TestParametersValues> toParameterValuesList(Executable executable) {
-    TestParameters annotation = executable.getAnnotation(TestParameters.class);
-    boolean valueIsSet = annotation.value().length > 0;
-    boolean valuesProviderIsSet =
-        !annotation.valuesProvider().equals(DefaultTestParametersValuesProvider.class);
-
-    checkState(
-        !(valueIsSet && valuesProviderIsSet),
-        "It is not allowed to specify both value and valuesProvider in @TestParameters(value=%s,"
-            + " valuesProvider=%s) on %s()",
-        Arrays.toString(annotation.value()),
-        annotation.valuesProvider().getSimpleName(),
-        executable.getName());
-    checkState(
-        valueIsSet || valuesProviderIsSet,
-        "Either a value or a valuesProvider must be set in @TestParameters on %s()",
-        executable.getName());
-
+    checkParameterNamesArePresent(executable);
     ImmutableList<Parameter> parametersList = ImmutableList.copyOf(executable.getParameters());
-    checkState(
-        parametersList.stream().allMatch(Parameter::isNamePresent),
-        ""
-            + "No parameter name could be found for %s, which likely means that parameter names"
-            + " aren't available at runtime. Please ensure that the this test was built with the"
-            + " -parameters compiler option.\n"
-            + "\n"
-            + "In Maven, you do this by adding <parameters>true</parameters> to the"
-            + " maven-compiler-plugin's configuration. For example:\n"
-            + "\n"
-            + "<build>\n"
-            + "  <plugins>\n"
-            + "    <plugin>\n"
-            + "      <groupId>org.apache.maven.plugins</groupId>\n"
-            + "      <artifactId>maven-compiler-plugin</artifactId>\n"
-            + "      <version>3.8.1</version>\n"
-            + "      <configuration>\n"
-            + "        <compilerArgs>\n"
-            + "          <arg>-parameters</arg>\n"
-            + "        </compilerArgs>\n"
-            + "      </configuration>\n"
-            + "    </plugin>\n"
-            + "  </plugins>\n"
-            + "</build>\n"
-            + "\n"
-            + "Don't forget to run `mvn clean` after making this change.",
-        executable.getName());
-    if (valueIsSet) {
-      return stream(annotation.value())
-          .map(yamlMap -> toParameterValues(yamlMap, parametersList))
+
+    if (executable.isAnnotationPresent(TestParameters.class)) {
+      checkState(
+          !executable.isAnnotationPresent(RepeatedTestParameters.class),
+          "Unexpected situation: Both @TestParameters and @RepeatedTestParameters annotating the"
+              + " same method");
+      TestParameters annotation = executable.getAnnotation(TestParameters.class);
+      boolean valueIsSet = annotation.value().length > 0;
+      boolean valuesProviderIsSet =
+          !annotation.valuesProvider().equals(DefaultTestParametersValuesProvider.class);
+
+      checkState(
+          !(valueIsSet && valuesProviderIsSet),
+          "It is not allowed to specify both value and valuesProvider in @TestParameters(value=%s,"
+              + " valuesProvider=%s) on %s()",
+          Arrays.toString(annotation.value()),
+          annotation.valuesProvider().getSimpleName(),
+          executable.getName());
+      checkState(
+          valueIsSet || valuesProviderIsSet,
+          "Either a value or a valuesProvider must be set in @TestParameters on %s()",
+          executable.getName());
+
+      if (valueIsSet) {
+        return stream(annotation.value())
+            .map(yamlMap -> toParameterValues(yamlMap, parametersList))
+            .collect(toImmutableList());
+      } else {
+        return toParameterValuesList(annotation.valuesProvider(), parametersList);
+      }
+    } else { // Not annotated with @TestParameters
+      verify(
+          executable.isAnnotationPresent(RepeatedTestParameters.class),
+          "This method should only be called for executables with at least one relevant"
+              + " annotation");
+
+      return stream(executable.getAnnotation(RepeatedTestParameters.class).value())
+          .map(
+              annotation ->
+                  toParameterValues(
+                      validateAndGetSingleValueFromRepeatedAnnotation(annotation, executable),
+                      parametersList))
           .collect(toImmutableList());
-    } else {
-      return toParameterValuesList(annotation.valuesProvider(), parametersList);
     }
   }
 
@@ -332,6 +328,58 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  private static void checkParameterNamesArePresent(Executable executable) {
+    checkState(
+        stream(executable.getParameters()).allMatch(Parameter::isNamePresent),
+        ""
+            + "No parameter name could be found for %s, which likely means that parameter names"
+            + " aren't available at runtime. Please ensure that the this test was built with the"
+            + " -parameters compiler option.\n"
+            + "\n"
+            + "In Maven, you do this by adding <parameters>true</parameters> to the"
+            + " maven-compiler-plugin's configuration. For example:\n"
+            + "\n"
+            + "<build>\n"
+            + "  <plugins>\n"
+            + "    <plugin>\n"
+            + "      <groupId>org.apache.maven.plugins</groupId>\n"
+            + "      <artifactId>maven-compiler-plugin</artifactId>\n"
+            + "      <version>3.8.1</version>\n"
+            + "      <configuration>\n"
+            + "        <compilerArgs>\n"
+            + "          <arg>-parameters</arg>\n"
+            + "        </compilerArgs>\n"
+            + "      </configuration>\n"
+            + "    </plugin>\n"
+            + "  </plugins>\n"
+            + "</build>\n"
+            + "\n"
+            + "Don't forget to run `mvn clean` after making this change.",
+        executable.getName());
+  }
+
+  private static String validateAndGetSingleValueFromRepeatedAnnotation(
+      TestParameters annotation, Executable executable) {
+    checkState(
+        annotation.valuesProvider().equals(DefaultTestParametersValuesProvider.class),
+        "Setting a valuesProvider is not supported for methods/constructors with"
+            + " multiple @TestParameters annotations on %s()",
+        executable.getName());
+    checkState(
+        annotation.value().length > 0,
+        "Either a value or a valuesProvider must be set in @TestParameters on %s()",
+        executable.getName());
+    checkState(
+        annotation.value().length == 1,
+        "When specifying more than one @TestParameter for a method/constructor, each annotation"
+            + " must have exactly one value. Instead, got %s values on %s(): %s",
+        annotation.value().length,
+        executable.getName(),
+        Arrays.toString(annotation.value()));
+
+    return annotation.value()[0];
   }
 
   private static void validateThatValuesMatchParameters(
@@ -401,11 +449,13 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   // this code is called even if only @TestParameter is used. In other places, Executable is usable
   // because @TestParameters only works for Java 8 anyway.
   private static boolean hasRelevantAnnotation(Constructor<?> executable) {
-    return executable.isAnnotationPresent(TestParameters.class);
+    return executable.isAnnotationPresent(TestParameters.class)
+        || executable.isAnnotationPresent(RepeatedTestParameters.class);
   }
 
   private static boolean hasRelevantAnnotation(Method executable) {
-    return executable.isAnnotationPresent(TestParameters.class);
+    return executable.isAnnotationPresent(TestParameters.class)
+        || executable.isAnnotationPresent(RepeatedTestParameters.class);
   }
 
   private static Object[] toParameterArray(

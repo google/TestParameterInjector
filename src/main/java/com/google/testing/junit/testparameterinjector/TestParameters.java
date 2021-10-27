@@ -22,6 +22,7 @@ import static java.util.Collections.unmodifiableMap;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.LinkedHashMap;
@@ -30,29 +31,72 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
- * Annotation that can be placed on @Test-methods or a test constructor to indicate the sets of
- * parameters that it should be invoked with.
+ * Annotation that can be placed (repeatedly) on @Test-methods or a test constructor to indicate the
+ * sets of parameters that it should be invoked with.
  *
  * <p>For @Test-methods, the method will be invoked for every set of parameters that is specified.
  * For constructors, all the tests in the test class will be invoked on a class instance that was
  * constructed by each set of parameters.
  *
- * <p>Note: If this annotation is used in a test class, the other methods in that class can use
- * other types of parameterization, such as {@linkplain TestParameter @TestParameter}.
+ * <p>Note: If this annotation is used in a test class, the other methods in that class can still
+ * use other types of parameterization, such as {@linkplain TestParameter @TestParameter}.
  *
  * <p>See {@link #value()} for simple examples.
  */
 @Retention(RUNTIME)
 @Target({CONSTRUCTOR, METHOD})
+@Repeatable(TestParameters.RepeatedTestParameters.class)
 public @interface TestParameters {
 
   /**
-   * Array of stringified set of parameters in YAML format. Each element corresponds to a single
-   * invocation of a test method.
+   * Specifies one or more stringified sets of parameters in YAML format. Each set corresponds to a
+   * single invocation of a test method.
    *
    * <p>Each element in this array is a full parameter set, formatted as a YAML mapping. The mapping
    * keys must match the parameter names and the mapping values will be converted to the parameter
-   * type if possible. See yaml.org for the YAML syntax. Parameter types that are supported:
+   * type if possible. See yaml.org for the YAML syntax and the section below on the supported
+   * parameter types.
+   *
+   * <p>There are two distinct ways of using this annotation: repeated vs single:
+   *
+   * <h2>Recommended usage: Separate annotation per parameter set</h2>
+   *
+   * This approach uses multiple @TestParameters annotations, one for each set of parameters, for
+   * example:
+   *
+   * <pre>
+   * {@literal @}Test
+   * {@literal @}TestParameters("{age: 17, expectIsAdult: false}")
+   * {@literal @}TestParameters("{age: 22, expectIsAdult: true}")
+   * public void personIsAdult(int age, boolean expectIsAdult) { ... }
+   *
+   * {@literal @}Test
+   * {@literal @}TestParameters("{updateRequest: {country_code: BE}, expectedResultType: SUCCESS}")
+   * {@literal @}TestParameters("{updateRequest: {country_code: XYZ}, expectedResultType: FAILURE}")
+   * public void update(UpdateRequest updateRequest, ResultType expectedResultType) { ... }
+   * </pre>
+   *
+   * <h2>Old discouraged usage: Single annotation with all parameter sets</h2>
+   *
+   * This approach uses a single @TestParameter annotation for all parameter sets, for example:
+   *
+   * <pre>
+   * {@literal @}Test
+   * {@literal @}TestParameters({
+   *   "{age: 17, expectIsAdult: false}",
+   *   "{age: 22, expectIsAdult: true}",
+   * })
+   * public void personIsAdult(int age, boolean expectIsAdult) { ... }
+   *
+   * {@literal @}Test
+   * {@literal @}TestParameters({
+   *   "{updateRequest: {country_code: BE}, expectedResultType: SUCCESS}",
+   *   "{updateRequest: {country_code: XYZ}, expectedResultType: FAILURE}",
+   * })
+   * public void update(UpdateRequest updateRequest, ResultType expectedResultType) { ... }
+   * </pre>
+   *
+   * <h2>Supported parameter types</h2>
    *
    * <ul>
    *   <li>YAML primitives:
@@ -74,24 +118,6 @@ public @interface TestParameters {
    *
    * <p>For dynamic sets of parameters or parameter types that are not supported here, use {@link
    * #valuesProvider()} and leave this field empty.
-   *
-   * <p><b>Examples</b>
-   *
-   * <pre>
-   * {@literal @}Test
-   * {@literal @}TestParameters({
-   *   "{age: 17, expectIsAdult: false}",
-   *   "{age: 22, expectIsAdult: true}",
-   * })
-   * public void personIsAdult(int age, boolean expectIsAdult) { ... }
-   *
-   * {@literal @}Test
-   * {@literal @}TestParameters({
-   *   "{updateRequest: {name: 'Hermione'}, expectedResultType: SUCCESS}",
-   *   "{updateRequest: {name: '---'}, expectedResultType: FAILURE}",
-   * })
-   * public void update(UpdateRequest updateRequest, ResultType expectedResultType) { ... }
-   * </pre>
    */
   String[] value() default {};
 
@@ -204,5 +230,14 @@ public @interface TestParameters {
     public List<TestParametersValues> provideValues() {
       return ImmutableList.of();
     }
+  }
+
+  /**
+   * Holder annotation for multiple @TestParameters annotations. This should never be used directly.
+   */
+  @Retention(RUNTIME)
+  @Target({CONSTRUCTOR, METHOD})
+  @interface RepeatedTestParameters {
+    TestParameters[] value();
   }
 }

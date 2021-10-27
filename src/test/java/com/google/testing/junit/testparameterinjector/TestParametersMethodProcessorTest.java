@@ -80,11 +80,9 @@ public class TestParametersMethodProcessorTest {
     }
 
     @Test
-    @TestParameters({
-      "{testEnum: ONE, testLong: 11, testBoolean: false, testString: ABC}",
-      "{testEnum: TWO,\ntestLong: 22,\ntestBoolean: true,\r\n\r\n testString: 'DEF'}",
-      "{testEnum: null, testLong: 33, testBoolean: false, testString: null}",
-    })
+    @TestParameters("{testEnum: ONE, testLong: 11, testBoolean: false, testString: ABC}")
+    @TestParameters("{testEnum: TWO,\ntestLong: 22,\ntestBoolean: true,\r\n\r\n testString: 'DEF'}")
+    @TestParameters("{testEnum: null, testLong: 33, testBoolean: false, testString: null}")
     public void test(TestEnum testEnum, long testLong, boolean testBoolean, String testString) {
       testNameToStringifiedParametersMap.put(
           testName.getMethodName(),
@@ -93,23 +91,35 @@ public class TestParametersMethodProcessorTest {
 
     @Test
     @TestParameters({
-      "{testString: ABC}",
-      "{testString: 'This is a very long string (240 characters) that would normally cause"
-          + " Sponge+Tin to exceed the filename limit of 255 characters."
-          + " ================================================================================="
-          + "=============='}"
+      "{testEnum: ONE, testLong: 11, testBoolean: false, testString: ABC}",
+      "{testEnum: TWO,\ntestLong: 22,\ntestBoolean: true,\r\n\r\n testString: 'DEF'}",
+      "{testEnum: null, testLong: 33, testBoolean: false, testString: null}",
     })
+    public void test_singleAnnotation(
+        TestEnum testEnum, long testLong, boolean testBoolean, String testString) {
+      testNameToStringifiedParametersMap.put(
+          testName.getMethodName(),
+          String.format("%s,%s,%s,%s", testEnum, testLong, testBoolean, testString));
+    }
+
+    @Test
+    @TestParameters("{testString: ABC}")
+    @TestParameters(
+        "{testString: 'This is a very long string (240 characters) that would normally cause"
+            + " Sponge+Tin to exceed the filename limit of 255 characters."
+            + " ================================================================================="
+            + "=============='}")
     public void test2_withLongNames(String testString) {
       testNameToStringifiedParametersMap.put(testName.getMethodName(), testString);
     }
 
     @Test
-    @TestParameters({
-      "{testEnums: [ONE, TWO, THREE], testLongs: [11, 4], testBooleans: [false, true],"
-          + " testStrings: [ABC, '123']}",
-      "{testEnums: [TWO],\ntestLongs: [22],\ntestBooleans: [true],\r\n\r\n testStrings: ['DEF']}",
-      "{testEnums: [], testLongs: [], testBooleans: [], testStrings: []}",
-    })
+    @TestParameters(
+        "{testEnums: [ONE, TWO, THREE], testLongs: [11, 4], testBooleans: [false, true],"
+            + " testStrings: [ABC, '123']}")
+    @TestParameters(
+        "{testEnums: [TWO],\ntestLongs: [22],\ntestBooleans: [true],\r\n\r\n testStrings: ['DEF']}")
+    @TestParameters("{testEnums: [], testLongs: [], testBooleans: [], testStrings: []}")
     public void test3_withRepeatedParams(
         List<TestEnum> testEnums,
         List<Long> testLongs,
@@ -129,6 +139,15 @@ public class TestParametersMethodProcessorTest {
               "test[{testEnum: TWO, testLong: 22, testBoolean: true, testString: 'DEF'}]",
               "TWO,22,true,DEF",
               "test[{testEnum: null, testLong: 33, testBoolean: false, testString: null}]",
+              "null,33,false,null",
+              "test_singleAnnotation[{testEnum: ONE, testLong: 11, testBoolean: false, testString:"
+                  + " ABC}]",
+              "ONE,11,false,ABC",
+              "test_singleAnnotation[{testEnum: TWO, testLong: 22, testBoolean: true, testString:"
+                  + " 'DEF'}]",
+              "TWO,22,true,DEF",
+              "test_singleAnnotation[{testEnum: null, testLong: 33, testBoolean: false, testString:"
+                  + " null}]",
               "null,33,false,null",
               "test2_withLongNames[1.{testString: ABC}]",
               "ABC",
@@ -277,7 +296,8 @@ public class TestParametersMethodProcessorTest {
     }
 
     @Test
-    @TestParameters({"{testEnum: ONE}", "{testEnum: TWO}"})
+    @TestParameters("{testEnum: ONE}")
+    @TestParameters("{testEnum: TWO}")
     public void testInBase(TestEnum testEnum) {
       allTestNames.add(testName.getMethodName());
     }
@@ -311,7 +331,8 @@ public class TestParametersMethodProcessorTest {
     private static List<String> testNamesThatInvokedBefore;
     private static List<String> testNamesThatInvokedAfter;
 
-    @TestParameters({"{testEnum: ONE}", "{testEnum: TWO}"})
+    @TestParameters("{testEnum: ONE}")
+    @TestParameters("{testEnum: TWO}")
     public MixedWithTestParameterMethodAnnotation(TestEnum testEnum) {}
 
     @BeforeClass
@@ -340,19 +361,19 @@ public class TestParametersMethodProcessorTest {
     }
 
     @Test
-    @TestParameters({"{testString: ABC}", "{testString: DEF}"})
+    @TestParameters("{testString: ABC}")
+    @TestParameters("{testString: DEF}")
     public void test2(String testString) {
       allTestNames.add(testName.getMethodName());
     }
 
     @Test
-    @TestParameters({
-      "{testString: ABC}",
-      "{testString: 'This is a very long string (240 characters) that would normally cause"
-          + " Sponge+Tin to exceed the filename limit of 255 characters."
-          + " ================================================================================="
-          + "=============='}"
-    })
+    @TestParameters("{testString: ABC}")
+    @TestParameters(
+        "{testString: 'This is a very long string (240 characters) that would normally cause"
+            + " Sponge+Tin to exceed the filename limit of 255 characters."
+            + " ================================================================================="
+            + "=============='}")
     public void test3_withLongNames(String testString) {
       allTestNames.add(testName.getMethodName());
     }
@@ -391,7 +412,8 @@ public class TestParametersMethodProcessorTest {
 
     @TestParameter TestEnum testEnumA;
 
-    @TestParameters({"{testEnumB: ONE}", "{testEnumB: TWO}"})
+    @TestParameters("{testEnumB: ONE}")
+    @TestParameters("{testEnumB: TWO}")
     public MixedWithTestParameterFieldAnnotation(TestEnum testEnumB) {}
 
     @BeforeClass
@@ -462,8 +484,42 @@ public class TestParametersMethodProcessorTest {
               + " @TestParameters(value=[{testEnum: ONE}], valuesProvider=TestEnumValuesProvider)"
               + " on test1()")
   public static class InvalidTestBecauseCombiningValueWithProvider {
+
     @Test
     @TestParameters(value = "{testEnum: ONE}", valuesProvider = TestEnumValuesProvider.class)
+    public void test1(TestEnum testEnum) {}
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "Either a value or a valuesProvider must be set in @TestParameters on test1()")
+  public static class InvalidTestBecauseRepeatedAnnotationIsEmpty {
+    @Test
+    @TestParameters(value = "{testEnum: ONE}")
+    @TestParameters
+    public void test1(TestEnum testEnum) {}
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "When specifying more than one @TestParameter for a method/constructor, each annotation"
+              + " must have exactly one value. Instead, got 2 values on test1(): [{testEnum: TWO},"
+              + " {testEnum: THREE}]")
+  public static class InvalidTestBecauseRepeatedAnnotationHasMultipleValues {
+    @Test
+    @TestParameters(value = "{testEnum: ONE}")
+    @TestParameters(value = {"{testEnum: TWO}", "{testEnum: THREE}"})
+    public void test1(TestEnum testEnum) {}
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "Setting a valuesProvider is not supported for methods/constructors with"
+              + " multiple @TestParameters annotations on test1()")
+  public static class InvalidTestBecauseRepeatedAnnotationHasProvider {
+    @Test
+    @TestParameters(valuesProvider = TestEnumValuesProvider.class)
+    @TestParameters(valuesProvider = TestEnumValuesProvider.class)
     public void test1(TestEnum testEnum) {}
   }
 
