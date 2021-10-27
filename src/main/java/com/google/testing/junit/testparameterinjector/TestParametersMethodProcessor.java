@@ -67,7 +67,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
 
   @Override
   public ValidationResult validateConstructor(TestClass testClass, List<Throwable> exceptions) {
-    if (testClass.getOnlyConstructor().isAnnotationPresent(TestParameters.class)) {
+    if (hasRelevantAnnotation(testClass.getOnlyConstructor())) {
       try {
         // This method throws an exception if there is a validation error
         getConstructorParameters();
@@ -83,7 +83,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   @Override
   public ValidationResult validateTestMethod(
       TestClass testClass, FrameworkMethod testMethod, List<Throwable> exceptions) {
-    if (testMethod.getMethod().isAnnotationPresent(TestParameters.class)) {
+    if (hasRelevantAnnotation(testMethod.getMethod())) {
       try {
         // This method throws an exception if there is a validation error
         getMethodParameters(testMethod.getMethod());
@@ -98,10 +98,8 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
 
   @Override
   public List<TestInfo> processTest(Class<?> clazz, TestInfo originalTest) {
-    boolean constructorIsParameterized =
-        testClass.getOnlyConstructor().isAnnotationPresent(TestParameters.class);
-    boolean methodIsParameterized =
-        originalTest.getMethod().isAnnotationPresent(TestParameters.class);
+    boolean constructorIsParameterized = hasRelevantAnnotation(testClass.getOnlyConstructor());
+    boolean methodIsParameterized = hasRelevantAnnotation(originalTest.getMethod());
 
     if (!constructorIsParameterized && !methodIsParameterized) {
       return ImmutableList.of(originalTest);
@@ -161,14 +159,14 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private ImmutableList<Optional<TestParametersValues>>
       getConstructorParametersOrSingleAbsentElement() {
-    return testClass.getOnlyConstructor().isAnnotationPresent(TestParameters.class)
+    return hasRelevantAnnotation(testClass.getOnlyConstructor())
         ? getConstructorParameters().stream().map(Optional::of).collect(toImmutableList())
         : ImmutableList.of(Optional.absent());
   }
 
   private ImmutableList<Optional<TestParametersValues>> getMethodParametersOrSingleAbsentElement(
       Method method) {
-    return method.isAnnotationPresent(TestParameters.class)
+    return hasRelevantAnnotation(method)
         ? getMethodParameters(method).stream().map(Optional::of).collect(toImmutableList())
         : ImmutableList.of(Optional.absent());
   }
@@ -181,7 +179,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   @Override
   public Optional<Object> createTest(
       TestClass testClass, FrameworkMethod method, Optional<Object> test) {
-    if (testClass.getOnlyConstructor().isAnnotationPresent(TestParameters.class)) {
+    if (hasRelevantAnnotation(testClass.getOnlyConstructor())) {
       ImmutableList<TestParametersValues> parameterValuesList = getConstructorParameters();
       TestParametersValues parametersValues =
           parameterValuesList.get(
@@ -207,7 +205,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
       FrameworkMethod method,
       Object testObject,
       Optional<Statement> statement) {
-    if (method.getMethod().isAnnotationPresent(TestParameters.class)) {
+    if (hasRelevantAnnotation(method.getMethod())) {
       ImmutableList<TestParametersValues> parameterValuesList =
           getMethodParameters(method.getMethod());
       TestParametersValues parametersValues =
@@ -377,6 +375,17 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
                         parsedYaml,
                         TypeToken.of(parametersByName.get(parameterName).getParameterizedType()))))
         .build();
+  }
+
+  // Note: We're not using the Executable interface here because it isn't supported by Java 7 and
+  // this code is called even if only @TestParameter is used. In other places, Executable is usable
+  // because @TestParameters only works for Java 8 anyway.
+  private static boolean hasRelevantAnnotation(Constructor<?> executable) {
+    return executable.isAnnotationPresent(TestParameters.class);
+  }
+
+  private static boolean hasRelevantAnnotation(Method executable) {
+    return executable.isAnnotationPresent(TestParameters.class);
   }
 
   private static Object[] toParameterArray(
