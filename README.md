@@ -207,8 +207,10 @@ mappings:
 
 ```java
 @Test
-@TestParameters("{age: 17, expectIsAdult: false}")
-@TestParameters("{age: 22, expectIsAdult: true}")
+@TestParameters({
+  "{age: 17, expectIsAdult: false}",
+  "{age: 22, expectIsAdult: true}",
+})
 public void personIsAdult(int age, boolean expectIsAdult) { ... }
 ```
 
