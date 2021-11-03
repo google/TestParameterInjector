@@ -129,6 +129,14 @@ public class TestParametersMethodProcessorTest {
           String.format("%s,%s,%s,%s", testEnums, testLongs, testBooleans, testStrings));
     }
 
+    @Test
+    @TestParameters(customName = "custom1", value = "{testEnum: ONE}")
+    @TestParameters("{testEnum: TWO}")
+    @TestParameters(customName = "custom3", value = "{testEnum: THREE}")
+    public void test4_withCustomName(TestEnum testEnum) {
+      testNameToStringifiedParametersMap.put(testName.getMethodName(), String.valueOf(testEnum));
+    }
+
     @AfterClass
     public static void completedAllParameterizedTests() {
       assertThat(testNameToStringifiedParametersMap)
@@ -165,7 +173,13 @@ public class TestParametersMethodProcessorTest {
               "[TWO],[22],[true],[DEF]",
               "test3_withRepeatedParams[{testEnums: [], testLongs: [], testBooleans: [],"
                   + " testStrings: []}]",
-              "[],[],[],[]");
+              "[],[],[],[]",
+              "test4_withCustomName[custom1]",
+              "ONE",
+              "test4_withCustomName[{testEnum: TWO}]",
+              "TWO",
+              "test4_withCustomName[custom3]",
+              "THREE");
     }
   }
 
@@ -519,6 +533,18 @@ public class TestParametersMethodProcessorTest {
     @Test
     @TestParameters(valuesProvider = TestEnumValuesProvider.class)
     @TestParameters(valuesProvider = TestEnumValuesProvider.class)
+    public void test1(TestEnum testEnum) {}
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "Setting @TestParameters.customName is only allowed if there is exactly one YAML string"
+              + " in @TestParameters.value (on test1())")
+  public static class InvalidTestBecauseNamedAnnotationHasMultipleValues {
+    @Test
+    @TestParameters(
+        customName = "custom",
+        value = {"{testEnum: TWO}", "{testEnum: THREE}"})
     public void test1(TestEnum testEnum) {}
   }
 

@@ -122,6 +122,18 @@ public @interface TestParameters {
   String[] value() default {};
 
   /**
+   * Overrides the name of the parameter set that is used in the test name.
+   *
+   * <p>This can only be set if {@link #value()} has exactly one element. If not set, the YAML
+   * string in {@link #value()} is used in the test name.
+   *
+   * <p>For example: If this name is set to "young adult", then the test name might be
+   * "personIsAdult[young adult]" where the default might have been "personIsAdult[{age: 17,
+   * expectIsAdult: false}]".
+   */
+  String customName() default "";
+
+  /**
    * Sets a provider that will return a list of parameter sets. Each element in the returned list
    * corresponds to a single invocation of a test method.
    *

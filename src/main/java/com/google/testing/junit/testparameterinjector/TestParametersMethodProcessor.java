@@ -278,10 +278,17 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
           valueIsSet || valuesProviderIsSet,
           "Either a value or a valuesProvider must be set in @TestParameters on %s()",
           executable.getName());
+      if (!annotation.customName().isEmpty()) {
+        checkState(
+            annotation.value().length == 1,
+            "Setting @TestParameters.customName is only allowed if there is exactly one YAML string"
+                + " in @TestParameters.value (on %s())",
+            executable.getName());
+      }
 
       if (valueIsSet) {
         return stream(annotation.value())
-            .map(yamlMap -> toParameterValues(yamlMap, parametersList))
+            .map(yamlMap -> toParameterValues(yamlMap, parametersList, annotation.customName()))
             .collect(toImmutableList());
       } else {
         return toParameterValuesList(annotation.valuesProvider(), parametersList);
@@ -297,7 +304,8 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
               annotation ->
                   toParameterValues(
                       validateAndGetSingleValueFromRepeatedAnnotation(annotation, executable),
-                      parametersList))
+                      parametersList,
+                      annotation.customName()))
           .collect(toImmutableList());
     }
   }
@@ -414,7 +422,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   private static TestParametersValues toParameterValues(
-      String yamlString, List<Parameter> parameters) {
+      String yamlString, List<Parameter> parameters, String maybeCustomName) {
     Object yamlMapObject = ParameterValueParsing.parseYamlStringToObject(yamlString);
     checkState(
         yamlMapObject instanceof Map,
@@ -434,7 +442,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
     Map<String, Object> checkedYamlMap = (Map<String, Object>) yamlMap;
 
     return TestParametersValues.builder()
-        .name(yamlString)
+        .name(maybeCustomName.isEmpty() ? yamlString : maybeCustomName)
         .addParameters(
             Maps.transformEntries(
                 checkedYamlMap,

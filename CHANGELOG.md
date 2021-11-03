@@ -7,7 +7,7 @@
 @Test
 @TestParameters("{age: 17, expectIsAdult: false}")
 @TestParameters("{age: 22, expectIsAdult: true}")
-public void withRepeatedAnnotation(int age,boolean expectIsAdult){...}
+public void withRepeatedAnnotation(int age, boolean expectIsAdult){...}
 
 // The old way of using @TestParameters is still supported
 @Test
@@ -15,7 +15,16 @@ public void withRepeatedAnnotation(int age,boolean expectIsAdult){...}
     "{age: 17, expectIsAdult: false}",
     "{age: 22, expectIsAdult: true}",
 })
-public void withSingleAnnotation(int age,boolean expectIsAdult){...}
+public void withSingleAnnotation(int age, boolean expectIsAdult){...}
+```
+
+- `@TestParameters` supports setting a custom test name:
+
+```java
+@Test
+@TestParameters(customName = "teenager", value = "{age: 17, expectIsAdult: false}")
+@TestParameters(customName = "young adult", value = "{age: 22, expectIsAdult: true}")
+public void personIsAdult(int age, boolean expectIsAdult){...}
 ```
 
 - Test names with very long parameter strings are abbreviated differentily: In
