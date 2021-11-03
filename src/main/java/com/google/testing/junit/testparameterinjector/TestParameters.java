@@ -59,7 +59,7 @@ public @interface TestParameters {
    *
    * <p>There are two distinct ways of using this annotation: repeated vs single:
    *
-   * <h2>Recommended usage: Separate annotation per parameter set</h2>
+   * <h4>Recommended usage: Separate annotation per parameter set</h4>
    *
    * This approach uses multiple @TestParameters annotations, one for each set of parameters, for
    * example:
@@ -76,7 +76,7 @@ public @interface TestParameters {
    * public void update(UpdateRequest updateRequest, ResultType expectedResultType) { ... }
    * </pre>
    *
-   * <h2>Old discouraged usage: Single annotation with all parameter sets</h2>
+   * <h4>Old discouraged usage: Single annotation with all parameter sets</h4>
    *
    * This approach uses a single @TestParameter annotation for all parameter sets, for example:
    *
@@ -96,7 +96,7 @@ public @interface TestParameters {
    * public void update(UpdateRequest updateRequest, ResultType expectedResultType) { ... }
    * </pre>
    *
-   * <h2>Supported parameter types</h2>
+   * <h4>Supported parameter types</h4>
    *
    * <ul>
    *   <li>YAML primitives:
