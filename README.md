@@ -207,11 +207,16 @@ mappings:
 
 ```java
 @Test
-@TestParameters({
-  "{age: 17, expectIsAdult: false}",
-  "{age: 22, expectIsAdult: true}",
-})
+@TestParameters("{age: 17, expectIsAdult: false}")
+@TestParameters("{age: 22, expectIsAdult: true}")
 public void personIsAdult(int age, boolean expectIsAdult) { ... }
+```
+
+which would generate the following tests:
+
+```
+MyTest#personIsAdult[{age: 17, expectIsAdult: false}]
+MyTest#personIsAdult[{age: 22, expectIsAdult: true}]
 ```
 
 The string format supports the same types as `@TestParameter` (e.g. enums). See
@@ -219,6 +224,22 @@ the `@TestParameters` javadoc for more info.
 
 `@TestParameters` works in the same way on the constructor, in which case all
 tests will be run for the given parameter sets.
+
+> Tip: Consider setting a custom name if the YAML string is large:
+>
+> ```java
+> @Test
+> @TestParameters(customName = "teenager", value = "{age: 17, expectIsAdult: false}")
+> @TestParameters(customName = "young adult", value = "{age: 22, expectIsAdult: true}")
+> public void personIsAdult(int age, boolean expectIsAdult) { ... }
+> ```
+>
+> This will generate the following test names:
+>
+> ```
+> MyTest#personIsAdult[teenager]
+> MyTest#personIsAdult[young adult]
+> ```
 
 ## Advanced usage
 
