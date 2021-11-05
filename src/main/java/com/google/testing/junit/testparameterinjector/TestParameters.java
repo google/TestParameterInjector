@@ -42,6 +42,10 @@ import javax.annotation.Nullable;
  * use other types of parameterization, such as {@linkplain TestParameter @TestParameter}.
  *
  * <p>See {@link #value()} for simple examples.
+ *
+ * <p>Warning: This annotation can only be used if the compiled java code contains the parameter
+ * names. This is typically done by passing the {@code -parameters} option to the Java compiler,
+ * which requires using Java 8 or higher and may not be available on Android.
  */
 @Retention(RUNTIME)
 @Target({CONSTRUCTOR, METHOD})
