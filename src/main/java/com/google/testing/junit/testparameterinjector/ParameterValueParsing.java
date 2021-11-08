@@ -96,13 +96,15 @@ final class ParameterValueParsing {
         .ifJavaType(Float.class)
         .supportParsedType(Float.class, identity())
         .supportParsedType(Double.class, Double::floatValue)
-        .supportParsedType(Integer.class, Integer::floatValue);
+        .supportParsedType(Integer.class, Integer::floatValue)
+        .supportParsedType(String.class, Float::valueOf);
 
     yamlValueTransformer
         .ifJavaType(Double.class)
         .supportParsedType(Double.class, identity())
         .supportParsedType(Integer.class, Integer::doubleValue)
-        .supportParsedType(Long.class, Long::doubleValue);
+        .supportParsedType(Long.class, Long::doubleValue)
+        .supportParsedType(String.class, Double::valueOf);
 
     yamlValueTransformer
         .ifJavaType(Enum.class)
@@ -210,7 +212,15 @@ final class ParameterValueParsing {
                 transformedJavaValue == null,
                 "This case is already handled. This is a bug in"
                     + " testparameterinjector.TestParametersMethodProcessor.");
-            transformedJavaValue = checkNotNull(transformation.apply((ParsedYamlT) parsedYaml));
+            try {
+              transformedJavaValue = checkNotNull(transformation.apply((ParsedYamlT) parsedYaml));
+            } catch (Exception e) {
+              throw new IllegalArgumentException(
+                  String.format(
+                      "Could not map YAML value %s (class = %s) to java class %s",
+                      parsedYaml, parsedYaml.getClass(), javaType),
+                  e);
+            }
           }
         }
 

@@ -75,6 +75,20 @@ public class ParameterValueParsingTest {
         /* yamlString= */ "442147483648",
         /* javaClass= */ Double.class,
         /* expectedResult= */ 442147483648.0),
+    NAN_TO_DOUBLE(
+        /* yamlString= */ "NaN", /* javaClass= */ Double.class, /* expectedResult= */ Double.NaN),
+    INFINITY_TO_DOUBLE(
+        /* yamlString= */ "Infinity",
+        /* javaClass= */ Double.class,
+        /* expectedResult= */ Double.POSITIVE_INFINITY),
+    POSITIVE_INFINITY_TO_DOUBLE(
+        /* yamlString= */ "+Infinity",
+        /* javaClass= */ Double.class,
+        /* expectedResult= */ Double.POSITIVE_INFINITY),
+    NEGATIVE_INFINITY_TO_DOUBLE(
+        /* yamlString= */ "-Infinity",
+        /* javaClass= */ Double.class,
+        /* expectedResult= */ Double.NEGATIVE_INFINITY),
 
     DOUBLE_TO_FLOAT(
         /* yamlString= */ "1.23", /* javaClass= */ Float.class, /* expectedResult= */ 1.23F),
