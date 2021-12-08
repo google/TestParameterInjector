@@ -24,7 +24,9 @@ import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.runner.Description;
 import org.junit.runners.Parameterized.Parameters;
@@ -86,26 +88,21 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public ValidationResult validateConstructor(TestClass testClass, List<Throwable> list) {
+  public ValidationResult validateConstructor(Constructor<?> constructor) {
     if (parametersForAllTests.isPresent()) {
-      if (testClass.getJavaClass().getConstructors().length != 1) {
-        list.add(
-            new IllegalStateException("Test class should have exactly one public constructor"));
-        return ValidationResult.HANDLED;
-      }
-      Constructor<?> constructor = testClass.getOnlyConstructor();
       Class<?>[] parameterTypes = constructor.getParameterTypes();
       Object[] testParameters = getTestParameters(0);
+
       if (parameterTypes.length != testParameters.length) {
-        list.add(
+        return ValidationResult.validated(
             new IllegalStateException(
                 "Mismatch constructor parameter count with values"
                     + " returned by the @Parameters method"));
-        return ValidationResult.HANDLED;
       }
+      List<Throwable> errors = new ArrayList<>();
       for (int i = 0; i < testParameters.length; i++) {
         if (!parameterTypes[i].isAssignableFrom(testParameters[i].getClass())) {
-          list.add(
+          errors.add(
               new IllegalStateException(
                   String.format(
                       "Mismatch constructor parameter type %s with value"
@@ -113,15 +110,15 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
                       parameterTypes[i], testParameters[i])));
         }
       }
-      return ValidationResult.HANDLED;
+      return ValidationResult.validated(errors);
+    } else {
+      return ValidationResult.notValidated();
     }
-    return ValidationResult.NOT_HANDLED;
   }
 
   @Override
-  public ValidationResult validateTestMethod(
-      TestClass testClass, FrameworkMethod testMethod, List<Throwable> errorsReturned) {
-    return ValidationResult.NOT_HANDLED;
+  public ValidationResult validateTestMethod(Method testMethod) {
+    return ValidationResult.notValidated();
   }
 
   @Override
@@ -174,12 +171,8 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public Optional<Statement> createStatement(
-      TestClass testClass,
-      FrameworkMethod method,
-      Object testObject,
-      Optional<Statement> statement) {
-    return statement;
+  public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
+    return Optional.absent();
   }
 
   /**

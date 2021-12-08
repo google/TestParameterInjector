@@ -41,6 +41,7 @@ import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -478,63 +479,68 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public ValidationResult validateConstructor(TestClass testClass, List<Throwable> errorsReturned) {
-    if (testClass.getJavaClass().getConstructors().length != 1) {
-      errorsReturned.add(
-          new IllegalStateException("Test class should have exactly one public constructor"));
-      return ValidationResult.HANDLED;
-    }
-    Constructor<?> constructor = testClass.getOnlyConstructor();
+  public ValidationResult validateConstructor(Constructor<?> constructor) {
     Class<?>[] parameterTypes = constructor.getParameterTypes();
     if (parameterTypes.length == 0) {
-      return ValidationResult.NOT_HANDLED;
+      return ValidationResult.notValidated();
     }
     // The constructor has parameters, they must be injected by a TestParameterAnnotation
     // annotation.
     Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
-    validateMethodOrConstructorParameters(
-        removeOverrides(
-            getAnnotationTypeOrigins(
-                Origin.CLASS, Origin.CONSTRUCTOR, Origin.CONSTRUCTOR_PARAMETER),
-            testClass.getJavaClass()),
-        testClass,
-        errorsReturned,
-        constructor,
-        parameterTypes,
-        parameterAnnotations);
-
-    return ValidationResult.HANDLED;
+    return ValidationResult.validated(
+        validateMethodOrConstructorParameters(
+            removeOverrides(
+                getAnnotationTypeOrigins(
+                    Origin.CLASS, Origin.CONSTRUCTOR, Origin.CONSTRUCTOR_PARAMETER),
+                testClass.getJavaClass()),
+            testClass,
+            constructor,
+            parameterTypes,
+            parameterAnnotations));
   }
 
   @Override
-  public ValidationResult validateTestMethod(
-      TestClass testClass, FrameworkMethod testMethod, List<Throwable> errorsReturned) {
-    Class<?>[] methodParameterTypes = testMethod.getMethod().getParameterTypes();
+  public ValidationResult validateTestMethod(Method testMethod) {
+    Class<?>[] methodParameterTypes = testMethod.getParameterTypes();
     if (methodParameterTypes.length == 0) {
-      return ValidationResult.NOT_HANDLED;
+      return ValidationResult.notValidated();
     } else {
-      Method method = testMethod.getMethod();
       // The method has parameters, they must be injected by a TestParameterAnnotation annotation.
-      testMethod.validatePublicVoid(false /* isStatic */, errorsReturned);
-      Annotation[][] parametersAnnotations = method.getParameterAnnotations();
-      validateMethodOrConstructorParameters(
-          getAnnotationTypeOrigins(Origin.CLASS, Origin.METHOD, Origin.METHOD_PARAMETER),
-          testClass,
-          errorsReturned,
-          method,
-          methodParameterTypes,
-          parametersAnnotations);
-      return ValidationResult.HANDLED;
+
+      List<Throwable> errors = new ArrayList<>();
+      if (Modifier.isStatic(testMethod.getModifiers())) {
+        errors.add(
+            new Exception(String.format("Method %s() should not be static", testMethod.getName())));
+      }
+      if (!Modifier.isPublic(testMethod.getModifiers())) {
+        errors.add(
+            new Exception(String.format("Method %s() should be public", testMethod.getName())));
+      }
+      if (testMethod.getReturnType() != Void.TYPE) {
+        errors.add(
+            new Exception(String.format("Method %s() should return void", testMethod.getName())));
+      }
+      Annotation[][] parametersAnnotations = testMethod.getParameterAnnotations();
+      errors.addAll(
+          validateMethodOrConstructorParameters(
+              getAnnotationTypeOrigins(Origin.CLASS, Origin.METHOD, Origin.METHOD_PARAMETER),
+              testClass,
+              testMethod,
+              methodParameterTypes,
+              parametersAnnotations));
+
+      return ValidationResult.validated(errors);
     }
   }
 
-  private void validateMethodOrConstructorParameters(
+  private List<Throwable> validateMethodOrConstructorParameters(
       List<AnnotationTypeOrigin> annotationTypeOrigins,
       TestClass testClass,
-      List<Throwable> errors,
       AnnotatedElement methodOrConstructor,
       Class<?>[] parameterTypes,
       Annotation[][] parametersAnnotations) {
+    List<Throwable> errors = new ArrayList<>();
+
     for (int parameterIndex = 0; parameterIndex < parameterTypes.length; parameterIndex++) {
       Class<?> parameterType = parameterTypes[parameterIndex];
       Annotation[] parameterAnnotations = parametersAnnotations[parameterIndex];
@@ -605,28 +611,50 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
                     parameterType.getName(), methodOrConstructor)));
       }
     }
+    return errors;
   }
 
   @Override
-  public Optional<Statement> createStatement(
-      TestClass testClass,
-      FrameworkMethod frameworkMethod,
-      Object testObject,
-      Optional<Statement> statement) {
-    if (frameworkMethod.getAnnotation(TestIndexHolder.class) == null
+  public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
+    Method testMethod = testInfo.getMethod();
+    if (testInfo.getAnnotation(TestIndexHolder.class) == null
         // Explicitly skip @TestParameters annotated methods to ensure compatibility.
         //
         // Reason (see b/175678220): @TestIndexHolder will even be present when the only (supported)
         // parameterization is at the field level (e.g. @TestParameter private TestEnum enum;).
-        // Without the @TestParameters check below, InvokeParameterizedMethod would be invoked for
+        // Without the @TestParameters check below, this class would try to find parameters for
         // these methods. When there are no method parameters, this is a no-op, but when the method
         // is annotated with @TestParameters, this throws an exception (because there are method
         // parameters that this processor has no values for - they are provided by the
         // @TestParameters processor).
-        || frameworkMethod.getAnnotation(TestParameters.class) != null) {
-      return statement;
+        || testMethod.isAnnotationPresent(TestParameters.class)) {
+      return Optional.absent();
     } else {
-      return Optional.of(new InvokeParameterizedMethod(frameworkMethod, testObject));
+      TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
+      checkState(testIndexHolder != null);
+      List<TestParameterValue> testParameterValues =
+          filterByOrigin(
+              getParameterValuesForTest(testIndexHolder),
+              Origin.CLASS,
+              Origin.METHOD,
+              Origin.METHOD_PARAMETER);
+
+      Class<?>[] parameterTypes = testMethod.getParameterTypes();
+      Annotation[][] parametersAnnotations = testMethod.getParameterAnnotations();
+      ArrayList<Object> parameterValues =
+          new ArrayList<>(/* initialCapacity= */ parameterTypes.length);
+
+      List<Class<? extends Annotation>> processedAnnotationTypes = new ArrayList<>();
+      for (int i = 0; i < parameterTypes.length; i++) {
+        parameterValues.add(
+            getParameterValue(
+                testParameterValues,
+                parameterTypes[i],
+                parametersAnnotations[i],
+                processedAnnotationTypes));
+      }
+
+      return Optional.of(parameterValues);
     }
   }
 
@@ -1093,49 +1121,6 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
         }
       }
     };
-  }
-
-  /**
-   * Class to invoke the test method if it has parameters, and they need to be injected from the
-   * TestParameterAnnotation values.
-   */
-  private class InvokeParameterizedMethod extends Statement {
-
-    private final FrameworkMethod frameworkMethod;
-    private final Object testObject;
-    private final List<TestParameterValue> testParameterValues;
-
-    public InvokeParameterizedMethod(FrameworkMethod frameworkMethod, Object testObject) {
-      this.frameworkMethod = frameworkMethod;
-      this.testObject = testObject;
-      TestIndexHolder testIndexHolder = frameworkMethod.getAnnotation(TestIndexHolder.class);
-      checkState(testIndexHolder != null);
-      testParameterValues =
-          filterByOrigin(
-              getParameterValuesForTest(testIndexHolder),
-              Origin.CLASS,
-              Origin.METHOD,
-              Origin.METHOD_PARAMETER);
-    }
-
-    @Override
-    public void evaluate() throws Throwable {
-      Class<?>[] parameterTypes = frameworkMethod.getMethod().getParameterTypes();
-      Annotation[][] parametersAnnotations = frameworkMethod.getMethod().getParameterAnnotations();
-      Object[] parameterValues = new Object[parameterTypes.length];
-
-      List<Class<? extends Annotation>> processedAnnotationTypes = new ArrayList<>();
-      // Initialize each parameter value from the corresponding TestParameterAnnotation value.
-      for (int i = 0; i < parameterTypes.length; i++) {
-        parameterValues[i] =
-            getParameterValue(
-                testParameterValues,
-                parameterTypes[i],
-                parametersAnnotations[i],
-                processedAnnotationTypes);
-      }
-      frameworkMethod.invokeExplosively(testObject, parameterValues);
-    }
   }
 
   /** Returns a {@link TestParameterAnnotation}'s value for a method or constructor parameter. */

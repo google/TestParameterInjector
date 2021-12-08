@@ -15,12 +15,15 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.util.stream.Collectors.joining;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
 import java.lang.annotation.Annotation;
@@ -1016,28 +1019,24 @@ public class TestParameterAnnotationMethodProcessorTest {
 
   @Test
   public void test() throws Exception {
-    List<Failure> failures;
     switch (result) {
       case SUCCESS_ALWAYS:
-        failures =
+        assertNoFailures(
             PluggableTestRunner.run(
                 newTestRunnerWithParameterizedSupport(
-                    TestParameterAnnotationMethodProcessor::forAllAnnotationPlacements));
-        assertThat(failures).isEmpty();
+                    TestParameterAnnotationMethodProcessor::forAllAnnotationPlacements)));
 
-        failures =
+        assertNoFailures(
             PluggableTestRunner.run(
                 newTestRunnerWithParameterizedSupport(
-                    TestParameterAnnotationMethodProcessor::onlyForFieldsAndParameters));
-        assertThat(failures).isEmpty();
+                    TestParameterAnnotationMethodProcessor::onlyForFieldsAndParameters)));
         break;
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
-        failures =
+        assertNoFailures(
             PluggableTestRunner.run(
                 newTestRunnerWithParameterizedSupport(
-                    TestParameterAnnotationMethodProcessor::forAllAnnotationPlacements));
-        assertThat(failures).isEmpty();
+                    TestParameterAnnotationMethodProcessor::forAllAnnotationPlacements)));
 
         assertThrows(
             IllegalStateException.class,
@@ -1072,5 +1071,23 @@ public class TestParameterAnnotationMethodProcessorTest {
         return ImmutableList.of(processor.apply(getTestClass()));
       }
     };
+  }
+
+  private static void assertNoFailures(List<Failure> failures) {
+    if (failures.size() == 1) {
+      throw new AssertionError(getOnlyElement(failures).getException());
+    } else if (failures.size() > 1) {
+      throw new AssertionError(
+          String.format(
+              "Test failed unexpectedly:\n\n%s",
+              failures.stream()
+                  .map(
+                      f ->
+                          String.format(
+                              "<<%s>> %s",
+                              f.getDescription(),
+                              Throwables.getStackTraceAsString(f.getException())))
+                  .collect(joining("\n------------------------------------\n"))));
+    }
   }
 }

@@ -14,10 +14,16 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
+import com.google.auto.value.AutoValue;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.List;
 import org.junit.runner.Description;
-import org.junit.runners.BlockJUnit4ClassRunner;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.Statement;
 import org.junit.runners.model.TestClass;
@@ -54,46 +60,54 @@ interface TestMethodProcessor {
   Optional<Object> createTest(TestClass testClass, FrameworkMethod method, Optional<Object> test);
 
   /**
-   * This method allows to transform the statement object used for {@link
-   * #processStatement(Statement, Description)}.
-   *
-   * @param statement the value returned by the previous processor, or {@link Optional#absent()} if
-   *     this processor is the first.
-   * @return {@link Optional#absent()} if the default statement will be used from invoking the test
-   *     method with no parameters.
-   *     <p>The default implementation should return {@code statement}.
+   * If this processor can handle the given test, returns the parameters with which that method
+   * should be invoked.
    */
-  Optional<Statement> createStatement(
-      TestClass testClass,
-      FrameworkMethod method,
-      Object testObject,
-      Optional<Statement> statement);
+  Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo);
+
+  /** Optionally validates the given constructor. */
+  ValidationResult validateConstructor(Constructor<?> constructor);
+
+  /** Optionally validates the given method. */
+  ValidationResult validateTestMethod(Method testMethod);
 
   /**
-   * Optionally validates the {@code testClass} constructor, and returns whether the validation
-   * should continue or stop.
+   * Value class that captures the result of a validating a single constructor or test method.
    *
-   * @param errorsReturned A mutable list that any validation error should be added to.
+   * <p>If the validation is not validated by any processor, it will be validated using the default
+   * validator. If a processor validates a constructor/test method, the remaining processors will
+   * *not* be called.
    */
-  ValidationResult validateConstructor(TestClass testClass, List<Throwable> errorsReturned);
+  @AutoValue
+  abstract class ValidationResult {
 
-  /**
-   * Optionally validates the {@code testClass} methods, and returns whether the validation should
-   * continue or stop.
-   *
-   * @param errorsReturned A mutable list that any validation error should be added to.
-   */
-  ValidationResult validateTestMethod(
-      TestClass testClass, FrameworkMethod testMethod, List<Throwable> errorsReturned);
+    /** Returns true if the properties of the given constructor/test method were validated. */
+    public abstract boolean wasValidated();
 
-  /**
-   * Whether the constructor or method validation has been handled or not.
-   *
-   * <p>If the validation is not handled by a processor, it will be handled using the default {@link
-   * BlockJUnit4ClassRunner} validator.
-   */
-  enum ValidationResult {
-    NOT_HANDLED,
-    HANDLED,
+    /** Returns the validation errors, if any. */
+    public abstract ImmutableList<Throwable> validationErrors();
+
+    static ValidationResult notValidated() {
+      return of(/* wasValidated= */ false, /* validationErrors= */ ImmutableList.of());
+    }
+
+    static ValidationResult validated(Collection<Throwable> errors) {
+      return of(/* wasValidated= */ true, /* validationErrors= */ errors);
+    }
+
+    static ValidationResult validated(Throwable error) {
+      return of(/* wasValidated= */ true, /* validationErrors= */ ImmutableList.of(error));
+    }
+
+    static ValidationResult valid() {
+      return of(/* wasValidated= */ true, /* validationErrors= */ ImmutableList.of());
+    }
+
+    private static ValidationResult of(
+        boolean wasValidated, Collection<Throwable> validationErrors) {
+      checkArgument(wasValidated || validationErrors.isEmpty());
+      return new AutoValue_TestMethodProcessor_ValidationResult(
+          wasValidated, ImmutableList.copyOf(validationErrors));
+    }
   }
 }

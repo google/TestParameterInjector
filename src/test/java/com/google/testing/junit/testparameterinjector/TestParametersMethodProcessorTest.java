@@ -15,11 +15,14 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.TruthJUnit.assume;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.util.stream.Collectors.joining;
 import static org.junit.Assert.assertThrows;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
@@ -575,7 +578,8 @@ public class TestParametersMethodProcessorTest {
     assume().that(maybeFailureMessage.isPresent()).isFalse();
 
     List<Failure> failures = PluggableTestRunner.run(newTestRunner());
-    assertThat(failures).isEmpty();
+
+    assertNoFailures(failures);
   }
 
   @Test
@@ -596,5 +600,23 @@ public class TestParametersMethodProcessorTest {
             getTestClass());
       }
     };
+  }
+
+  private static void assertNoFailures(List<Failure> failures) {
+    if (failures.size() == 1) {
+      throw new AssertionError(getOnlyElement(failures).getException());
+    } else if (failures.size() > 1) {
+      throw new AssertionError(
+          String.format(
+              "Test failed unexpectedly:\n\n%s",
+              failures.stream()
+                  .map(
+                      f ->
+                          String.format(
+                              "<<%s>> %s",
+                              f.getDescription(),
+                              Throwables.getStackTraceAsString(f.getException())))
+                  .collect(joining("\n------------------------------------\n"))));
+    }
   }
 }

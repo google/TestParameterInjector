@@ -281,16 +281,23 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   @Override
   protected final Statement methodInvoker(FrameworkMethod frameworkMethod, Object testObject) {
-    Optional<Statement> statement = Optional.absent();
-    for (TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
-      statement =
-          testMethodProcessor.createStatement(
-              getTestClass(), frameworkMethod, testObject, statement);
+    TestInfo testInfo = ((OverriddenFrameworkMethod) frameworkMethod).getTestInfo();
+    Optional<List<Object>> maybeParameters =
+        getTestMethodProcessors().stream()
+            .map(processor -> processor.maybeGetTestMethodParameters(testInfo))
+            .filter(Optional::isPresent)
+            .findFirst()
+            .orElse(Optional.absent());
+    if (maybeParameters.isPresent()) {
+      return new Statement() {
+        @Override
+        public void evaluate() throws Throwable {
+          frameworkMethod.invokeExplosively(testObject, maybeParameters.get().toArray());
+        }
+      };
+    } else {
+      return super.methodInvoker(frameworkMethod, testObject);
     }
-    if (statement.isPresent()) {
-      return statement.get();
-    }
-    return super.methodInvoker(frameworkMethod, testObject);
   }
 
   /** Modifies the statement with each {@link MethodRule} and {@link TestRule} */
@@ -338,32 +345,38 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   @Override
   protected final void validateZeroArgConstructor(List<Throwable> errorsReturned) {
-    for (TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
-      if (testMethodProcessor.validateConstructor(getTestClass(), errorsReturned)
-          == ValidationResult.HANDLED) {
-        return;
-      }
+    ValidationResult validationResult =
+        getTestMethodProcessors().stream()
+            .map(processor -> processor.validateConstructor(getTestClass().getOnlyConstructor()))
+            .filter(ValidationResult::wasValidated)
+            .findFirst()
+            .orElse(ValidationResult.notValidated());
+
+    if (validationResult.wasValidated()) {
+      errorsReturned.addAll(validationResult.validationErrors());
+    } else {
+      super.validateZeroArgConstructor(errorsReturned);
     }
-    super.validateZeroArgConstructor(errorsReturned);
   }
 
   @Override
-  protected final void validateTestMethods(List<Throwable> list) {
+  protected final void validateTestMethods(List<Throwable> errorsReturned) {
     List<FrameworkMethod> testMethods =
         getSupportedTestAnnotations().stream()
             .flatMap(annotation -> getTestClass().getAnnotatedMethods(annotation).stream())
-            .collect(Collectors.toList());
+            .collect(toImmutableList());
     for (FrameworkMethod testMethod : testMethods) {
-      boolean isHandled = false;
-      for (TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
-        if (testMethodProcessor.validateTestMethod(getTestClass(), testMethod, list)
-            == ValidationResult.HANDLED) {
-          isHandled = true;
-          break;
-        }
-      }
-      if (!isHandled) {
-        testMethod.validatePublicVoidNoArg(false /* isStatic */, list);
+      ValidationResult validationResult =
+          getTestMethodProcessors().stream()
+              .map(processor -> processor.validateTestMethod(testMethod.getMethod()))
+              .filter(ValidationResult::wasValidated)
+              .findFirst()
+              .orElse(ValidationResult.notValidated());
+
+      if (validationResult.wasValidated()) {
+        errorsReturned.addAll(validationResult.validationErrors());
+      } else {
+        testMethod.validatePublicVoidNoArg(/* isStatic= */ false, errorsReturned);
       }
     }
   }

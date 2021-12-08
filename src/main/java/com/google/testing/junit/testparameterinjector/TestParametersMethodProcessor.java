@@ -17,6 +17,7 @@ package com.google.testing.junit.testparameterinjector;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static java.util.Arrays.stream;
+import static java.util.stream.Collectors.toList;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.common.base.Optional;
@@ -71,33 +72,32 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public ValidationResult validateConstructor(TestClass testClass, List<Throwable> exceptions) {
-    if (hasRelevantAnnotation(testClass.getOnlyConstructor())) {
+  public ValidationResult validateConstructor(Constructor<?> constructor) {
+    if (hasRelevantAnnotation(constructor)) {
       try {
         // This method throws an exception if there is a validation error
         getConstructorParameters();
       } catch (Throwable t) {
-        exceptions.add(t);
+        return ValidationResult.validated(t);
       }
-      return ValidationResult.HANDLED;
+      return ValidationResult.valid();
     } else {
-      return ValidationResult.NOT_HANDLED;
+      return ValidationResult.notValidated();
     }
   }
 
   @Override
-  public ValidationResult validateTestMethod(
-      TestClass testClass, FrameworkMethod testMethod, List<Throwable> exceptions) {
-    if (hasRelevantAnnotation(testMethod.getMethod())) {
+  public ValidationResult validateTestMethod(Method testMethod) {
+    if (hasRelevantAnnotation(testMethod)) {
       try {
         // This method throws an exception if there is a validation error
-        getMethodParameters(testMethod.getMethod());
+        getMethodParameters(testMethod);
       } catch (Throwable t) {
-        exceptions.add(t);
+        return ValidationResult.validated(t);
       }
-      return ValidationResult.HANDLED;
+      return ValidationResult.valid();
     } else {
-      return ValidationResult.NOT_HANDLED;
+      return ValidationResult.notValidated();
     }
   }
 
@@ -194,8 +194,8 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
         Constructor<?> constructor = testClass.getOnlyConstructor();
         return Optional.of(
             constructor.newInstance(
-                toParameterArray(
-                    parametersValues, testClass.getOnlyConstructor().getParameters())));
+                toParameterList(parametersValues, testClass.getOnlyConstructor().getParameters())
+                    .toArray()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -205,29 +205,17 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public Optional<Statement> createStatement(
-      TestClass testClass,
-      FrameworkMethod method,
-      Object testObject,
-      Optional<Statement> statement) {
-    if (hasRelevantAnnotation(method.getMethod())) {
-      ImmutableList<TestParametersValues> parameterValuesList =
-          getMethodParameters(method.getMethod());
+  public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
+    Method testMethod = testInfo.getMethod();
+    if (hasRelevantAnnotation(testMethod)) {
+      ImmutableList<TestParametersValues> parameterValuesList = getMethodParameters(testMethod);
       TestParametersValues parametersValues =
           parameterValuesList.get(
-              method.getAnnotation(TestIndexHolder.class).methodParametersIndex());
+              testInfo.getAnnotation(TestIndexHolder.class).methodParametersIndex());
 
-      return Optional.of(
-          new Statement() {
-            @Override
-            public void evaluate() throws Throwable {
-              method.invokeExplosively(
-                  testObject,
-                  toParameterArray(parametersValues, method.getMethod().getParameters()));
-            }
-          });
+      return Optional.of(toParameterList(parametersValues, testMethod.getParameters()));
     } else {
-      return statement;
+      return Optional.absent();
     }
   }
 
@@ -466,11 +454,11 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
         || executable.isAnnotationPresent(RepeatedTestParameters.class);
   }
 
-  private static Object[] toParameterArray(
+  private static List<Object> toParameterList(
       TestParametersValues parametersValues, Parameter[] parameters) {
     return stream(parameters)
         .map(parameter -> parametersValues.parametersMap().get(parameter.getName()))
-        .toArray();
+        .collect(toList());
   }
 
   // Immutable collectors are re-implemented here because they are missing from the Android
