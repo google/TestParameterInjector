@@ -590,7 +590,7 @@ public class TestParameterAnnotationMethodProcessorTest {
   }
 
   @Retention(RUNTIME)
-  @TestParameterAnnotation(validator = TestEnumValidator.class, processor = TestEnumProcessor.class)
+  @TestParameterAnnotation(validator = TestEnumValidator.class)
   public @interface EnumEvaluatorParameter {
     TestEnum[] value() default {};
   }
@@ -600,31 +600,6 @@ public class TestParameterAnnotationMethodProcessorTest {
     @Override
     public boolean shouldSkip(Context context) {
       return context.has(EnumEvaluatorParameter.class, TestEnum.THREE);
-    }
-  }
-
-  public static class TestEnumProcessor implements TestParameterProcessor {
-
-    static List<Object> beforeCalls = new ArrayList<>();
-    static List<Object> afterCalls = new ArrayList<>();
-
-    static void init() {
-      beforeCalls.clear();
-      afterCalls.clear();
-    }
-
-    static TestEnum currentValue;
-
-    @Override
-    public void before(Object testParameterValue) {
-      beforeCalls.add(testParameterValue);
-      currentValue = (TestEnum) testParameterValue;
-    }
-
-    @Override
-    public void after(Object testParameterValue) {
-      afterCalls.add(testParameterValue);
-      currentValue = null;
     }
   }
 
@@ -648,16 +623,9 @@ public class TestParameterAnnotationMethodProcessorTest {
       testedParameters = new ArrayList<>();
     }
 
-    @BeforeClass
-    public static void init() {
-      TestEnumProcessor.init();
-    }
-
     @AfterClass
     public static void completedAllParameterizedTests() {
       assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO);
-      assertThat(TestEnumProcessor.beforeCalls).containsExactly(TestEnum.ONE, TestEnum.TWO);
-      assertThat(TestEnumProcessor.afterCalls).containsExactly(TestEnum.ONE, TestEnum.TWO);
     }
   }
 
@@ -683,51 +651,9 @@ public class TestParameterAnnotationMethodProcessorTest {
       }
     }
 
-    @BeforeClass
-    public static void init() {
-      TestEnumProcessor.init();
-    }
-
     @AfterClass
     public static void completedAllParameterizedTests() {
       assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO);
-      assertThat(TestEnumProcessor.beforeCalls).containsExactly(TestEnum.ONE, TestEnum.TWO);
-      assertThat(TestEnumProcessor.afterCalls).containsExactly(TestEnum.ONE, TestEnum.TWO);
-    }
-  }
-
-  @ClassTestResult(Result.SUCCESS_FOR_ALL_PLACEMENTS_ONLY)
-  @EnumEvaluatorParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
-  public static class ClassEvaluatorClass {
-
-    private static List<TestEnum> testedParameters;
-
-    public ClassEvaluatorClass() {}
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
-    @Test
-    public void test() {
-      if (TestEnumProcessor.currentValue == TestEnum.THREE) {
-        fail();
-      } else {
-        testedParameters.add(TestEnumProcessor.currentValue);
-      }
-    }
-
-    @BeforeClass
-    public static void init() {
-      TestEnumProcessor.init();
-    }
-
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO);
-      assertThat(TestEnumProcessor.beforeCalls).containsExactly(TestEnum.ONE, TestEnum.TWO);
-      assertThat(TestEnumProcessor.afterCalls).containsExactly(TestEnum.ONE, TestEnum.TWO);
     }
   }
 
@@ -780,29 +706,6 @@ public class TestParameterAnnotationMethodProcessorTest {
     @AfterClass
     public static void completedAllParameterizedTests() {
       assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
-    }
-  }
-
-  @ClassTestResult(Result.SUCCESS_FOR_ALL_PLACEMENTS_ONLY)
-  @EnumEvaluatorParameter({TestEnum.ONE})
-  public static class MethodClassOverrideClass {
-
-    private static List<TestEnum> testedParameters;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
-    @Test
-    @EnumEvaluatorParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
-    public void test() {
-      testedParameters.add(TestEnumProcessor.currentValue);
-    }
-
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO);
     }
   }
 

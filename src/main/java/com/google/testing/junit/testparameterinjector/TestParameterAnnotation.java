@@ -153,12 +153,6 @@ import java.util.Optional;
   /** Specifies a validator for the parameter to determine whether test should be skipped. */
   Class<? extends TestParameterValidator> validator() default DefaultValidator.class;
 
-  /**
-   * Specifies a processor for the parameter to invoke arbitrary code before and after the test
-   * statement's execution.
-   */
-  Class<? extends TestParameterProcessor> processor() default DefaultProcessor.class;
-
   /** Specifies a value provider for the parameter to provide the values to test. */
   Class<? extends TestParameterValueProvider> valueProvider() default DefaultValueProvider.class;
 
@@ -169,15 +163,6 @@ import java.util.Optional;
     public boolean shouldSkip(Context context) {
       return false;
     }
-  }
-
-  /** Default {@link TestParameterProcessor} implementation which does nothing. */
-  class DefaultProcessor implements TestParameterProcessor {
-    @Override
-    public void before(Object testParameterValue) {}
-
-    @Override
-    public void after(Object testParameterValue) {}
   }
 
   /**

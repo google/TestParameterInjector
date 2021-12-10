@@ -1095,32 +1095,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
 
   @Override
   public Statement processStatement(Statement originalStatement, Description finalTestDescription) {
-    TestIndexHolder testIndexHolder = finalTestDescription.getAnnotation(TestIndexHolder.class);
-    if (testIndexHolder == null) {
-      return originalStatement;
-    }
-    List<TestParameterValue> testParameterValues = getParameterValuesForTest(testIndexHolder);
-
-    return new Statement() {
-      @Override
-      public void evaluate() throws Throwable {
-        for (TestParameterValue testParameterValue : testParameterValues) {
-          callBefore(
-              testParameterValue.annotationTypeOrigin().annotationType(),
-              testParameterValue.value());
-        }
-        try {
-          originalStatement.evaluate();
-        } finally {
-          // In reverse order.
-          for (TestParameterValue testParameterValue : Lists.reverse(testParameterValues)) {
-            callAfter(
-                testParameterValue.annotationTypeOrigin().annotationType(),
-                testParameterValue.value());
-          }
-        }
-      }
-    };
+    return originalStatement;
   }
 
   /** Returns a {@link TestParameterAnnotation}'s value for a method or constructor parameter. */
@@ -1200,32 +1175,6 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
     }
 
     private TestIndexHolderFactory() {}
-  }
-
-  /** Invokes the {@link TestParameterProcessor#before} method of an annotation. */
-  private static void callBefore(
-      Class<? extends Annotation> annotationType, Object annotationValue) {
-    TestParameterAnnotation annotation =
-        annotationType.getAnnotation(TestParameterAnnotation.class);
-    Class<? extends TestParameterProcessor> processor = annotation.processor();
-    try {
-      processor.getConstructor().newInstance().before(annotationValue);
-    } catch (Exception e) {
-      throw new RuntimeException("Unexpected exception while invoking processor " + processor, e);
-    }
-  }
-
-  /** Invokes the {@link TestParameterProcessor#after} method of an annotation. */
-  private static void callAfter(
-      Class<? extends Annotation> annotationType, Object annotationValue) {
-    TestParameterAnnotation annotation =
-        annotationType.getAnnotation(TestParameterAnnotation.class);
-    Class<? extends TestParameterProcessor> processor = annotation.processor();
-    try {
-      processor.getConstructor().newInstance().after(annotationValue);
-    } catch (Exception e) {
-      throw new RuntimeException("Unexpected exception while invoking processor " + processor, e);
-    }
   }
 
   /**
