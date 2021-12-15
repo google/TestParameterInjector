@@ -50,9 +50,6 @@ import java.util.Objects;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.junit.runner.Description;
-import org.junit.runners.model.FrameworkMethod;
-import org.junit.runners.model.Statement;
 import org.junit.runners.model.TestClass;
 
 /** {@code TestMethodProcessor} implementation for supporting {@link TestParameters}. */
@@ -72,32 +69,32 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public ValidationResult validateConstructor(Constructor<?> constructor) {
+  public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
     if (hasRelevantAnnotation(constructor)) {
       try {
         // This method throws an exception if there is a validation error
         getConstructorParameters();
       } catch (Throwable t) {
-        return ValidationResult.validated(t);
+        return ExecutableValidationResult.validated(t);
       }
-      return ValidationResult.valid();
+      return ExecutableValidationResult.valid();
     } else {
-      return ValidationResult.notValidated();
+      return ExecutableValidationResult.notValidated();
     }
   }
 
   @Override
-  public ValidationResult validateTestMethod(Method testMethod) {
+  public ExecutableValidationResult validateTestMethod(Method testMethod) {
     if (hasRelevantAnnotation(testMethod)) {
       try {
         // This method throws an exception if there is a validation error
         getMethodParameters(testMethod);
       } catch (Throwable t) {
-        return ValidationResult.validated(t);
+        return ExecutableValidationResult.validated(t);
       }
-      return ValidationResult.valid();
+      return ExecutableValidationResult.valid();
     } else {
-      return ValidationResult.notValidated();
+      return ExecutableValidationResult.notValidated();
     }
   }
 
@@ -177,30 +174,17 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public Statement processStatement(Statement originalStatement, Description finalTestDescription) {
-    return originalStatement;
-  }
-
-  @Override
-  public Optional<Object> createTest(
-      TestClass testClass, FrameworkMethod method, Optional<Object> test) {
-    if (hasRelevantAnnotation(testClass.getOnlyConstructor())) {
+  public Optional<List<Object>> maybeGetConstructorParameters(
+      Constructor<?> constructor, TestInfo testInfo) {
+    if (hasRelevantAnnotation(constructor)) {
       ImmutableList<TestParametersValues> parameterValuesList = getConstructorParameters();
       TestParametersValues parametersValues =
           parameterValuesList.get(
-              method.getAnnotation(TestIndexHolder.class).constructorParametersIndex());
+              testInfo.getAnnotation(TestIndexHolder.class).constructorParametersIndex());
 
-      try {
-        Constructor<?> constructor = testClass.getOnlyConstructor();
-        return Optional.of(
-            constructor.newInstance(
-                toParameterList(parametersValues, testClass.getOnlyConstructor().getParameters())
-                    .toArray()));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
+      return Optional.of(toParameterList(parametersValues, constructor.getParameters()));
     } else {
-      return test;
+      return Optional.absent();
     }
   }
 
@@ -218,6 +202,9 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
       return Optional.absent();
     }
   }
+
+  @Override
+  public void postProcessTestInstance(Object testInstance, TestInfo testInfo) {}
 
   private ImmutableList<TestParametersValues> getConstructorParameters() {
     try {

@@ -23,8 +23,8 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.testing.junit.testparameterinjector.TestMethodProcessor.ValidationResult;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.stream.Collector;
@@ -60,7 +60,6 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
    */
   private static final ThreadLocal<TestInfo> currentTestInfo = new ThreadLocal<>();
 
-  private ImmutableList<TestRule> testRules;
   private List<TestMethodProcessor> testMethodProcessors;
 
   protected PluggableTestRunner(Class<?> klass) throws InitializationError {
@@ -282,21 +281,26 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   @Override
   protected final Statement methodInvoker(FrameworkMethod frameworkMethod, Object testObject) {
     TestInfo testInfo = ((OverriddenFrameworkMethod) frameworkMethod).getTestInfo();
-    Optional<List<Object>> maybeParameters =
-        getTestMethodProcessors().stream()
-            .map(processor -> processor.maybeGetTestMethodParameters(testInfo))
-            .filter(Optional::isPresent)
-            .findFirst()
-            .orElse(Optional.absent());
-    if (maybeParameters.isPresent()) {
-      return new Statement() {
-        @Override
-        public void evaluate() throws Throwable {
-          frameworkMethod.invokeExplosively(testObject, maybeParameters.get().toArray());
-        }
-      };
-    } else {
+
+    if (testInfo.getMethod().getParameterTypes().length == 0) {
       return super.methodInvoker(frameworkMethod, testObject);
+    } else {
+      Optional<List<Object>> maybeParameters =
+          getTestMethodProcessors().stream()
+              .map(processor -> processor.maybeGetTestMethodParameters(testInfo))
+              .filter(Optional::isPresent)
+              .findFirst()
+              .orElse(Optional.absent());
+      if (maybeParameters.isPresent()) {
+        return new Statement() {
+          @Override
+          public void evaluate() throws Throwable {
+            frameworkMethod.invokeExplosively(testObject, maybeParameters.get().toArray());
+          }
+        };
+      } else {
+        return super.methodInvoker(frameworkMethod, testObject);
+      }
     }
   }
 
@@ -304,7 +308,6 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   private Statement withRules(FrameworkMethod method, Object target, Statement statement) {
     ImmutableList<TestRule> testRules =
         Stream.of(
-                getTestRulesForProcessors().stream(),
                 getInnerTestRules().stream(),
                 getTestRules(target).stream(),
                 getOuterTestRules().stream())
@@ -330,13 +333,32 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   private Object createTestForMethod(FrameworkMethod method) throws Exception {
-    Optional<Object> maybeTestInstance = Optional.absent();
-    for (TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
-      maybeTestInstance = testMethodProcessor.createTest(getTestClass(), method, maybeTestInstance);
+    TestInfo testInfo = ((OverriddenFrameworkMethod) method).getTestInfo();
+    Constructor<?> constructor = getTestClass().getOnlyConstructor();
+
+    // Construct a test instance
+    Object testInstance;
+    if (constructor.getParameterTypes().length == 0) {
+      testInstance = createTest();
+    } else {
+      List<Object> constructorParameters =
+          getTestMethodProcessors().stream()
+              .map(processor -> processor.maybeGetConstructorParameters(constructor, testInfo))
+              .filter(Optional::isPresent)
+              .findFirst()
+              .get()
+              .get();
+      try {
+        testInstance = constructor.newInstance(constructorParameters.toArray());
+      } catch (IllegalAccessException e) {
+        throw new RuntimeException(e);
+      }
     }
-    // If no processor created the test instance, fallback on the default implementation.
-    Object testInstance =
-        maybeTestInstance.isPresent() ? maybeTestInstance.get() : super.createTest();
+
+    // Run all post processors on the newly created instance
+    for (TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
+      testMethodProcessor.postProcessTestInstance(testInstance, testInfo);
+    }
 
     finalizeCreatedTestInstance(testInstance);
 
@@ -345,12 +367,12 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   @Override
   protected final void validateZeroArgConstructor(List<Throwable> errorsReturned) {
-    ValidationResult validationResult =
+    ExecutableValidationResult validationResult =
         getTestMethodProcessors().stream()
             .map(processor -> processor.validateConstructor(getTestClass().getOnlyConstructor()))
-            .filter(ValidationResult::wasValidated)
+            .filter(ExecutableValidationResult::wasValidated)
             .findFirst()
-            .orElse(ValidationResult.notValidated());
+            .orElse(ExecutableValidationResult.notValidated());
 
     if (validationResult.wasValidated()) {
       errorsReturned.addAll(validationResult.validationErrors());
@@ -366,12 +388,12 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
             .flatMap(annotation -> getTestClass().getAnnotatedMethods(annotation).stream())
             .collect(toImmutableList());
     for (FrameworkMethod testMethod : testMethods) {
-      ValidationResult validationResult =
+      ExecutableValidationResult validationResult =
           getTestMethodProcessors().stream()
               .map(processor -> processor.validateTestMethod(testMethod.getMethod()))
-              .filter(ValidationResult::wasValidated)
+              .filter(ExecutableValidationResult::wasValidated)
               .findFirst()
-              .orElse(ValidationResult.notValidated());
+              .orElse(ExecutableValidationResult.notValidated());
 
       if (validationResult.wasValidated()) {
         errorsReturned.addAll(validationResult.validationErrors());
@@ -417,16 +439,6 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
       testMethodProcessors = createTestMethodProcessorList();
     }
     return testMethodProcessors;
-  }
-
-  private synchronized ImmutableList<TestRule> getTestRulesForProcessors() {
-    if (testRules == null) {
-      testRules =
-          testMethodProcessors.stream()
-              .map(testMethodProcessor -> (TestRule) testMethodProcessor::processStatement)
-              .collect(toImmutableList());
-    }
-    return testRules;
   }
 
   /** {@link MethodRule} that sets up the Context for each test. */

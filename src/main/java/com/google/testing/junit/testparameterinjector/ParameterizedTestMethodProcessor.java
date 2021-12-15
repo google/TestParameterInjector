@@ -27,11 +27,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import org.junit.runner.Description;
 import org.junit.runners.Parameterized.Parameters;
 import org.junit.runners.model.FrameworkMethod;
-import org.junit.runners.model.Statement;
 import org.junit.runners.model.TestClass;
 
 /**
@@ -88,37 +87,37 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public ValidationResult validateConstructor(Constructor<?> constructor) {
+  public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
     if (parametersForAllTests.isPresent()) {
       Class<?>[] parameterTypes = constructor.getParameterTypes();
-      Object[] testParameters = getTestParameters(0);
+      List<Object> testParameters = getTestParameters(0);
 
-      if (parameterTypes.length != testParameters.length) {
-        return ValidationResult.validated(
+      if (parameterTypes.length != testParameters.size()) {
+        return ExecutableValidationResult.validated(
             new IllegalStateException(
                 "Mismatch constructor parameter count with values"
                     + " returned by the @Parameters method"));
       }
       List<Throwable> errors = new ArrayList<>();
-      for (int i = 0; i < testParameters.length; i++) {
-        if (!parameterTypes[i].isAssignableFrom(testParameters[i].getClass())) {
+      for (int i = 0; i < testParameters.size(); i++) {
+        if (!parameterTypes[i].isAssignableFrom(testParameters.get(i).getClass())) {
           errors.add(
               new IllegalStateException(
                   String.format(
                       "Mismatch constructor parameter type %s with value"
                           + " returned by the @Parameters method: %s",
-                      parameterTypes[i], testParameters[i])));
+                      parameterTypes[i], testParameters.get(i))));
         }
       }
-      return ValidationResult.validated(errors);
+      return ExecutableValidationResult.validated(errors);
     } else {
-      return ValidationResult.notValidated();
+      return ExecutableValidationResult.notValidated();
     }
   }
 
   @Override
-  public ValidationResult validateTestMethod(Method testMethod) {
-    return ValidationResult.notValidated();
+  public ExecutableValidationResult validateTestMethod(Method testMethod) {
+    return ExecutableValidationResult.notValidated();
   }
 
   @Override
@@ -150,30 +149,23 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public Statement processStatement(Statement originalStatement, Description finalTestDescription) {
-    return originalStatement;
-  }
-
-  @Override
-  public Optional<Object> createTest(
-      TestClass testClass, FrameworkMethod method, Optional<Object> test) {
+  public Optional<List<Object>> maybeGetConstructorParameters(
+      Constructor<?> constructor, TestInfo testInfo) {
     if (parametersForAllTests.isPresent()) {
-      Object[] testParameters =
-          getTestParameters(method.getAnnotation(TestIndexHolder.class).testIndex());
-      try {
-        Constructor<?> constructor = testClass.getOnlyConstructor();
-        return Optional.<Object>of(constructor.newInstance(testParameters));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
+      return Optional.of(
+          getTestParameters(testInfo.getAnnotation(TestIndexHolder.class).testIndex()));
+    } else {
+      return Optional.absent();
     }
-    return test;
   }
 
   @Override
   public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
     return Optional.absent();
   }
+
+  @Override
+  public void postProcessTestInstance(Object testInstance, TestInfo testInfo) {}
 
   /**
    * This mechanism is a workaround to be able to store the test index in the annotation list of the
@@ -195,12 +187,12 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
     private TestIndexHolderFactory() {}
   }
 
-  private Object[] getTestParameters(int testIndex) {
+  private List<Object> getTestParameters(int testIndex) {
     Object parameters = Iterables.get(parametersForAllTests.get(), testIndex);
     if (parameters instanceof Object[]) {
-      return (Object[]) parameters;
+      return Arrays.asList((Object[]) parameters);
     } else {
-      return new Object[] {parameters};
+      return Arrays.asList(parameters);
     }
   }
 

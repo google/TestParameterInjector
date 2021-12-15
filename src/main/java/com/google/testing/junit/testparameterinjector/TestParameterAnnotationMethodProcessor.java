@@ -58,9 +58,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
-import org.junit.runner.Description;
-import org.junit.runners.model.FrameworkMethod;
-import org.junit.runners.model.Statement;
 import org.junit.runners.model.TestClass;
 
 /**
@@ -479,15 +476,15 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public ValidationResult validateConstructor(Constructor<?> constructor) {
+  public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
     Class<?>[] parameterTypes = constructor.getParameterTypes();
     if (parameterTypes.length == 0) {
-      return ValidationResult.notValidated();
+      return ExecutableValidationResult.notValidated();
     }
     // The constructor has parameters, they must be injected by a TestParameterAnnotation
     // annotation.
     Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
-    return ValidationResult.validated(
+    return ExecutableValidationResult.validated(
         validateMethodOrConstructorParameters(
             removeOverrides(
                 getAnnotationTypeOrigins(
@@ -500,10 +497,10 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public ValidationResult validateTestMethod(Method testMethod) {
+  public ExecutableValidationResult validateTestMethod(Method testMethod) {
     Class<?>[] methodParameterTypes = testMethod.getParameterTypes();
     if (methodParameterTypes.length == 0) {
-      return ValidationResult.notValidated();
+      return ExecutableValidationResult.notValidated();
     } else {
       // The method has parameters, they must be injected by a TestParameterAnnotation annotation.
 
@@ -529,7 +526,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
               methodParameterTypes,
               parametersAnnotations));
 
-      return ValidationResult.validated(errors);
+      return ExecutableValidationResult.validated(errors);
     }
   }
 
@@ -612,6 +609,45 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
       }
     }
     return errors;
+  }
+
+  @Override
+  public Optional<List<Object>> maybeGetConstructorParameters(
+      Constructor<?> constructor, TestInfo testInfo) {
+    if (testInfo.getAnnotation(TestIndexHolder.class) == null
+        // Explicitly skip @TestParameters annotated methods to ensure compatibility.
+        //
+        // Reason (see b/175678220): @TestIndexHolder will even be present when the only (supported)
+        // parameterization is at the field level (e.g. @TestParameter private TestEnum enum;).
+        // Without the @TestParameters check below, this class would try to find parameters for
+        // these methods. When there are no method parameters, this is a no-op, but when the method
+        // is annotated with @TestParameters, this throws an exception (because there are method
+        // parameters that this processor has no values for - they are provided by the
+        // @TestParameters processor).
+        || constructor.isAnnotationPresent(TestParameters.class)) {
+      return Optional.absent();
+    } else {
+      TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
+      List<TestParameterValue> testParameterValues = getParameterValuesForTest(testIndexHolder);
+
+      Class<?>[] parameterTypes = constructor.getParameterTypes();
+      Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
+      List<Object> parameterValues = new ArrayList<>(/* initialCapacity= */ parameterTypes.length);
+      List<Class<? extends Annotation>> processedAnnotationTypes = new ArrayList<>();
+      List<TestParameterValue> parameterValuesForConstructor =
+          filterByOrigin(
+              testParameterValues, Origin.CLASS, Origin.CONSTRUCTOR, Origin.CONSTRUCTOR_PARAMETER);
+      for (int i = 0; i < parameterTypes.length; i++) {
+        // Initialize each parameter value from the corresponding TestParameterAnnotation value.
+        parameterValues.add(
+            getParameterValue(
+                parameterValuesForConstructor,
+                parameterTypes[i],
+                parameterAnnotations[i],
+                processedAnnotationTypes));
+      }
+      return Optional.of(parameterValues);
+    }
   }
 
   @Override
@@ -997,72 +1033,37 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public Optional<Object> createTest(
-      TestClass testClass, FrameworkMethod method, Optional<Object> test) {
-    TestIndexHolder testIndexHolder = method.getAnnotation(TestIndexHolder.class);
-    if (testIndexHolder == null) {
-      return test;
-    }
+  public void postProcessTestInstance(Object testInstance, TestInfo testInfo) {
+    TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
     try {
-      List<TestParameterValue> testParameterValues = getParameterValuesForTest(testIndexHolder);
+      if (testIndexHolder != null) {
+        List<TestParameterValue> testParameterValues = getParameterValuesForTest(testIndexHolder);
 
-      Object testObject;
-      if (test.isPresent()) {
-        testObject = test.get();
-      } else {
-        Constructor<?> constructor = testClass.getOnlyConstructor();
-        Class<?>[] parameterTypes = constructor.getParameterTypes();
-        if (parameterTypes.length == 0) {
-          testObject = constructor.newInstance();
-        } else {
-          // The constructor has parameters, they must be injected by a TestParameterAnnotation
-          // annotation.
-          Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
-          Object[] arguments = new Object[parameterTypes.length];
-          List<Class<? extends Annotation>> processedAnnotationTypes = new ArrayList<>();
-          List<TestParameterValue> parameterValuesForConstructor =
-              filterByOrigin(
-                  testParameterValues,
-                  Origin.CLASS,
-                  Origin.CONSTRUCTOR,
-                  Origin.CONSTRUCTOR_PARAMETER);
-          for (int i = 0; i < arguments.length; i++) {
-            // Initialize each parameter value from the corresponding TestParameterAnnotation value.
-            arguments[i] =
-                getParameterValue(
-                    parameterValuesForConstructor,
-                    parameterTypes[i],
-                    parameterAnnotations[i],
-                    processedAnnotationTypes);
-          }
-          testObject = constructor.newInstance(arguments);
-        }
-      }
-      // Do not include {@link Origin#METHOD_PARAMETER} nor {@link Origin#CONSTRUCTOR_PARAMETER}
-      // annotations.
-      List<TestParameterValue> testParameterValuesForFieldInjection =
-          filterByOrigin(testParameterValues, Origin.CLASS, Origin.FIELD, Origin.METHOD);
-      // The annotationType corresponding to the annotationIndex, e.g ColorParameter.class
-      // in the example above.
-      List<TestParameterValue> remainingTestParameterValuesForFieldInjection =
-          new ArrayList<>(testParameterValuesForFieldInjection);
-      for (Field declaredField :
-          streamWithParents(testObject.getClass())
-              .flatMap(c -> stream(c.getDeclaredFields()))
-              .collect(toImmutableList())) {
-        for (TestParameterValue testParameterValue :
-            remainingTestParameterValuesForFieldInjection) {
-          if (declaredField.isAnnotationPresent(
-              testParameterValue.annotationTypeOrigin().annotationType())) {
-            declaredField.setAccessible(true);
-            declaredField.set(testObject, testParameterValue.value());
-            remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
-            break;
+        // Do not include {@link Origin#METHOD_PARAMETER} nor {@link Origin#CONSTRUCTOR_PARAMETER}
+        // annotations.
+        List<TestParameterValue> testParameterValuesForFieldInjection =
+            filterByOrigin(testParameterValues, Origin.CLASS, Origin.FIELD, Origin.METHOD);
+        // The annotationType corresponding to the annotationIndex, e.g. ColorParameter.class
+        // in the example above.
+        List<TestParameterValue> remainingTestParameterValuesForFieldInjection =
+            new ArrayList<>(testParameterValuesForFieldInjection);
+        for (Field declaredField :
+            streamWithParents(testInstance.getClass())
+                .flatMap(c -> stream(c.getDeclaredFields()))
+                .collect(toImmutableList())) {
+          for (TestParameterValue testParameterValue :
+              remainingTestParameterValuesForFieldInjection) {
+            if (declaredField.isAnnotationPresent(
+                testParameterValue.annotationTypeOrigin().annotationType())) {
+              declaredField.setAccessible(true);
+              declaredField.set(testInstance, testParameterValue.value());
+              remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
+              break;
+            }
           }
         }
       }
-      return Optional.of(testObject);
-    } catch (Exception e) {
+    } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }
   }
@@ -1093,11 +1094,6 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
         .collect(toImmutableList());
   }
 
-  @Override
-  public Statement processStatement(Statement originalStatement, Description finalTestDescription) {
-    return originalStatement;
-  }
-
   /** Returns a {@link TestParameterAnnotation}'s value for a method or constructor parameter. */
   private Object getParameterValue(
       List<TestParameterValue> testParameterValues,
@@ -1106,7 +1102,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
       List<Class<? extends Annotation>> processedAnnotationTypes) {
     List<Class<? extends Annotation>> iteratedAnnotationTypes = new ArrayList<>();
     for (TestParameterValue testParameterValue : testParameterValues) {
-      // The annotationType corresponding to the annotationIndex, e.g ColorParameter.class
+      // The annotationType corresponding to the annotationIndex, e.g. ColorParameter.class
       // in the example above.
       for (Annotation parameterAnnotation : parameterAnnotations) {
         Class<? extends Annotation> annotationType =
@@ -1130,7 +1126,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
     }
     // If no annotation matches, use the method parameter type.
     for (TestParameterValue testParameterValue : testParameterValues) {
-      // The annotationType corresponding to the annotationIndex, e.g ColorParameter.class
+      // The annotationType corresponding to the annotationIndex, e.g. ColorParameter.class
       // in the example above.
       if (methodParameterType.isAssignableFrom(
           getValueMethodReturnType(
