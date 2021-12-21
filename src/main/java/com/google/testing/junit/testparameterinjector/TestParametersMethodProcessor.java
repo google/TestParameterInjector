@@ -54,7 +54,7 @@ import org.junit.runners.model.TestClass;
 
 /** {@code TestMethodProcessor} implementation for supporting {@link TestParameters}. */
 @SuppressWarnings("AndroidJdkLibsChecker") // Parameter is not available on old Android SDKs.
-class TestParametersMethodProcessor implements TestMethodProcessor {
+final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private final TestClass testClass;
 

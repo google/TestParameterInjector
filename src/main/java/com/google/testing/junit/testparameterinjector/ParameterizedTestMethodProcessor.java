@@ -48,7 +48,7 @@ import org.junit.runners.model.TestClass;
  * instead requires a single class constructor with one argument for each parameter returned by the
  * {@link Parameters} method.
  */
-class ParameterizedTestMethodProcessor implements TestMethodProcessor {
+final class ParameterizedTestMethodProcessor implements TestMethodProcessor {
 
   /**
    * The parameters as returned by the {@link Parameters} annotated method, or {@link

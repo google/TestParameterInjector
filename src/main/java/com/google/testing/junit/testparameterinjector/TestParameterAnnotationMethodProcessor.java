@@ -66,7 +66,7 @@ import org.junit.runners.model.TestClass;
  *
  * @see TestParameterAnnotation
  */
-class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
+final class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
 
   /**
    * Class to hold an annotation type and origin and one of the values as returned by the {@code
