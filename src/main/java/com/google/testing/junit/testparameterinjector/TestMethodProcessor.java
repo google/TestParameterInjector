@@ -28,7 +28,7 @@ import java.util.List;
 interface TestMethodProcessor {
 
   /** Allows to transform the test information (name and annotations). */
-  List<TestInfo> processTest(Class<?> testClass, TestInfo originalTest);
+  List<TestInfo> calculateTestInfos(TestInfo originalTest);
 
   /**
    * If this processor can handle the given constructor, returns the parameters with which it should

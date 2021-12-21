@@ -14,7 +14,6 @@
 
 package com.google.testing.junit.testparameterinjector;
 
-import java.util.List;
 import org.junit.runners.model.InitializationError;
 
 /**
@@ -30,7 +29,8 @@ public final class TestParameterInjector extends PluggableTestRunner {
   }
 
   @Override
-  protected List<TestMethodProcessor> createTestMethodProcessorList() {
-    return TestMethodProcessors.createNewParameterizedProcessorsWithLegacyFeatures(getTestClass());
+  protected TestMethodProcessorList createTestMethodProcessorList() {
+    return TestMethodProcessorList.createNewParameterizedProcessorsWithLegacyFeatures(
+        getTestClass());
   }
 }

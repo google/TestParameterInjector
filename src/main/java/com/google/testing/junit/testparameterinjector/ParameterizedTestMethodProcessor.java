@@ -121,7 +121,7 @@ class ParameterizedTestMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public List<TestInfo> processTest(Class<?> testClass, TestInfo originalTest) {
+  public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
     if (parametersForAllTests.isPresent()) {
       ImmutableList.Builder<TestInfo> tests = ImmutableList.builder();
       int testIndex = 0;

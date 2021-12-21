@@ -73,8 +73,8 @@ public class PluggableTestRunnerTest {
     PluggableTestRunner.run(
         new PluggableTestRunner(TestAndMethodRuleTestClass.class) {
           @Override
-          protected List<TestMethodProcessor> createTestMethodProcessorList() {
-            return ImmutableList.of();
+          protected TestMethodProcessorList createTestMethodProcessorList() {
+            return TestMethodProcessorList.empty();
           }
         });
 
@@ -101,8 +101,8 @@ public class PluggableTestRunnerTest {
     PluggableTestRunner.run(
         new PluggableTestRunner(CustomTestAnnotationTestClass.class) {
           @Override
-          protected List<TestMethodProcessor> createTestMethodProcessorList() {
-            return ImmutableList.of();
+          protected TestMethodProcessorList createTestMethodProcessorList() {
+            return TestMethodProcessorList.empty();
           }
 
           @Override
@@ -140,8 +140,8 @@ public class PluggableTestRunnerTest {
     PluggableTestRunner.run(
         new PluggableTestRunner(SortedPluggableTestRunnerTestClass.class) {
           @Override
-          protected List<TestMethodProcessor> createTestMethodProcessorList() {
-            return ImmutableList.of();
+          protected TestMethodProcessorList createTestMethodProcessorList() {
+            return TestMethodProcessorList.empty();
           }
 
           @Override

@@ -203,8 +203,8 @@ public class TestParameterTest {
         PluggableTestRunner.run(
             new PluggableTestRunner(testClass) {
               @Override
-              protected List<TestMethodProcessor> createTestMethodProcessorList() {
-                return TestMethodProcessors.createNewParameterizedProcessorsWithLegacyFeatures(
+              protected TestMethodProcessorList createTestMethodProcessorList() {
+                return TestMethodProcessorList.createNewParameterizedProcessorsWithLegacyFeatures(
                     getTestClass());
               }
             });

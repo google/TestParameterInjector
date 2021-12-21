@@ -716,7 +716,7 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
    * corresponding to the cartesian product of both annotations.
    */
   @Override
-  public List<TestInfo> processTest(Class<?> testClass, TestInfo originalTest) {
+  public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
     List<List<TestParameterValue>> parameterValuesForMethod =
         getParameterValuesForMethod(originalTest.getMethod());
 
@@ -742,7 +742,8 @@ class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
               .withExtraAnnotation(
                   TestIndexHolderFactory.create(
                       /* methodIndex= */ strictIndexOf(
-                          getMethodsIncludingParents(testClass), originalTest.getMethod()),
+                          getMethodsIncludingParents(testClass.getJavaClass()),
+                          originalTest.getMethod()),
                       parametersIndex,
                       testClass.getName())));
     }

@@ -18,7 +18,6 @@ import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -60,17 +59,14 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
    */
   private static final ThreadLocal<TestInfo> currentTestInfo = new ThreadLocal<>();
 
-  private List<TestMethodProcessor> testMethodProcessors;
+  private TestMethodProcessorList testMethodProcessors;
 
   protected PluggableTestRunner(Class<?> klass) throws InitializationError {
     super(klass);
   }
 
-  /**
-   * Returns the list of {@link TestMethodProcessor}s to use. This is meant to be overridden by
-   * subclasses.
-   */
-  protected abstract List<TestMethodProcessor> createTestMethodProcessorList();
+  /** Returns the TestMethodProcessorList to use. This is meant to be overridden by subclasses. */
+  protected abstract TestMethodProcessorList createTestMethodProcessorList();
 
   /**
    * This method is run to perform optional additional operations on the test instance, right after
@@ -229,25 +225,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   private ImmutableList<FrameworkMethod> processMethod(FrameworkMethod initialMethod) {
-    ImmutableList<TestInfo> testInfos =
-        ImmutableList.of(
-            TestInfo.createWithoutParameters(
-                initialMethod.getMethod(), ImmutableList.copyOf(initialMethod.getAnnotations())));
-
-    for (final TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
-      testInfos =
-          testInfos.stream()
-              .flatMap(
-                  lastTestInfo ->
-                      testMethodProcessor
-                          .processTest(getTestClass().getJavaClass(), lastTestInfo)
-                          .stream())
-              .collect(toImmutableList());
-    }
-
-    testInfos = TestInfo.deduplicateTestNames(TestInfo.shortenNamesIfNecessary(testInfos));
-
-    return testInfos.stream()
+    return getTestMethodProcessors().calculateTestInfos(initialMethod.getMethod()).stream()
         .map(testInfo -> new OverriddenFrameworkMethod(testInfo.getMethod(), testInfo))
         .collect(toImmutableList());
   }
@@ -285,22 +263,13 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
     if (testInfo.getMethod().getParameterTypes().length == 0) {
       return super.methodInvoker(frameworkMethod, testObject);
     } else {
-      Optional<List<Object>> maybeParameters =
-          getTestMethodProcessors().stream()
-              .map(processor -> processor.maybeGetTestMethodParameters(testInfo))
-              .filter(Optional::isPresent)
-              .findFirst()
-              .orElse(Optional.absent());
-      if (maybeParameters.isPresent()) {
-        return new Statement() {
-          @Override
-          public void evaluate() throws Throwable {
-            frameworkMethod.invokeExplosively(testObject, maybeParameters.get().toArray());
-          }
-        };
-      } else {
-        return super.methodInvoker(frameworkMethod, testObject);
-      }
+      List<Object> parameters = getTestMethodProcessors().getTestMethodParameters(testInfo);
+      return new Statement() {
+        @Override
+        public void evaluate() throws Throwable {
+          frameworkMethod.invokeExplosively(testObject, parameters.toArray());
+        }
+      };
     }
   }
 
@@ -342,12 +311,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
       testInstance = createTest();
     } else {
       List<Object> constructorParameters =
-          getTestMethodProcessors().stream()
-              .map(processor -> processor.maybeGetConstructorParameters(constructor, testInfo))
-              .filter(Optional::isPresent)
-              .findFirst()
-              .get()
-              .get();
+          getTestMethodProcessors().getConstructorParameters(constructor, testInfo);
       try {
         testInstance = constructor.newInstance(constructorParameters.toArray());
       } catch (IllegalAccessException e) {
@@ -356,9 +320,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
     }
 
     // Run all post processors on the newly created instance
-    for (TestMethodProcessor testMethodProcessor : getTestMethodProcessors()) {
-      testMethodProcessor.postProcessTestInstance(testInstance, testInfo);
-    }
+    getTestMethodProcessors().postProcessTestInstance(testInstance, testInfo);
 
     finalizeCreatedTestInstance(testInstance);
 
@@ -368,11 +330,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   @Override
   protected final void validateZeroArgConstructor(List<Throwable> errorsReturned) {
     ExecutableValidationResult validationResult =
-        getTestMethodProcessors().stream()
-            .map(processor -> processor.validateConstructor(getTestClass().getOnlyConstructor()))
-            .filter(ExecutableValidationResult::wasValidated)
-            .findFirst()
-            .orElse(ExecutableValidationResult.notValidated());
+        getTestMethodProcessors().validateConstructor(getTestClass().getOnlyConstructor());
 
     if (validationResult.wasValidated()) {
       errorsReturned.addAll(validationResult.validationErrors());
@@ -389,11 +347,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
             .collect(toImmutableList());
     for (FrameworkMethod testMethod : testMethods) {
       ExecutableValidationResult validationResult =
-          getTestMethodProcessors().stream()
-              .map(processor -> processor.validateTestMethod(testMethod.getMethod()))
-              .filter(ExecutableValidationResult::wasValidated)
-              .findFirst()
-              .orElse(ExecutableValidationResult.notValidated());
+          getTestMethodProcessors().validateTestMethod(testMethod.getMethod());
 
       if (validationResult.wasValidated()) {
         errorsReturned.addAll(validationResult.validationErrors());
@@ -434,7 +388,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
     super.validatePublicVoidNoArgMethods(annotation, isStatic, errors);
   }
 
-  private synchronized List<TestMethodProcessor> getTestMethodProcessors() {
+  private synchronized TestMethodProcessorList getTestMethodProcessors() {
     if (testMethodProcessors == null) {
       testMethodProcessors = createTestMethodProcessorList();
     }

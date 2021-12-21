@@ -595,8 +595,8 @@ public class TestParametersMethodProcessorTest {
   private PluggableTestRunner newTestRunner() throws Exception {
     return new PluggableTestRunner(testClass) {
       @Override
-      protected List<TestMethodProcessor> createTestMethodProcessorList() {
-        return TestMethodProcessors.createNewParameterizedProcessorsWithLegacyFeatures(
+      protected TestMethodProcessorList createTestMethodProcessorList() {
+        return TestMethodProcessorList.createNewParameterizedProcessorsWithLegacyFeatures(
             getTestClass());
       }
     };

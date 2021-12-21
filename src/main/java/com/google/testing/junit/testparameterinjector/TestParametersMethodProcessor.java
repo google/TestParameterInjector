@@ -99,7 +99,7 @@ class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public List<TestInfo> processTest(Class<?> clazz, TestInfo originalTest) {
+  public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
     boolean constructorIsParameterized = hasRelevantAnnotation(testClass.getOnlyConstructor());
     boolean methodIsParameterized = hasRelevantAnnotation(originalTest.getMethod());
 

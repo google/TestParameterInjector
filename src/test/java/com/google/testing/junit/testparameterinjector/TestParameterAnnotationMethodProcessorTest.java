@@ -927,26 +927,26 @@ public class TestParameterAnnotationMethodProcessorTest {
         assertNoFailures(
             PluggableTestRunner.run(
                 newTestRunnerWithParameterizedSupport(
-                    TestParameterAnnotationMethodProcessor::forAllAnnotationPlacements)));
+                    TestMethodProcessorList::createNewParameterizedProcessorsWithLegacyFeatures)));
 
         assertNoFailures(
             PluggableTestRunner.run(
                 newTestRunnerWithParameterizedSupport(
-                    TestParameterAnnotationMethodProcessor::onlyForFieldsAndParameters)));
+                    TestMethodProcessorList::createNewParameterizedProcessors)));
         break;
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
         assertNoFailures(
             PluggableTestRunner.run(
                 newTestRunnerWithParameterizedSupport(
-                    TestParameterAnnotationMethodProcessor::forAllAnnotationPlacements)));
+                    TestMethodProcessorList::createNewParameterizedProcessorsWithLegacyFeatures)));
 
         assertThrows(
             IllegalStateException.class,
             () ->
                 PluggableTestRunner.run(
                     newTestRunnerWithParameterizedSupport(
-                        TestParameterAnnotationMethodProcessor::onlyForFieldsAndParameters)));
+                        TestMethodProcessorList::createNewParameterizedProcessors)));
         break;
 
       case FAILURE:
@@ -955,23 +955,24 @@ public class TestParameterAnnotationMethodProcessorTest {
             () ->
                 PluggableTestRunner.run(
                     newTestRunnerWithParameterizedSupport(
-                        TestParameterAnnotationMethodProcessor::forAllAnnotationPlacements)));
+                        TestMethodProcessorList
+                            ::createNewParameterizedProcessorsWithLegacyFeatures)));
         assertThrows(
             IllegalStateException.class,
             () ->
                 PluggableTestRunner.run(
                     newTestRunnerWithParameterizedSupport(
-                        TestParameterAnnotationMethodProcessor::onlyForFieldsAndParameters)));
+                        TestMethodProcessorList::createNewParameterizedProcessors)));
         break;
     }
   }
 
   private PluggableTestRunner newTestRunnerWithParameterizedSupport(
-      Function<TestClass, TestMethodProcessor> processor) throws Exception {
+      Function<TestClass, TestMethodProcessorList> processorListGenerator) throws Exception {
     return new PluggableTestRunner(testClass) {
       @Override
-      protected List<TestMethodProcessor> createTestMethodProcessorList() {
-        return ImmutableList.of(processor.apply(getTestClass()));
+      protected TestMethodProcessorList createTestMethodProcessorList() {
+        return processorListGenerator.apply(getTestClass());
       }
     };
   }
