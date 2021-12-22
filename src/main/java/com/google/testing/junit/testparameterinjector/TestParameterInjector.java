@@ -18,9 +18,7 @@ import org.junit.runners.model.InitializationError;
 
 /**
  * A JUnit test runner which knows how to instantiate and run test classes where each test case may
- * be parameterized with its own unique set of test parameters (as opposed to {@link
- * org.junit.runners.Parameterized} where each test case in a test class is invoked with the exact
- * same set of parameters).
+ * be parameterized with its own unique set of test parameters.
  */
 public final class TestParameterInjector extends PluggableTestRunner {
 
@@ -30,7 +28,6 @@ public final class TestParameterInjector extends PluggableTestRunner {
 
   @Override
   protected TestMethodProcessorList createTestMethodProcessorList() {
-    return TestMethodProcessorList.createNewParameterizedProcessorsWithLegacyFeatures(
-        getTestClass());
+    return TestMethodProcessorList.createNewParameterizedProcessors(getTestClass());
   }
 }

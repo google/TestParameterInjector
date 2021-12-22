@@ -1,3 +1,13 @@
+## 1.7
+
+- Remove `TestParameterInjector` support for `org.junit.runners.Parameterized`,
+  which was undocumented and thus unlikely to be used.
+
+## 1.6
+
+- Bugfixes
+- Better documentation
+
 ## 1.5
 
 - `@TestParameters` can now also be used as a repeated annotation:
