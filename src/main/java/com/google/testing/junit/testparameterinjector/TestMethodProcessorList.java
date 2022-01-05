@@ -35,20 +35,6 @@ final class TestMethodProcessorList {
   }
 
   /**
-   * Returns a TestMethodProcessorList that supports all features that this package supports.
-   *
-   * <p>Note that this includes support for {@link org.junit.runners.Parameterized}.
-   */
-  public static TestMethodProcessorList createNewParameterizedProcessorsWithLegacyFeatures(
-      TestClass testClass) {
-    return new TestMethodProcessorList(
-        ImmutableList.of(
-            new ParameterizedTestMethodProcessor(testClass),
-            new TestParametersMethodProcessor(testClass),
-            TestParameterAnnotationMethodProcessor.forAllAnnotationPlacements(testClass)));
-  }
-
-  /**
    * Returns a TestMethodProcessorList that supports all features that this package supports, except
    * the following legacy features:
    *
@@ -60,8 +46,8 @@ final class TestMethodProcessorList {
   public static TestMethodProcessorList createNewParameterizedProcessors(TestClass testClass) {
     return new TestMethodProcessorList(
         ImmutableList.of(
-            new TestParametersMethodProcessor(testClass),
-            TestParameterAnnotationMethodProcessor.onlyForFieldsAndParameters(testClass)));
+            new TestParametersMethodProcessor(),
+            TestParameterAnnotationMethodProcessor.onlyForFieldsAndParameters()));
   }
 
   static TestMethodProcessorList empty() {
@@ -75,11 +61,11 @@ final class TestMethodProcessorList {
    * <p>The returned list always contains at least one element. If there is no parameterization,
    * this would be the TestInfo for running the test method without parameters.
    */
-  public List<TestInfo> calculateTestInfos(Method testMethod) {
+  public List<TestInfo> calculateTestInfos(Method testMethod, Class<?> testClass) {
     List<TestInfo> testInfos =
         ImmutableList.of(
             TestInfo.createWithoutParameters(
-                testMethod, ImmutableList.copyOf(testMethod.getAnnotations())));
+                testMethod, testClass, ImmutableList.copyOf(testMethod.getAnnotations())));
 
     for (final TestMethodProcessor testMethodProcessor : testMethodProcessors) {
       testInfos =
@@ -151,9 +137,9 @@ final class TestMethodProcessorList {
   }
 
   /** Optionally validates the given method. */
-  public ExecutableValidationResult validateTestMethod(Method testMethod) {
+  public ExecutableValidationResult validateTestMethod(Method testMethod, Class<?> testClass) {
     return testMethodProcessors.stream()
-        .map(processor -> processor.validateTestMethod(testMethod))
+        .map(processor -> processor.validateTestMethod(testMethod, testClass))
         .filter(ExecutableValidationResult::wasValidated)
         .findFirst()
         .orElse(ExecutableValidationResult.notValidated());

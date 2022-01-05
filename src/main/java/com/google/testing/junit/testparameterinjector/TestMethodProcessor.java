@@ -56,6 +56,11 @@ interface TestMethodProcessor {
   /** Optionally validates the given constructor. */
   ExecutableValidationResult validateConstructor(Constructor<?> constructor);
 
-  /** Optionally validates the given method. */
-  ExecutableValidationResult validateTestMethod(Method testMethod);
+  /**
+   * Optionally validates the given method.
+   *
+   * <p>Note that the given method is not necessarily declared in the given class because test
+   * methods can be inherited.
+   */
+  ExecutableValidationResult validateTestMethod(Method testMethod, Class<?> testClass);
 }

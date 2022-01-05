@@ -927,20 +927,10 @@ public class TestParameterAnnotationMethodProcessorTest {
         assertNoFailures(
             PluggableTestRunner.run(
                 newTestRunnerWithParameterizedSupport(
-                    TestMethodProcessorList::createNewParameterizedProcessorsWithLegacyFeatures)));
-
-        assertNoFailures(
-            PluggableTestRunner.run(
-                newTestRunnerWithParameterizedSupport(
                     TestMethodProcessorList::createNewParameterizedProcessors)));
         break;
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
-        assertNoFailures(
-            PluggableTestRunner.run(
-                newTestRunnerWithParameterizedSupport(
-                    TestMethodProcessorList::createNewParameterizedProcessorsWithLegacyFeatures)));
-
         assertThrows(
             IllegalStateException.class,
             () ->
@@ -950,13 +940,6 @@ public class TestParameterAnnotationMethodProcessorTest {
         break;
 
       case FAILURE:
-        assertThrows(
-            IllegalStateException.class,
-            () ->
-                PluggableTestRunner.run(
-                    newTestRunnerWithParameterizedSupport(
-                        TestMethodProcessorList
-                            ::createNewParameterizedProcessorsWithLegacyFeatures)));
         assertThrows(
             IllegalStateException.class,
             () ->

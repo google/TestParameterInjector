@@ -225,7 +225,9 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   private ImmutableList<FrameworkMethod> processMethod(FrameworkMethod initialMethod) {
-    return getTestMethodProcessors().calculateTestInfos(initialMethod.getMethod()).stream()
+    return getTestMethodProcessors()
+        .calculateTestInfos(initialMethod.getMethod(), getTestClass().getJavaClass())
+        .stream()
         .map(testInfo -> new OverriddenFrameworkMethod(testInfo.getMethod(), testInfo))
         .collect(toImmutableList());
   }
@@ -347,7 +349,8 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
             .collect(toImmutableList());
     for (FrameworkMethod testMethod : testMethods) {
       ExecutableValidationResult validationResult =
-          getTestMethodProcessors().validateTestMethod(testMethod.getMethod());
+          getTestMethodProcessors()
+              .validateTestMethod(testMethod.getMethod(), getTestClass().getJavaClass());
 
       if (validationResult.wasValidated()) {
         errorsReturned.addAll(validationResult.validationErrors());

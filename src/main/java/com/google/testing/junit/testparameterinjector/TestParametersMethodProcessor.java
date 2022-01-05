@@ -16,6 +16,7 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.toList;
 
@@ -50,13 +51,10 @@ import java.util.Objects;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.junit.runners.model.TestClass;
 
 /** {@code TestMethodProcessor} implementation for supporting {@link TestParameters}. */
 @SuppressWarnings("AndroidJdkLibsChecker") // Parameter is not available on old Android SDKs.
 final class TestParametersMethodProcessor implements TestMethodProcessor {
-
-  private final TestClass testClass;
 
   private final LoadingCache<Executable, ImmutableList<TestParametersValues>>
       parameterValuesByConstructorOrMethodCache =
@@ -64,16 +62,12 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
               .maximumSize(1000)
               .build(CacheLoader.from(TestParametersMethodProcessor::toParameterValuesList));
 
-  public TestParametersMethodProcessor(TestClass testClass) {
-    this.testClass = testClass;
-  }
-
   @Override
   public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
     if (hasRelevantAnnotation(constructor)) {
       try {
         // This method throws an exception if there is a validation error
-        getConstructorParameters();
+        getConstructorParameters(constructor);
       } catch (Throwable t) {
         return ExecutableValidationResult.validated(t);
       }
@@ -84,7 +78,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   @Override
-  public ExecutableValidationResult validateTestMethod(Method testMethod) {
+  public ExecutableValidationResult validateTestMethod(Method testMethod, Class<?> testClass) {
     if (hasRelevantAnnotation(testMethod)) {
       try {
         // This method throws an exception if there is a validation error
@@ -100,7 +94,8 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   @Override
   public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
-    boolean constructorIsParameterized = hasRelevantAnnotation(testClass.getOnlyConstructor());
+    boolean constructorIsParameterized =
+        hasRelevantAnnotation(getOnlyConstructor(originalTest.getTestClass()));
     boolean methodIsParameterized = hasRelevantAnnotation(originalTest.getMethod());
 
     if (!constructorIsParameterized && !methodIsParameterized) {
@@ -110,7 +105,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
     ImmutableList.Builder<TestInfo> testInfos = ImmutableList.builder();
 
     ImmutableList<Optional<TestParametersValues>> constructorParametersList =
-        getConstructorParametersOrSingleAbsentElement();
+        getConstructorParametersOrSingleAbsentElement(originalTest.getTestClass());
     ImmutableList<Optional<TestParametersValues>> methodParametersList =
         getMethodParametersOrSingleAbsentElement(originalTest.getMethod());
     for (int constructorParametersIndex = 0;
@@ -160,9 +155,12 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   private ImmutableList<Optional<TestParametersValues>>
-      getConstructorParametersOrSingleAbsentElement() {
-    return hasRelevantAnnotation(testClass.getOnlyConstructor())
-        ? getConstructorParameters().stream().map(Optional::of).collect(toImmutableList())
+      getConstructorParametersOrSingleAbsentElement(Class<?> testClass) {
+    Constructor<?> constructor = getOnlyConstructor(testClass);
+    return hasRelevantAnnotation(constructor)
+        ? getConstructorParameters(constructor).stream()
+            .map(Optional::of)
+            .collect(toImmutableList())
         : ImmutableList.of(Optional.absent());
   }
 
@@ -177,7 +175,8 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   public Optional<List<Object>> maybeGetConstructorParameters(
       Constructor<?> constructor, TestInfo testInfo) {
     if (hasRelevantAnnotation(constructor)) {
-      ImmutableList<TestParametersValues> parameterValuesList = getConstructorParameters();
+      ImmutableList<TestParametersValues> parameterValuesList =
+          getConstructorParameters(constructor);
       TestParametersValues parametersValues =
           parameterValuesList.get(
               testInfo.getAnnotation(TestIndexHolder.class).constructorParametersIndex());
@@ -206,9 +205,9 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   @Override
   public void postProcessTestInstance(Object testInstance, TestInfo testInfo) {}
 
-  private ImmutableList<TestParametersValues> getConstructorParameters() {
+  private ImmutableList<TestParametersValues> getConstructorParameters(Constructor<?> constructor) {
     try {
-      return parameterValuesByConstructorOrMethodCache.getUnchecked(testClass.getOnlyConstructor());
+      return parameterValuesByConstructorOrMethodCache.getUnchecked(constructor);
     } catch (UncheckedExecutionException e) {
       // Rethrow IllegalStateException because they can be caused by user mistakes and the user
       // doesn't need to know that the caching layer is in between.
@@ -446,6 +445,13 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
     return stream(parameters)
         .map(parameter -> parametersValues.parametersMap().get(parameter.getName()))
         .collect(toList());
+  }
+
+  private static Constructor<?> getOnlyConstructor(Class<?> testClass) {
+    ImmutableList<Constructor<?>> constructors = ImmutableList.copyOf(testClass.getConstructors());
+    checkState(
+        constructors.size() == 1, "Expected exactly one constructor, but got %s", constructors);
+    return getOnlyElement(constructors);
   }
 
   // Immutable collectors are re-implemented here because they are missing from the Android

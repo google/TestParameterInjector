@@ -28,6 +28,8 @@ import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -58,7 +60,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
-import org.junit.runners.model.TestClass;
 
 /**
  * {@code TestMethodProcessor} implementation for supporting parameterized tests annotated with
@@ -167,10 +168,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     } else {
       return annotationType ->
           Optional.fromNullable(
-              new TestParameterAnnotationMethodProcessor(
-                      new TestClass(testInfo.getMethod().getDeclaringClass()),
-                      /* onlyForFieldsAndParameters= */ false)
-                  .getParameterValuesForTest(testIndexHolder).stream()
+              new TestParameterAnnotationMethodProcessor(/* onlyForFieldsAndParameters= */ false)
+                  .getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()).stream()
                       .filter(matches(annotationType))
                       .map(TestParameterValue::value)
                       .findFirst()
@@ -284,15 +283,16 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     }
   }
 
-  private final TestClass testClass;
   private final boolean onlyForFieldsAndParameters;
-  private volatile ImmutableList<AnnotationTypeOrigin> cachedAnnotationTypeOrigins;
+  private final LoadingCache<Class<?>, ImmutableList<AnnotationTypeOrigin>>
+      annotationTypeOriginsCache =
+          CacheBuilder.newBuilder()
+              .maximumSize(1000)
+              .build(CacheLoader.from(this::calculateAnnotationTypeOrigins));
   private final Cache<Method, List<List<TestParameterValue>>> parameterValuesCache =
       CacheBuilder.newBuilder().maximumSize(1000).build();
 
-  private TestParameterAnnotationMethodProcessor(
-      TestClass testClass, boolean onlyForFieldsAndParameters) {
-    this.testClass = testClass;
+  private TestParameterAnnotationMethodProcessor(boolean onlyForFieldsAndParameters) {
     this.onlyForFieldsAndParameters = onlyForFieldsAndParameters;
   }
 
@@ -307,9 +307,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
    *   <li>At the test class
    * </ul>
    */
-  static TestMethodProcessor forAllAnnotationPlacements(TestClass testClass) {
-    return new TestParameterAnnotationMethodProcessor(
-        testClass, /* onlyForFieldsAndParameters= */ false);
+  static TestMethodProcessor forAllAnnotationPlacements() {
+    return new TestParameterAnnotationMethodProcessor(/* onlyForFieldsAndParameters= */ false);
   }
 
   /**
@@ -319,102 +318,103 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
    * <p>Note that this excludes class and method-level annotations, as is the default (using the
    * constructor).
    */
-  static TestMethodProcessor onlyForFieldsAndParameters(TestClass testClass) {
-    return new TestParameterAnnotationMethodProcessor(
-        testClass, /* onlyForFieldsAndParameters= */ true);
+  static TestMethodProcessor onlyForFieldsAndParameters() {
+    return new TestParameterAnnotationMethodProcessor(/* onlyForFieldsAndParameters= */ true);
+  }
+
+  private ImmutableList<AnnotationTypeOrigin> calculateAnnotationTypeOrigins(Class<?> testClass) {
+    // Collect all annotations used in declared fields and methods that have themselves a
+    // @TestParameterAnnotation annotation.
+    List<AnnotationTypeOrigin> fieldAnnotations =
+        extractTestParameterAnnotations(
+            streamWithParents(testClass)
+                .flatMap(c -> stream(c.getDeclaredFields()))
+                .flatMap(field -> stream(field.getAnnotations())),
+            Origin.FIELD);
+    List<AnnotationTypeOrigin> methodAnnotations =
+        extractTestParameterAnnotations(
+            stream(testClass.getMethods()).flatMap(method -> stream(method.getAnnotations())),
+            Origin.METHOD);
+    List<AnnotationTypeOrigin> parameterAnnotations =
+        extractTestParameterAnnotations(
+            stream(testClass.getMethods())
+                .flatMap(method -> stream(method.getParameterAnnotations()).flatMap(Stream::of)),
+            Origin.METHOD_PARAMETER);
+    List<AnnotationTypeOrigin> classAnnotations =
+        extractTestParameterAnnotations(stream(testClass.getAnnotations()), Origin.CLASS);
+    List<AnnotationTypeOrigin> constructorAnnotations =
+        extractTestParameterAnnotations(
+            stream(testClass.getConstructors())
+                .flatMap(constructor -> stream(constructor.getAnnotations())),
+            Origin.CONSTRUCTOR);
+    List<AnnotationTypeOrigin> constructorParameterAnnotations =
+        extractTestParameterAnnotations(
+            stream(testClass.getConstructors())
+                .flatMap(
+                    constructor ->
+                        stream(constructor.getParameterAnnotations()).flatMap(Stream::of)),
+            Origin.CONSTRUCTOR_PARAMETER);
+
+    checkDuplicatedClassAndFieldAnnotations(
+        constructorAnnotations, classAnnotations, fieldAnnotations);
+
+    checkDuplicatedFieldsAnnotations(methodAnnotations, fieldAnnotations);
+
+    checkState(
+        constructorAnnotations.stream().distinct().count() == constructorAnnotations.size(),
+        "Annotations should not be duplicated on the constructor.");
+
+    checkState(
+        classAnnotations.stream().distinct().count() == classAnnotations.size(),
+        "Annotations should not be duplicated on the class.");
+
+    if (onlyForFieldsAndParameters) {
+      checkState(
+          methodAnnotations.isEmpty(),
+          "This test runner (constructed by the testparameterinjector package) was configured"
+              + " to disallow method-level annotations that could be field/parameter"
+              + " annotations, but found %s",
+          methodAnnotations);
+      checkState(
+          classAnnotations.isEmpty(),
+          "This test runner (constructed by the testparameterinjector package) was configured"
+              + " to disallow class-level annotations that could be field/parameter annotations,"
+              + " but found %s",
+          classAnnotations);
+      checkState(
+          constructorAnnotations.isEmpty(),
+          "This test runner (constructed by the testparameterinjector package) was configured"
+              + " to disallow constructor-level annotations that could be field/parameter"
+              + " annotations, but found %s",
+          constructorAnnotations);
+    }
+
+    return Stream.of(
+            // The order matters, since it will determine which annotation processor is
+            // called first.
+            classAnnotations.stream(),
+            fieldAnnotations.stream(),
+            constructorAnnotations.stream(),
+            constructorParameterAnnotations.stream(),
+            methodAnnotations.stream(),
+            parameterAnnotations.stream())
+        .flatMap(x -> x)
+        .distinct()
+        .collect(toImmutableList());
   }
 
   private ImmutableList<AnnotationTypeOrigin> getAnnotationTypeOrigins(
-      Origin firstOrigin, Origin... otherOrigins) {
-    if (cachedAnnotationTypeOrigins == null) {
-      // Collect all annotations used in declared fields and methods that have themselves a
-      // @TestParameterAnnotation annotation.
-      List<AnnotationTypeOrigin> fieldAnnotations =
-          extractTestParameterAnnotations(
-              streamWithParents(testClass.getJavaClass())
-                  .flatMap(c -> stream(c.getDeclaredFields()))
-                  .flatMap(field -> stream(field.getAnnotations())),
-              Origin.FIELD);
-      List<AnnotationTypeOrigin> methodAnnotations =
-          extractTestParameterAnnotations(
-              stream(testClass.getJavaClass().getMethods())
-                  .flatMap(method -> stream(method.getAnnotations())),
-              Origin.METHOD);
-      List<AnnotationTypeOrigin> parameterAnnotations =
-          extractTestParameterAnnotations(
-              stream(testClass.getJavaClass().getMethods())
-                  .flatMap(method -> stream(method.getParameterAnnotations()).flatMap(Stream::of)),
-              Origin.METHOD_PARAMETER);
-      List<AnnotationTypeOrigin> classAnnotations =
-          extractTestParameterAnnotations(
-              stream(testClass.getJavaClass().getAnnotations()), Origin.CLASS);
-      List<AnnotationTypeOrigin> constructorAnnotations =
-          extractTestParameterAnnotations(
-              stream(testClass.getJavaClass().getConstructors())
-                  .flatMap(constructor -> stream(constructor.getAnnotations())),
-              Origin.CONSTRUCTOR);
-      List<AnnotationTypeOrigin> constructorParameterAnnotations =
-          extractTestParameterAnnotations(
-              stream(testClass.getJavaClass().getConstructors())
-                  .flatMap(
-                      constructor ->
-                          stream(constructor.getParameterAnnotations()).flatMap(Stream::of)),
-              Origin.CONSTRUCTOR_PARAMETER);
-
-      checkDuplicatedClassAndFieldAnnotations(
-          constructorAnnotations, classAnnotations, fieldAnnotations);
-
-      checkDuplicatedFieldsAnnotations(methodAnnotations, fieldAnnotations);
-
-      checkState(
-          constructorAnnotations.stream().distinct().count() == constructorAnnotations.size(),
-          "Annotations should not be duplicated on the constructor.");
-
-      checkState(
-          classAnnotations.stream().distinct().count() == classAnnotations.size(),
-          "Annotations should not be duplicated on the class.");
-
-      if (onlyForFieldsAndParameters) {
-        checkState(
-            methodAnnotations.isEmpty(),
-            "This test runner (constructed by the testparameterinjector package) was configured"
-                + " to disallow method-level annotations that could be field/parameter"
-                + " annotations, but found %s",
-            methodAnnotations);
-        checkState(
-            classAnnotations.isEmpty(),
-            "This test runner (constructed by the testparameterinjector package) was configured"
-                + " to disallow class-level annotations that could be field/parameter annotations,"
-                + " but found %s",
-            classAnnotations);
-        checkState(
-            constructorAnnotations.isEmpty(),
-            "This test runner (constructed by the testparameterinjector package) was configured"
-                + " to disallow constructor-level annotations that could be field/parameter"
-                + " annotations, but found %s",
-            constructorAnnotations);
-      }
-
-      cachedAnnotationTypeOrigins =
-          Stream.of(
-                  // The order matters, since it will determine which annotation processor is
-                  // called first.
-                  classAnnotations.stream(),
-                  fieldAnnotations.stream(),
-                  constructorAnnotations.stream(),
-                  constructorParameterAnnotations.stream(),
-                  methodAnnotations.stream(),
-                  parameterAnnotations.stream())
-              .flatMap(x -> x)
-              .distinct()
-              .collect(toImmutableList());
-    }
-
+      Class<?> testClass, Origin firstOrigin, Origin... otherOrigins) {
     Set<Origin> originsToFilterBy =
         ImmutableSet.<Origin>builder().add(firstOrigin).add(otherOrigins).build();
-    return cachedAnnotationTypeOrigins.stream()
-        .filter(annotationTypeOrigin -> originsToFilterBy.contains(annotationTypeOrigin.origin()))
-        .collect(toImmutableList());
+    try {
+      return annotationTypeOriginsCache.getUnchecked(testClass).stream()
+          .filter(annotationTypeOrigin -> originsToFilterBy.contains(annotationTypeOrigin.origin()))
+          .collect(toImmutableList());
+    } catch (UncheckedExecutionException e) {
+      Throwables.throwIfInstanceOf(e.getCause(), IllegalStateException.class);
+      throw e;
+    }
   }
 
   private void checkDuplicatedFieldsAnnotations(
@@ -484,12 +484,13 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     // The constructor has parameters, they must be injected by a TestParameterAnnotation
     // annotation.
     Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
+    Class<?> testClass = constructor.getDeclaringClass();
     return ExecutableValidationResult.validated(
         validateMethodOrConstructorParameters(
             removeOverrides(
                 getAnnotationTypeOrigins(
-                    Origin.CLASS, Origin.CONSTRUCTOR, Origin.CONSTRUCTOR_PARAMETER),
-                testClass.getJavaClass()),
+                    testClass, Origin.CLASS, Origin.CONSTRUCTOR, Origin.CONSTRUCTOR_PARAMETER),
+                testClass),
             testClass,
             constructor,
             parameterTypes,
@@ -497,7 +498,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   }
 
   @Override
-  public ExecutableValidationResult validateTestMethod(Method testMethod) {
+  public ExecutableValidationResult validateTestMethod(Method testMethod, Class<?> testClass) {
     Class<?>[] methodParameterTypes = testMethod.getParameterTypes();
     if (methodParameterTypes.length == 0) {
       return ExecutableValidationResult.notValidated();
@@ -520,7 +521,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       Annotation[][] parametersAnnotations = testMethod.getParameterAnnotations();
       errors.addAll(
           validateMethodOrConstructorParameters(
-              getAnnotationTypeOrigins(Origin.CLASS, Origin.METHOD, Origin.METHOD_PARAMETER),
+              getAnnotationTypeOrigins(
+                  testClass, Origin.CLASS, Origin.METHOD, Origin.METHOD_PARAMETER),
               testClass,
               testMethod,
               methodParameterTypes,
@@ -532,7 +534,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
   private List<Throwable> validateMethodOrConstructorParameters(
       List<AnnotationTypeOrigin> annotationTypeOrigins,
-      TestClass testClass,
+      Class<?> testClass,
       AnnotatedElement methodOrConstructor,
       Class<?>[] parameterTypes,
       Annotation[][] parametersAnnotations) {
@@ -579,7 +581,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                 // been evaluated.
                 filterAnnotationTypeOriginsByOrigin(
                     annotationTypeOrigins, Origin.CLASS, Origin.CONSTRUCTOR, Origin.METHOD),
-                testClass.getJavaClass(),
+                testClass,
                 methodOrConstructor);
         // If no annotation is present, simply compare the type.
         for (Class<? extends Annotation> testParameterAnnotationType :
@@ -628,7 +630,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       return Optional.absent();
     } else {
       TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
-      List<TestParameterValue> testParameterValues = getParameterValuesForTest(testIndexHolder);
+      List<TestParameterValue> testParameterValues =
+          getParameterValuesForTest(testIndexHolder, testInfo.getTestClass());
 
       Class<?>[] parameterTypes = constructor.getParameterTypes();
       Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
@@ -670,7 +673,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       checkState(testIndexHolder != null);
       List<TestParameterValue> testParameterValues =
           filterByOrigin(
-              getParameterValuesForTest(testIndexHolder),
+              getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()),
               Origin.CLASS,
               Origin.METHOD,
               Origin.METHOD_PARAMETER);
@@ -718,7 +721,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   @Override
   public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
     List<List<TestParameterValue>> parameterValuesForMethod =
-        getParameterValuesForMethod(originalTest.getMethod());
+        getParameterValuesForMethod(originalTest.getMethod(), originalTest.getTestClass());
 
     if (parameterValuesForMethod.equals(ImmutableList.of(ImmutableList.of()))) {
       // This test is not parameterized
@@ -742,22 +745,23 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
               .withExtraAnnotation(
                   TestIndexHolderFactory.create(
                       /* methodIndex= */ strictIndexOf(
-                          getMethodsIncludingParents(testClass.getJavaClass()),
+                          getMethodsIncludingParents(originalTest.getTestClass()),
                           originalTest.getMethod()),
                       parametersIndex,
-                      testClass.getName())));
+                      originalTest.getTestClass().getName())));
     }
 
     return testInfos.build();
   }
 
-  private List<List<TestParameterValue>> getParameterValuesForMethod(Method method) {
+  private List<List<TestParameterValue>> getParameterValuesForMethod(
+      Method method, Class<?> testClass) {
     try {
       return parameterValuesCache.get(
           method,
           () -> {
             List<List<TestParameterValue>> testParameterValuesList =
-                getAnnotationValuesForUsedAnnotationTypes(testClass.getJavaClass(), method);
+                getAnnotationValuesForUsedAnnotationTypes(method, testClass);
 
             return Lists.cartesianProduct(testParameterValuesList).stream()
                 .filter(
@@ -778,16 +782,17 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     }
   }
 
-  private List<TestParameterValue> getParameterValuesForTest(TestIndexHolder testIndexHolder) {
+  private List<TestParameterValue> getParameterValuesForTest(
+      TestIndexHolder testIndexHolder, Class<?> testClass) {
     verify(
         testIndexHolder.testClassName().equals(testClass.getName()),
         "The class for which the given annotation was created (%s) is not the same as the test"
             + " class that this runner is handling (%s)",
         testIndexHolder.testClassName(),
         testClass.getName());
-    Method testMethod =
-        getMethodsIncludingParents(testClass.getJavaClass()).get(testIndexHolder.methodIndex());
-    return getParameterValuesForMethod(testMethod).get(testIndexHolder.parametersIndex());
+    Method testMethod = getMethodsIncludingParents(testClass).get(testIndexHolder.methodIndex());
+    return getParameterValuesForMethod(testMethod, testClass)
+        .get(testIndexHolder.parametersIndex());
   }
 
   /**
@@ -795,15 +800,15 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
    * class.
    */
   private ImmutableList<List<TestParameterValue>> getAnnotationValuesForUsedAnnotationTypes(
-      Class<?> testClass, Method method) {
+      Method method, Class<?> testClass) {
     ImmutableList<AnnotationTypeOrigin> annotationTypes =
         Stream.of(
-                getAnnotationTypeOrigins(Origin.CLASS).stream(),
-                getAnnotationTypeOrigins(Origin.FIELD).stream(),
-                getAnnotationTypeOrigins(Origin.CONSTRUCTOR).stream(),
-                getAnnotationTypeOrigins(Origin.CONSTRUCTOR_PARAMETER).stream(),
-                getAnnotationTypeOrigins(Origin.METHOD).stream(),
-                getAnnotationTypeOrigins(Origin.METHOD_PARAMETER).stream()
+                getAnnotationTypeOrigins(testClass, Origin.CLASS).stream(),
+                getAnnotationTypeOrigins(testClass, Origin.FIELD).stream(),
+                getAnnotationTypeOrigins(testClass, Origin.CONSTRUCTOR).stream(),
+                getAnnotationTypeOrigins(testClass, Origin.CONSTRUCTOR_PARAMETER).stream(),
+                getAnnotationTypeOrigins(testClass, Origin.METHOD).stream(),
+                getAnnotationTypeOrigins(testClass, Origin.METHOD_PARAMETER).stream()
                     .sorted(annotationComparator(method.getParameterAnnotations())))
             .flatMap(x -> x)
             .collect(toImmutableList());
@@ -1038,7 +1043,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
     try {
       if (testIndexHolder != null) {
-        List<TestParameterValue> testParameterValues = getParameterValuesForTest(testIndexHolder);
+        List<TestParameterValue> testParameterValues =
+            getParameterValuesForTest(testIndexHolder, testInfo.getTestClass());
 
         // Do not include {@link Origin#METHOD_PARAMETER} nor {@link Origin#CONSTRUCTOR_PARAMETER}
         // annotations.
@@ -1152,7 +1158,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
     /**
      * The index of the set of parameters to run the test method with in the list produced by {@link
-     * #getParameterValuesForMethod(Method)}.
+     * #getParameterValuesForMethod}.
      */
     int parametersIndex();
 

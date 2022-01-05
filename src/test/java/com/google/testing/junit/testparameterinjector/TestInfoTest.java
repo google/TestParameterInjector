@@ -56,6 +56,7 @@ public class TestInfoTest {
                             + "000000000000000000000000000000000000000000000000000000000000000000"
                             + "000000000000000000000000000000000000000000000000000000000000000000"
                             + "000000000000000000000000"),
+                getClass(),
                 /* annotations= */ ImmutableList.of()));
 
     ImmutableList<TestInfo> result = TestInfo.shortenNamesIfNecessary(givenTestInfos);
@@ -237,7 +238,9 @@ public class TestInfoTest {
   private static TestInfo fakeTestInfo(TestInfoParameter... parameters)
       throws NoSuchMethodException {
     return TestInfo.createWithoutParameters(
-            String.class.getMethod("toLowerCase"), /* annotations= */ ImmutableList.of())
+            String.class.getMethod("toLowerCase"),
+            String.class,
+            /* annotations= */ ImmutableList.of())
         .withExtraParameters(ImmutableList.copyOf(parameters));
   }
 

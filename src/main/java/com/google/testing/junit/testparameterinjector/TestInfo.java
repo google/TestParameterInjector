@@ -49,7 +49,15 @@ abstract class TestInfo {
 
   public abstract Method getMethod();
 
-  public String getName() {
+  /**
+   * The test class that is being run.
+   *
+   * <p>Note that this is not always the same as the class that declares {@link #getMethod()}
+   * because test methods can be inherited.
+   */
+  public abstract Class<?> getTestClass();
+
+  public final String getName() {
     if (getParameters().isEmpty()) {
       return getMethod().getName();
     } else {
@@ -65,7 +73,7 @@ abstract class TestInfo {
   public abstract ImmutableList<Annotation> getAnnotations();
 
   @Nullable
-  public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+  public final <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
     for (Annotation annotation : getAnnotations()) {
       if (annotationClass.isInstance(annotation)) {
         return annotationClass.cast(annotation);
@@ -74,9 +82,10 @@ abstract class TestInfo {
     return null;
   }
 
-  TestInfo withExtraParameters(List<TestInfoParameter> parameters) {
+  final TestInfo withExtraParameters(List<TestInfoParameter> parameters) {
     return new AutoValue_TestInfo(
         getMethod(),
+        getTestClass(),
         ImmutableList.<TestInfoParameter>builder()
             .addAll(this.getParameters())
             .addAll(parameters)
@@ -84,10 +93,10 @@ abstract class TestInfo {
         getAnnotations());
   }
 
-  TestInfo withExtraAnnotation(Annotation annotation) {
+  final TestInfo withExtraAnnotation(Annotation annotation) {
     ImmutableList<Annotation> newAnnotations =
         ImmutableList.<Annotation>builder().addAll(this.getAnnotations()).add(annotation).build();
-    return new AutoValue_TestInfo(getMethod(), getParameters(), newAnnotations);
+    return new AutoValue_TestInfo(getMethod(), getTestClass(), getParameters(), newAnnotations);
   }
 
   /**
@@ -100,6 +109,7 @@ abstract class TestInfo {
       BiFunction<TestInfoParameter, Integer, String> parameterWithIndexToNewName) {
     return new AutoValue_TestInfo(
         getMethod(),
+        getTestClass(),
         IntStream.range(0, getParameters().size())
             .mapToObj(
                 parameterIndex -> {
@@ -111,14 +121,16 @@ abstract class TestInfo {
         getAnnotations());
   }
 
-  public static TestInfo legacyCreate(Method method, String name, List<Annotation> annotations) {
+  public static TestInfo legacyCreate(
+      Method method, Class<?> testClass, String name, List<Annotation> annotations) {
     return new AutoValue_TestInfo(
-        method, /* parameters= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
+        method, testClass, /* parameters= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
   }
 
-  static TestInfo createWithoutParameters(Method method, List<Annotation> annotations) {
+  static TestInfo createWithoutParameters(
+      Method method, Class<?> testClass, List<Annotation> annotations) {
     return new AutoValue_TestInfo(
-        method, /* parameters= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
+        method, testClass, /* parameters= */ ImmutableList.of(), ImmutableList.copyOf(annotations));
   }
 
   static ImmutableList<TestInfo> shortenNamesIfNecessary(List<TestInfo> testInfos) {
@@ -284,7 +296,7 @@ abstract class TestInfo {
      */
     abstract int getIndexInValueSource();
 
-    TestInfoParameter withName(String newName) {
+    final TestInfoParameter withName(String newName) {
       return create(newName, getValue(), getIndexInValueSource());
     }
 
