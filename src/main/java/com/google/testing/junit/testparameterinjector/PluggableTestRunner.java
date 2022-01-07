@@ -25,6 +25,7 @@ import com.google.common.collect.Lists;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -351,6 +352,15 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
       ExecutableValidationResult validationResult =
           getTestMethodProcessors()
               .validateTestMethod(testMethod.getMethod(), getTestClass().getJavaClass());
+
+      if (Modifier.isStatic(testMethod.getMethod().getModifiers())) {
+        errorsReturned.add(
+            new Exception(String.format("Method %s() should not be static", testMethod.getName())));
+      }
+      if (!Modifier.isPublic(testMethod.getMethod().getModifiers())) {
+        errorsReturned.add(
+            new Exception(String.format("Method %s() should be public", testMethod.getName())));
+      }
 
       if (validationResult.wasValidated()) {
         errorsReturned.addAll(validationResult.validationErrors());

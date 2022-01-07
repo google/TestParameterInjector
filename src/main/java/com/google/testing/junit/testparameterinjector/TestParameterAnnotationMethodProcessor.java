@@ -43,7 +43,6 @@ import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -504,31 +503,14 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       return ExecutableValidationResult.notValidated();
     } else {
       // The method has parameters, they must be injected by a TestParameterAnnotation annotation.
-
-      List<Throwable> errors = new ArrayList<>();
-      if (Modifier.isStatic(testMethod.getModifiers())) {
-        errors.add(
-            new Exception(String.format("Method %s() should not be static", testMethod.getName())));
-      }
-      if (!Modifier.isPublic(testMethod.getModifiers())) {
-        errors.add(
-            new Exception(String.format("Method %s() should be public", testMethod.getName())));
-      }
-      if (testMethod.getReturnType() != Void.TYPE) {
-        errors.add(
-            new Exception(String.format("Method %s() should return void", testMethod.getName())));
-      }
-      Annotation[][] parametersAnnotations = testMethod.getParameterAnnotations();
-      errors.addAll(
+      return ExecutableValidationResult.validated(
           validateMethodOrConstructorParameters(
               getAnnotationTypeOrigins(
                   testClass, Origin.CLASS, Origin.METHOD, Origin.METHOD_PARAMETER),
               testClass,
               testMethod,
               methodParameterTypes,
-              parametersAnnotations));
-
-      return ExecutableValidationResult.validated(errors);
+              testMethod.getParameterAnnotations()));
     }
   }
 
