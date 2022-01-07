@@ -927,7 +927,7 @@ public class TestParameterAnnotationMethodProcessorTest {
         assertNoFailures(
             PluggableTestRunner.run(
                 newTestRunnerWithParameterizedSupport(
-                    TestMethodProcessorList::createNewParameterizedProcessors)));
+                    testClass -> TestMethodProcessorList.createNewParameterizedProcessors())));
         break;
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
@@ -936,7 +936,7 @@ public class TestParameterAnnotationMethodProcessorTest {
             () ->
                 PluggableTestRunner.run(
                     newTestRunnerWithParameterizedSupport(
-                        TestMethodProcessorList::createNewParameterizedProcessors)));
+                        testClass -> TestMethodProcessorList.createNewParameterizedProcessors())));
         break;
 
       case FAILURE:
@@ -945,7 +945,7 @@ public class TestParameterAnnotationMethodProcessorTest {
             () ->
                 PluggableTestRunner.run(
                     newTestRunnerWithParameterizedSupport(
-                        TestMethodProcessorList::createNewParameterizedProcessors)));
+                        testClass -> TestMethodProcessorList.createNewParameterizedProcessors())));
         break;
     }
   }

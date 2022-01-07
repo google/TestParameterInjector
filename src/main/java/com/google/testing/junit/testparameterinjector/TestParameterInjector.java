@@ -28,6 +28,6 @@ public final class TestParameterInjector extends PluggableTestRunner {
 
   @Override
   protected TestMethodProcessorList createTestMethodProcessorList() {
-    return TestMethodProcessorList.createNewParameterizedProcessors(getTestClass());
+    return TestMethodProcessorList.createNewParameterizedProcessors();
   }
 }

@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.List;
-import org.junit.runners.model.TestClass;
 
 /**
  * Combined version of all {@link TestMethodProcessor} implementations that this package supports.
@@ -43,7 +42,7 @@ final class TestMethodProcessorList {
    *   <li>No support for class and method-level parameters, except for @TestParameters
    * </ul>
    */
-  public static TestMethodProcessorList createNewParameterizedProcessors(TestClass testClass) {
+  public static TestMethodProcessorList createNewParameterizedProcessors() {
     return new TestMethodProcessorList(
         ImmutableList.of(
             new TestParametersMethodProcessor(),

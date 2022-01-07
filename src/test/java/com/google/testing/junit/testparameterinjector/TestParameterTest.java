@@ -204,7 +204,7 @@ public class TestParameterTest {
             new PluggableTestRunner(testClass) {
               @Override
               protected TestMethodProcessorList createTestMethodProcessorList() {
-                return TestMethodProcessorList.createNewParameterizedProcessors(getTestClass());
+                return TestMethodProcessorList.createNewParameterizedProcessors();
               }
             });
 
