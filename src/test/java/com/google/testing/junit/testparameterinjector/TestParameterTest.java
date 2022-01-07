@@ -76,13 +76,15 @@ public class TestParameterTest {
 
   @RunAsTest
   public static class AnnotatedConstructorParameter {
-    private static List<TestEnum> testedParameters;
+    private static List<String> testedParameters;
 
-    private final TestEnum enumParameter;
+    private final TestEnum constructorEnum;
 
-    public AnnotatedConstructorParameter(@TestParameter TestEnum enumParameter) {
-      this.enumParameter = enumParameter;
+    public AnnotatedConstructorParameter(@TestParameter TestEnum constructorEnum) {
+      this.constructorEnum = constructorEnum;
     }
+
+    @TestParameter TestEnum fieldEnum;
 
     @BeforeClass
     public static void initializeStaticFields() {
@@ -92,12 +94,22 @@ public class TestParameterTest {
 
     @Test
     public void test() {
-      testedParameters.add(enumParameter);
+      testedParameters.add(String.format("%s:%s", fieldEnum, constructorEnum));
     }
 
     @AfterClass
     public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+      assertThat(testedParameters)
+          .containsExactly(
+              "ONE:ONE",
+              "ONE:TWO",
+              "ONE:THREE",
+              "TWO:ONE",
+              "TWO:TWO",
+              "TWO:THREE",
+              "THREE:ONE",
+              "THREE:TWO",
+              "THREE:THREE");
     }
   }
 

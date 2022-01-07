@@ -870,13 +870,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                 case FIELD: // Fall through.
                 case CLASS:
                   return getAnnotationListWithType(
-                              getOnlyConstructor(testClass).getAnnotations(),
-                              annotationTypeOrigin.annotationType())
-                          .isEmpty()
-                      && getAnnotationListWithType(
-                              getOnlyConstructor(testClass).getParameterAnnotations(),
-                              annotationTypeOrigin.annotationType())
-                          .isEmpty();
+                          getOnlyConstructor(testClass).getAnnotations(),
+                          annotationTypeOrigin.annotationType())
+                      .isEmpty();
                 default:
                   return true;
               }
@@ -1012,14 +1008,6 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       }
     }
     return resultBuilder.build();
-  }
-
-  private ImmutableList<Annotation> getAnnotationListWithType(
-      Annotation[][] parameterAnnotations, Class<? extends Annotation> annotationType) {
-    return stream(parameterAnnotations)
-        .flatMap(Stream::of)
-        .filter(annotation -> annotation.annotationType().equals(annotationType))
-        .collect(toImmutableList());
   }
 
   private ImmutableList<Annotation> getAnnotationListWithType(
