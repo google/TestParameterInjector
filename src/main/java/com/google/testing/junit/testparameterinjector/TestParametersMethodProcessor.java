@@ -448,7 +448,8 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   private static Constructor<?> getOnlyConstructor(Class<?> testClass) {
-    ImmutableList<Constructor<?>> constructors = ImmutableList.copyOf(testClass.getConstructors());
+    ImmutableList<Constructor<?>> constructors =
+        ImmutableList.copyOf(testClass.getDeclaredConstructors());
     checkState(
         constructors.size() == 1, "Expected exactly one constructor, but got %s", constructors);
     return getOnlyElement(constructors);

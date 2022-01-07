@@ -26,6 +26,7 @@ import static org.junit.Assert.fail;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
+import com.google.testing.junit.testparameterinjector.TestParameterAnnotationMethodProcessorTest.ErrorNonStaticProviderClass.NonStaticProvider;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.util.ArrayList;
@@ -502,6 +503,30 @@ public class TestParameterAnnotationMethodProcessorTest {
     }
   }
 
+  public abstract static class BaseClassWithSingleTest {
+    @Rule public TestName testName = new TestName();
+
+    static List<String> allTestNames;
+
+    @BeforeClass
+    public static void resetStaticState() {
+      allTestNames = new ArrayList<>();
+    }
+
+    @Test
+    public void testInBase(@TestParameter boolean b) {
+      allTestNames.add(testName.getMethodName());
+    }
+
+    @AfterClass
+    public static void completedAllParameterizedTests() {
+      assertThat(allTestNames).containsExactly("testInBase[b=true]", "testInBase[b=false]");
+    }
+  }
+
+  @ClassTestResult(Result.SUCCESS_ALWAYS)
+  public static class SimpleTestInheritedFromBaseClass extends BaseClassWithSingleTest {}
+
   public abstract static class BaseClassWithAnnotations {
     @Rule public TestName testName = new TestName();
 
@@ -778,6 +803,13 @@ public class TestParameterAnnotationMethodProcessorTest {
     }
   }
 
+  @ClassTestResult(Result.FAILURE)
+  public static class ErrorNonPublicTestMethod {
+
+    @Test
+    void test(@TestParameter boolean b) {}
+  }
+
   public enum EnumA {
     A1,
     A2
@@ -932,7 +964,7 @@ public class TestParameterAnnotationMethodProcessorTest {
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
         assertThrows(
-            IllegalStateException.class,
+            RuntimeException.class,
             () ->
                 PluggableTestRunner.run(
                     newTestRunnerWithParameterizedSupport(
@@ -941,7 +973,7 @@ public class TestParameterAnnotationMethodProcessorTest {
 
       case FAILURE:
         assertThrows(
-            IllegalStateException.class,
+            RuntimeException.class,
             () ->
                 PluggableTestRunner.run(
                     newTestRunnerWithParameterizedSupport(

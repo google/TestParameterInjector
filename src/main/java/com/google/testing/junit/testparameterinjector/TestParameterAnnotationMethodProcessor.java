@@ -336,19 +336,20 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
             Origin.METHOD);
     List<AnnotationTypeOrigin> parameterAnnotations =
         extractTestParameterAnnotations(
-            stream(testClass.getMethods())
+            streamWithParents(testClass)
+                .flatMap(c -> stream(c.getDeclaredMethods()))
                 .flatMap(method -> stream(method.getParameterAnnotations()).flatMap(Stream::of)),
             Origin.METHOD_PARAMETER);
     List<AnnotationTypeOrigin> classAnnotations =
         extractTestParameterAnnotations(stream(testClass.getAnnotations()), Origin.CLASS);
     List<AnnotationTypeOrigin> constructorAnnotations =
         extractTestParameterAnnotations(
-            stream(testClass.getConstructors())
+            stream(testClass.getDeclaredConstructors())
                 .flatMap(constructor -> stream(constructor.getAnnotations())),
             Origin.CONSTRUCTOR);
     List<AnnotationTypeOrigin> constructorParameterAnnotations =
         extractTestParameterAnnotations(
-            stream(testClass.getConstructors())
+            stream(testClass.getDeclaredConstructors())
                 .flatMap(
                     constructor ->
                         stream(constructor.getParameterAnnotations()).flatMap(Stream::of)),
@@ -1000,7 +1001,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   }
 
   private static Constructor<?> getOnlyConstructor(Class<?> testClass) {
-    Constructor<?>[] constructors = testClass.getConstructors();
+    Constructor<?>[] constructors = testClass.getDeclaredConstructors();
     checkState(
         constructors.length == 1,
         "a single public constructor is required for class %s",
@@ -1259,7 +1260,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   private ImmutableList<Method> getMethodsIncludingParents(Class<?> clazz) {
     ImmutableList.Builder<Method> resultBuilder = ImmutableList.builder();
     while (clazz != null) {
-      resultBuilder.add(clazz.getMethods());
+      resultBuilder.add(clazz.getDeclaredMethods());
       clazz = clazz.getSuperclass();
     }
     return resultBuilder.build();
