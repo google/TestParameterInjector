@@ -27,7 +27,7 @@ public class ParameterValueParsingTest {
   public void parseEnum_success() throws Exception {
     Enum<?> result = ParameterValueParsing.parseEnum("BBB", TestEnum.class);
 
-    assertThat(result).isEqualTo(TestEnum.BBB);
+    assertThat(result).isEqualTo(TestEnum.AAA);
   }
 
   @Test
