@@ -33,8 +33,9 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+          cache: maven
 
-      - run: mvn verify javadoc:javadoc
+      - run: mvn --update-snapshots -B verify javadoc:javadoc
 
       - name: Deploy docs to website
         if: ${{ github.ref == 'refs/heads/main' }}
