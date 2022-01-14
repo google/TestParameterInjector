@@ -15,6 +15,7 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.Iterables.getOnlyElement;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
@@ -57,5 +58,15 @@ abstract class ExecutableValidationResult {
     checkArgument(wasValidated || validationErrors.isEmpty());
     return new AutoValue_ExecutableValidationResult(
         wasValidated, ImmutableList.copyOf(validationErrors));
+  }
+
+  void assertValid() {
+    if (wasValidated() && !validationErrors().isEmpty()) {
+      if (validationErrors().size() == 1) {
+        throw new AssertionError(getOnlyElement(validationErrors()));
+      } else {
+        throw new AssertionError(String.format("Found validation errors: %s", validationErrors()));
+      }
+    }
   }
 }
