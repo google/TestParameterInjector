@@ -17,7 +17,7 @@ package com.google.testing.junit.testparameterinjector;
 import org.junit.runners.model.InitializationError;
 
 /**
- * A JUnit test runner which knows how to instantiate and run test classes where each test case may
+ * A JUnit4 test runner which knows how to instantiate and run test classes where each test case may
  * be parameterized with its own unique set of test parameters.
  */
 public final class TestParameterInjector extends PluggableTestRunner {
