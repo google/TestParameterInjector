@@ -38,6 +38,6 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: site
-          FOLDER: target/site/apidocs
+          FOLDER: junit4/target/site/apidocs
           TARGET_FOLDER: docs/1.x/
           CLEAN: true
