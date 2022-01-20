@@ -1,3 +1,7 @@
+## 1.8
+
+- Add support for JUnit5 (Jupiter)
+
 ## 1.7
 
 - Remove `TestParameterInjector` support for `org.junit.runners.Parameterized`,
