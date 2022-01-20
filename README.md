@@ -5,7 +5,7 @@ TestParameterInjector
 
 ## Introduction
 
-`TestParameterInjector` is a JUnit4 test runner that runs its test methods for
+`TestParameterInjector` is a JUnit4 and JUnit5 test runner that runs its test methods for
 different combinations of field/parameter values.
 
 Parameterized tests are a great way to avoid code duplication between tests and
@@ -22,6 +22,8 @@ goes into a bit more detail about how `TestParameterInjector` compares to other
 frameworks used at Google.
 
 ## Getting started
+
+### JUnit4
 
 To start using `TestParameterInjector` right away, copy the following snippet:
 
@@ -52,7 +54,7 @@ And add the following dependency to your `.pom` file:
 <dependency>
   <groupId>com.google.testparameterinjector</groupId>
   <artifactId>test-parameter-injector</artifactId>
-  <version>1.7</version>
+  <version>1.8</version>
 </dependency>
 ```
 
@@ -60,8 +62,55 @@ or see [this maven.org
 page](https://search.maven.org/artifact/com.google.testparameterinjector/test-parameter-injector)
 for instructions for other build tools.
 
+### JUnit5 (Jupiter)
+<details>
+<summary>Click to expand</summary>
+
+To start using `TestParameterInjector` right away, copy the following snippet:
+
+```java
+import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorTest;
+import com.google.testing.junit.testparameterinjector.junit5.TestParameter;
+
+class MyTest {
+
+  @TestParameter boolean isDryRun;
+
+  @TestParameterInjectorTest
+  void test1(@TestParameter boolean enableFlag) {
+    // ...
+  }
+
+  @TestParameterInjectorTest
+  void test2(@TestParameter MyEnum myEnum) {
+    // ...
+  }
+
+  enum MyEnum { VALUE_A, VALUE_B, VALUE_C }
+}
+```
+
+And add the following dependency to your `.pom` file:
+
+```xml
+<dependency>
+  <groupId>com.google.testparameterinjector</groupId>
+  <artifactId>test-parameter-injector-junit5</artifactId>
+  <version>1.8</version>
+</dependency>
+```
+
+or see [this maven.org
+page](https://search.maven.org/artifact/com.google.testparameterinjector/test-parameter-injector-junit5)
+for instructions for other build tools.
+
+</details>
 
 ## Basics
+
+**Note about JUnit4 vs JUnit5:**<br />
+The code below assumes you're using JUnit4. For JUnit5 users, simply remove the
+`@RunWith` annotation and replace `@Test` by `@TestParameterInjectorTest`.
 
 ### `@TestParameter` for testing all combinations
 
@@ -242,6 +291,10 @@ tests will be run for the given parameter sets.
 > ```
 
 ## Advanced usage
+
+**Note about JUnit4 vs JUnit5:**<br />
+The code below assumes you're using JUnit4. For JUnit5 users, simply remove the
+`@RunWith` annotation and replace `@Test` by `@TestParameterInjectorTest`.
 
 ### Dynamic parameter generation for `@TestParameter`
 
