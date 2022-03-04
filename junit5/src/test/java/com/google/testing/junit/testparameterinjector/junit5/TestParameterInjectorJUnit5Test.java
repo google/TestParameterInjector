@@ -127,8 +127,9 @@ class TestParameterInjectorJUnit5Test {
 
     @TestParameterInjectorTest
     void withParameter_success(
-        @TestParameter({"2", "xyz"}) String name, @TestParameter boolean bool) {
-      storeTestParametersForThisTest(name, bool);
+        @TestParameter({"2", "xyz"}) String name, @TestParameter boolean bool,
+        @TestParameter(exclude = {"THREE"}) TestEnum enumParameter) {
+      storeTestParametersForThisTest(name, bool, enumParameter);
     }
 
     @Override
@@ -138,10 +139,14 @@ class TestParameterInjectorJUnit5Test {
           .put("withoutParameters", "")
           .put("withParameters_success[{name: 1, number: 3.3}]", "1:3.3")
           .put("withParameters_success[{name: abc, number: 5}]", "abc:5.0")
-          .put("withParameter_success[2,bool=false]", "2:false")
-          .put("withParameter_success[2,bool=true]", "2:true")
-          .put("withParameter_success[xyz,bool=false]", "xyz:false")
-          .put("withParameter_success[xyz,bool=true]", "xyz:true")
+          .put("withParameter_success[2,bool=false,ONE]", "2:false:ONE")
+          .put("withParameter_success[2,bool=false,TWO]", "2:false:TWO")
+          .put("withParameter_success[2,bool=true,ONE]", "2:true:ONE")
+          .put("withParameter_success[2,bool=true,TWO]", "2:true:TWO")
+          .put("withParameter_success[xyz,bool=false,ONE]", "xyz:false:ONE")
+          .put("withParameter_success[xyz,bool=false,TWO]", "xyz:false:TWO")
+          .put("withParameter_success[xyz,bool=true,ONE]", "xyz:true:ONE")
+          .put("withParameter_success[xyz,bool=true,TWO]", "xyz:true:TWO")
           .build();
     }
   }

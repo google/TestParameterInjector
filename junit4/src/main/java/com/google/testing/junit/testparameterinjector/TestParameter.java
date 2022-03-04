@@ -15,6 +15,8 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -22,6 +24,7 @@ import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.toList;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Primitives;
 import com.google.protobuf.MessageLite;
 import com.google.testing.junit.testparameterinjector.TestParameter.InternalImplementationOfThisParameter;
@@ -116,6 +119,18 @@ public @interface TestParameter {
   Class<? extends TestParameterValuesProvider> valuesProvider() default
       DefaultTestParameterValuesProvider.class;
 
+  /**
+   * Excludes an array of stringified values for the annotated type.
+   *
+   * <p>Types that are supported:
+   *
+   * <ul>
+   *   <li>Enum value: Specified as a String that can be parsed by {@code Enum.valueOf()}
+   * </ul>
+   * @return
+   */
+  String[] exclude() default {};
+
   /** Interface for custom providers of test parameter values. */
   interface TestParameterValuesProvider {
     List<?> provideValues();
@@ -153,7 +168,13 @@ public @interface TestParameter {
         return getValuesFromProvider(annotation.valuesProvider());
       } else {
         if (Enum.class.isAssignableFrom(parameterClass)) {
-          return ImmutableList.copyOf(parameterClass.asSubclass(Enum.class).getEnumConstants());
+          ImmutableSet<Enum> excludedEnums = stream(annotation.exclude())
+              .map(excludedEnumString ->
+                  ParameterValueParsing.parseEnum(excludedEnumString, parameterClass))
+              .collect(toImmutableSet());
+          return stream(parameterClass.asSubclass(Enum.class).getEnumConstants())
+              .filter(e -> !excludedEnums.contains(e))
+              .collect(toImmutableList());
         } else if (Primitives.wrap(parameterClass).equals(Boolean.class)) {
           return ImmutableList.of(false, true);
         } else {

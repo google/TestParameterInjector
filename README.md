@@ -167,6 +167,7 @@ The following examples show most of the supported types. See the `@TestParameter
 // Enums
 @TestParameter AnimalEnum a; // Implies all possible values of AnimalEnum
 @TestParameter({"CAT", "DOG"}) AnimalEnum a; // Implies AnimalEnum.CAT and AnimalEnum.DOG.
+@TestParameter(exclude = {"CAT", "DOG"}) AnimalEnum a; // Excludes AnimalEnum.CAT and AnimalEnum.DOG.
 
 // Strings
 @TestParameter({"cat", "dog"}) String animalName;
