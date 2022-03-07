@@ -292,6 +292,29 @@ tests will be run for the given parameter sets.
 > MyTest#personIsAdult[young adult]
 > ```
 
+### Filtering unwanted parameters
+
+Sometimes, you want to exclude a parameter or a combination of parameters. We
+recommend doing this via JUnit assumptions which is also supported by
+[Truth](https://truth.dev/):
+
+```java
+import static com.google.common.truth.TruthJUnit.assume;
+
+@Test
+public void myTest(@TestParameter Fruit fruit) {
+  assume().that(fruit).isNotEqualTo(Fruit.BANANA);
+
+  // At this point, the test will only run for APPLE and CHERRY.
+  // The BANANA case will silently be ignored.
+}
+
+enum Fruit { APPLE, BANANA, CHERRY }
+```
+
+Note that the above works regardless of what parameterization framework you
+choose.
+
 ## Advanced usage
 
 **Note about JUnit4 vs JUnit5:**<br />
