@@ -20,8 +20,6 @@ import static java.util.stream.Collectors.joining;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -117,34 +115,10 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   /**
-   * {@link TestRule}s that will be executed after the ones defined in the test class (but still
-   * before all {@link MethodRule}s). This is meant to be overridden by subclasses.
-   */
-  protected List<TestRule> getInnerTestRules() {
-    return ImmutableList.of();
-  }
-
-  /**
    * {@link TestRule}s that will be executed before the ones defined in the test class. This is
    * meant to be overridden by subclasses.
    */
   protected List<TestRule> getExtraTestRules() {
-    return ImmutableList.of();
-  }
-
-  /**
-   * {@link MethodRule}s that will be executed after the ones defined in the test class. This is
-   * meant to be overridden by subclasses.
-   */
-  protected List<MethodRule> getInnerMethodRules() {
-    return ImmutableList.of();
-  }
-
-  /**
-   * {@link MethodRule}s that will be executed before the ones defined in the test class (but still
-   * after all {@link TestRule}s). This is meant to be overridden by subclasses.
-   */
-  protected List<MethodRule> getOuterMethodRules() {
     return ImmutableList.of();
   }
 
@@ -279,19 +253,11 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   /** Modifies the statement with each {@link MethodRule} and {@link TestRule} */
   private Statement withRules(FrameworkMethod method, Object target, Statement statement) {
     ImmutableList<TestRule> testRules =
-        Stream.of(
-                getInnerTestRules().stream(),
-                getTestRules(target).stream(),
-                getExtraTestRules().stream())
+        Stream.of(getTestRules(target).stream(), getExtraTestRules().stream())
             .flatMap(x -> x)
             .collect(toImmutableList());
 
-    Iterable<MethodRule> methodRules =
-        Iterables.concat(
-            Lists.reverse(getInnerMethodRules()),
-            rules(target),
-            Lists.reverse(getOuterMethodRules()));
-    for (MethodRule methodRule : methodRules) {
+    for (MethodRule methodRule : rules(target)) {
       // For rules that implement both TestRule and MethodRule, only apply the TestRule.
       if (!testRules.contains(methodRule)) {
         statement = methodRule.apply(statement, method, target);
