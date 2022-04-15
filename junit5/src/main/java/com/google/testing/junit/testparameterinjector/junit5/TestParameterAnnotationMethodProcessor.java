@@ -843,7 +843,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         testClass);
   }
 
-  /** @see #removeOverrides(List, Class) */
+  /**
+   * @see #removeOverrides(List, Class)
+   */
   private List<AnnotationTypeOrigin> removeOverrides(
       List<AnnotationTypeOrigin> annotationTypeOrigins, Class<?> testClass) {
     return annotationTypeOrigins.stream()

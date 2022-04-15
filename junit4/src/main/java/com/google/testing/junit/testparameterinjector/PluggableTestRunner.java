@@ -128,7 +128,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
    * {@link TestRule}s that will be executed before the ones defined in the test class. This is
    * meant to be overridden by subclasses.
    */
-  protected List<TestRule> getOuterTestRules() {
+  protected List<TestRule> getExtraTestRules() {
     return ImmutableList.of();
   }
 
@@ -282,7 +282,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
         Stream.of(
                 getInnerTestRules().stream(),
                 getTestRules(target).stream(),
-                getOuterTestRules().stream())
+                getExtraTestRules().stream())
             .flatMap(x -> x)
             .collect(toImmutableList());
 
