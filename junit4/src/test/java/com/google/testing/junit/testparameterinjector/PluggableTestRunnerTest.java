@@ -24,6 +24,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.MethodRule;
@@ -36,24 +37,52 @@ import org.junit.runners.model.Statement;
 
 @RunWith(JUnit4.class)
 public class PluggableTestRunnerTest {
+
+  private static ArrayList<String> ruleInvocations;
+  private static int testMethodInvocationCount;
+  private static List<String> testOrder;
+
+  @Before
+  public void setUp() {
+    ruleInvocations = new ArrayList<>();
+    testMethodInvocationCount = 0;
+    testOrder = new ArrayList<>();
+  }
+
   @Retention(RetentionPolicy.RUNTIME)
-  private static @interface CustomTest {}
+  private @interface CustomTest {}
 
-  private static int ruleInvocationCount = 0;
-  private static int testMethodInvocationCount = 0;
+  static class TestAndMethodRule implements MethodRule, TestRule {
+    private final String name;
 
-  public static class TestAndMethodRule implements MethodRule, TestRule {
+    TestAndMethodRule() {
+      this("DEFAULT_NAME");
+    }
+
+    TestAndMethodRule(String name) {
+      this.name = name;
+    }
 
     @Override
     public Statement apply(Statement base, Description description) {
-      ruleInvocationCount++;
-      return base;
+      return new Statement() {
+        @Override
+        public void evaluate() throws Throwable {
+          ruleInvocations.add(name);
+          base.evaluate();
+        }
+      };
     }
 
     @Override
     public Statement apply(Statement base, FrameworkMethod method, Object target) {
-      ruleInvocationCount++;
-      return base;
+      return new Statement() {
+        @Override
+        public void evaluate() throws Throwable {
+          ruleInvocations.add(name);
+          base.evaluate();
+        }
+      };
     }
   }
 
@@ -78,7 +107,66 @@ public class PluggableTestRunnerTest {
           }
         });
 
-    assertThat(ruleInvocationCount).isEqualTo(1);
+    assertThat(ruleInvocations).hasSize(1);
+  }
+
+  @RunWith(PluggableTestRunner.class)
+  public static class RuleOrderingTestClassWithExplicitOrder {
+
+    @Rule(order = 3)
+    public TestAndMethodRule ruleA = new TestAndMethodRule("A");
+
+    @Rule(order = 1)
+    public TestAndMethodRule ruleB = new TestAndMethodRule("B");
+
+    @Rule(order = 2)
+    public TestAndMethodRule ruleC = new TestAndMethodRule("C");
+
+    @Test
+    public void test() {
+      // no-op
+    }
+  }
+
+  @Test
+  public void rulesAreSortedCorrectly_withExplicitOrder() throws Exception {
+    PluggableTestRunner.run(
+        new PluggableTestRunner(RuleOrderingTestClassWithExplicitOrder.class) {
+          @Override
+          protected TestMethodProcessorList createTestMethodProcessorList() {
+            return TestMethodProcessorList.empty();
+          }
+        });
+
+    assertThat(ruleInvocations).containsExactly("B", "C", "A").inOrder();
+  }
+
+  @RunWith(PluggableTestRunner.class)
+  public static class RuleOrderingTestClassWithImplicitOrder {
+
+    @Rule public TestAndMethodRule ruleC = new TestAndMethodRule("C");
+    @Rule public TestAndMethodRule ruleA = new TestAndMethodRule("A");
+    @Rule public TestAndMethodRule ruleB = new TestAndMethodRule("B");
+
+    @Test
+    public void test() {
+      // no-op
+    }
+  }
+
+  @Test
+  public void rulesAreSortedCorrectly_withImplicitOrder() throws Exception {
+    PluggableTestRunner.run(
+        new PluggableTestRunner(RuleOrderingTestClassWithImplicitOrder.class) {
+          @Override
+          protected TestMethodProcessorList createTestMethodProcessorList() {
+            return TestMethodProcessorList.empty();
+          }
+        });
+
+    // This might look counter-intuitive, but JUnit4 behaves in this reverse order way. So for
+    // consistency, PluggableTestRunner should do the same.
+    assertThat(ruleInvocations).containsExactly("B", "A", "C").inOrder();
   }
 
   @RunWith(PluggableTestRunner.class)
@@ -113,8 +201,6 @@ public class PluggableTestRunnerTest {
 
     assertThat(testMethodInvocationCount).isEqualTo(2);
   }
-
-  private static final List<String> testOrder = new ArrayList<>();
 
   @RunWith(PluggableTestRunner.class)
   public static class SortedPluggableTestRunnerTestClass {

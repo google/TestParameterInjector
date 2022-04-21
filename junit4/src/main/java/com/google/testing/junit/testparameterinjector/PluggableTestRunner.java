@@ -20,6 +20,8 @@ import static java.util.stream.Collectors.joining;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Lists;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -28,6 +30,7 @@ import java.util.List;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.internal.runners.model.ReflectiveCallable;
 import org.junit.internal.runners.statements.Fail;
@@ -40,7 +43,9 @@ import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.BlockJUnit4ClassRunner;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
+import org.junit.runners.model.MemberValueConsumer;
 import org.junit.runners.model.Statement;
+import org.junit.runners.model.TestClass;
 
 /**
  * Class to substitute JUnit4 runner in JUnit4 tests, adding additional functionality.
@@ -252,22 +257,63 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   /** Modifies the statement with each {@link MethodRule} and {@link TestRule} */
   private Statement withRules(FrameworkMethod method, Object target, Statement statement) {
-    ImmutableList<TestRule> testRules =
-        Stream.of(getTestRules(target).stream(), getExtraTestRules().stream())
-            .flatMap(x -> x)
+    Description testDescription = describeChild(method);
+    TestClass testClass = getTestClass();
+
+    LinkedListMultimap<Integer, Object> orderToRulesMultimap = LinkedListMultimap.create();
+    MemberValueConsumer<Object> collector =
+        (frameworkMember, rule) -> {
+          Rule ruleAnnotation = frameworkMember.getAnnotation(Rule.class);
+          int order = ruleAnnotation == null ? Rule.DEFAULT_ORDER : ruleAnnotation.order();
+          if (orderToRulesMultimap.containsValue(rule)
+              && rule instanceof MethodRule
+              && rule instanceof TestRule) {
+            // This rule was already added because it is both a MethodRule and a TestRule.
+            // For legacy reasons, we need to put the new rule at the end of the list.
+            orderToRulesMultimap.remove(order, rule);
+          }
+          orderToRulesMultimap.put(order, rule);
+        };
+
+    testClass.collectAnnotatedMethodValues(target, Rule.class, MethodRule.class, collector::accept);
+    testClass.collectAnnotatedFieldValues(target, Rule.class, MethodRule.class, collector::accept);
+    testClass.collectAnnotatedMethodValues(target, Rule.class, TestRule.class, collector::accept);
+    testClass.collectAnnotatedFieldValues(target, Rule.class, TestRule.class, collector::accept);
+
+    ImmutableList<Object> orderedRules =
+        orderToRulesMultimap.keySet().stream()
+            .sorted()
+            .flatMap(
+                // Execute the rules in the reverse order of when the fields occurred. This may look
+                // counter-intuitive, but that is what the default JUnit4 runner does, and there is
+                // no reason to deviate from that here.
+                key -> Lists.reverse(orderToRulesMultimap.get(key)).stream())
             .collect(toImmutableList());
 
-    for (MethodRule methodRule : rules(target)) {
-      // For rules that implement both TestRule and MethodRule, only apply the TestRule.
-      if (!testRules.contains(methodRule)) {
-        statement = methodRule.apply(statement, method, target);
+    // Note: The perceived order* is the reverse of the order in which the code below applies the
+    // rules to the statements because each subsequent rule wraps the previous statement.
+    //
+    // [*] The rule implementation can add its logic both before or after the base statement, so the
+    // order depends on the rule implementation. If all rules put their logic before the base
+    // statement, the order matches that of `orderedRules`.
+
+    for (Object rule : Lists.reverse(orderedRules)) {
+      if (rule instanceof TestRule) {
+        statement = ((TestRule) rule).apply(statement, testDescription);
+      } else if (rule instanceof MethodRule) {
+        statement = ((MethodRule) rule).apply(statement, method, target);
+      } else {
+        throw new AssertionError(rule);
       }
     }
-    Description testDescription = describeChild(method);
-    for (TestRule testRule : testRules) {
+
+    // Apply extra rules
+    for (TestRule testRule : getExtraTestRules()) {
       statement = testRule.apply(statement, testDescription);
     }
-    return new ContextMethodRule().apply(statement, method, target);
+    statement = new ContextMethodRule().apply(statement, method, target);
+
+    return statement;
   }
 
   private Object createTestForMethod(FrameworkMethod method) throws Exception {
