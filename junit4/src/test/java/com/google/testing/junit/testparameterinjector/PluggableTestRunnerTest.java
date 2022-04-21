@@ -142,34 +142,6 @@ public class PluggableTestRunnerTest {
   }
 
   @RunWith(PluggableTestRunner.class)
-  public static class RuleOrderingTestClassWithImplicitOrder {
-
-    @Rule public TestAndMethodRule ruleC = new TestAndMethodRule("C");
-    @Rule public TestAndMethodRule ruleA = new TestAndMethodRule("A");
-    @Rule public TestAndMethodRule ruleB = new TestAndMethodRule("B");
-
-    @Test
-    public void test() {
-      // no-op
-    }
-  }
-
-  @Test
-  public void rulesAreSortedCorrectly_withImplicitOrder() throws Exception {
-    PluggableTestRunner.run(
-        new PluggableTestRunner(RuleOrderingTestClassWithImplicitOrder.class) {
-          @Override
-          protected TestMethodProcessorList createTestMethodProcessorList() {
-            return TestMethodProcessorList.empty();
-          }
-        });
-
-    // This might look counter-intuitive, but JUnit4 behaves in this reverse order way. So for
-    // consistency, PluggableTestRunner should do the same.
-    assertThat(ruleInvocations).containsExactly("B", "A", "C").inOrder();
-  }
-
-  @RunWith(PluggableTestRunner.class)
   public static class CustomTestAnnotationTestClass {
     @SuppressWarnings("JUnit4TestNotRun")
     @CustomTest
