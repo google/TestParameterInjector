@@ -159,6 +159,10 @@ public class MyTest {
 In this example, both `test1` and `test2` will be run twice (once for each
 parameter value).
 
+The test runner will set these fields before calling any methods, so it is safe
+to use such `@TestParameter`-annotated fields for setting up other test values
+and behavior in `@Before` methods.
+
 #### Supported types
 
 The following examples show most of the supported types. See the `@TestParameter` javadoc for more details. 

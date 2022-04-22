@@ -1,3 +1,7 @@
+## 1.9
+
+- Bugfix: Support explicit ordering by the JUnit4 `@Rule`. For example: `@Rule(ordering=3)`.
+
 ## 1.8
 
 - Add support for JUnit5 (Jupiter)
