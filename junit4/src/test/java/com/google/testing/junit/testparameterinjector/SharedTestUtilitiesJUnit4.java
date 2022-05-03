@@ -14,6 +14,7 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -131,6 +132,8 @@ class SharedTestUtilitiesJUnit4 {
 
     @AfterClass
     public static void completedAllTests() {
+      checkNotNull(
+          testNameToStringifiedParameters, "storeTestParametersForThisTest() was never called");
       try {
         assertWithMessage(toCopyPastableJavaString(testNameToStringifiedParameters))
             .that(testNameToStringifiedParameters)

@@ -21,23 +21,16 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
 import java.lang.annotation.Retention;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -67,24 +60,14 @@ public class TestParametersMethodProcessorTest {
   }
 
   @RunAsTest
-  public static class SimpleMethodAnnotation {
-    @Rule public TestName testName = new TestName();
-
-    private static Map<String, String> testNameToStringifiedParametersMap;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testNameToStringifiedParametersMap = new LinkedHashMap<>();
-    }
+  public static class SimpleMethodAnnotation extends SuccessfulTestCaseBase {
 
     @Test
     @TestParameters("{testEnum: ONE, testLong: 11, testBoolean: false, testString: ABC}")
     @TestParameters("{testEnum: TWO,\ntestLong: 22,\ntestBoolean: true,\r\n\r\n testString: 'DEF'}")
     @TestParameters("{testEnum: null, testLong: 33, testBoolean: false, testString: null}")
     public void test(TestEnum testEnum, long testLong, boolean testBoolean, String testString) {
-      testNameToStringifiedParametersMap.put(
-          testName.getMethodName(),
-          String.format("%s,%s,%s,%s", testEnum, testLong, testBoolean, testString));
+      storeTestParametersForThisTest(testEnum, testLong, testBoolean, testString);
     }
 
     @Test
@@ -95,9 +78,7 @@ public class TestParametersMethodProcessorTest {
     })
     public void test_singleAnnotation(
         TestEnum testEnum, long testLong, boolean testBoolean, String testString) {
-      testNameToStringifiedParametersMap.put(
-          testName.getMethodName(),
-          String.format("%s,%s,%s,%s", testEnum, testLong, testBoolean, testString));
+      storeTestParametersForThisTest(testEnum, testLong, testBoolean, testString);
     }
 
     @Test
@@ -108,7 +89,7 @@ public class TestParametersMethodProcessorTest {
             + " ================================================================================="
             + "=============='}")
     public void test2_withLongNames(String testString) {
-      testNameToStringifiedParametersMap.put(testName.getMethodName(), testString);
+      storeTestParametersForThisTest(testString);
     }
 
     @Test
@@ -123,9 +104,7 @@ public class TestParametersMethodProcessorTest {
         List<Long> testLongs,
         List<Boolean> testBooleans,
         List<String> testStrings) {
-      testNameToStringifiedParametersMap.put(
-          testName.getMethodName(),
-          String.format("%s,%s,%s,%s", testEnums, testLongs, testBooleans, testStrings));
+      storeTestParametersForThisTest(testEnums, testLongs, testBooleans, testStrings);
     }
 
     @Test
@@ -133,61 +112,62 @@ public class TestParametersMethodProcessorTest {
     @TestParameters("{testEnum: TWO}")
     @TestParameters(customName = "custom3", value = "{testEnum: THREE}")
     public void test4_withCustomName(TestEnum testEnum) {
-      testNameToStringifiedParametersMap.put(testName.getMethodName(), String.valueOf(testEnum));
+      storeTestParametersForThisTest(testEnum);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testNameToStringifiedParametersMap)
-          .containsExactly(
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put(
               "test[{testEnum: ONE, testLong: 11, testBoolean: false, testString: ABC}]",
-              "ONE,11,false,ABC",
+              "ONE:11:false:ABC")
+          .put(
               "test[{testEnum: TWO, testLong: 22, testBoolean: true, testString: 'DEF'}]",
-              "TWO,22,true,DEF",
+              "TWO:22:true:DEF")
+          .put(
               "test[{testEnum: null, testLong: 33, testBoolean: false, testString: null}]",
-              "null,33,false,null",
+              "null:33:false:null")
+          .put(
               "test_singleAnnotation[{testEnum: ONE, testLong: 11, testBoolean: false, testString:"
                   + " ABC}]",
-              "ONE,11,false,ABC",
+              "ONE:11:false:ABC")
+          .put(
               "test_singleAnnotation[{testEnum: TWO, testLong: 22, testBoolean: true, testString:"
                   + " 'DEF'}]",
-              "TWO,22,true,DEF",
+              "TWO:22:true:DEF")
+          .put(
               "test_singleAnnotation[{testEnum: null, testLong: 33, testBoolean: false, testString:"
                   + " null}]",
-              "null,33,false,null",
-              "test2_withLongNames[1.{testString: ABC}]",
-              "ABC",
+              "null:33:false:null")
+          .put("test2_withLongNames[1.{testString: ABC}]", "ABC")
+          .put(
               "test2_withLongNames[2.{testString: 'This is a very long string (240 characters) that"
                   + " would normally cause Sponge+Tin to exceed the filename limit of 255"
                   + " characters. =============================...]",
               "This is a very long string (240 characters) that would normally cause Sponge+Tin to"
                   + " exceed the filename limit of 255 characters."
-                  + " ================================================================================="
-                  + "==============",
+                  + " ===============================================================================================")
+          .put(
               "test3_withRepeatedParams[{testEnums: [ONE, TWO, THREE], testLongs: [11, 4],"
                   + " testBooleans: [false, true], testStrings: [ABC, '123']}]",
-              "[ONE, TWO, THREE],[11, 4],[false, true],[ABC, 123]",
+              "[ONE, TWO, THREE]:[11, 4]:[false, true]:[ABC, 123]")
+          .put(
               "test3_withRepeatedParams[{testEnums: [TWO], testLongs: [22], testBooleans: [true],"
                   + " testStrings: ['DEF']}]",
-              "[TWO],[22],[true],[DEF]",
+              "[TWO]:[22]:[true]:[DEF]")
+          .put(
               "test3_withRepeatedParams[{testEnums: [], testLongs: [], testBooleans: [],"
                   + " testStrings: []}]",
-              "[],[],[],[]",
-              "test4_withCustomName[custom1]",
-              "ONE",
-              "test4_withCustomName[{testEnum: TWO}]",
-              "TWO",
-              "test4_withCustomName[custom3]",
-              "THREE");
+              "[]:[]:[]:[]")
+          .put("test4_withCustomName[custom1]", "ONE")
+          .put("test4_withCustomName[{testEnum: TWO}]", "TWO")
+          .put("test4_withCustomName[custom3]", "THREE")
+          .build();
     }
   }
 
   @RunAsTest
-  public static class SimpleConstructorAnnotation {
-
-    @Rule public TestName testName = new TestName();
-
-    private static Map<String, String> testNameToStringifiedParametersMap;
+  public static class SimpleConstructorAnnotation extends SuccessfulTestCaseBase {
 
     private final TestEnum testEnum;
     private final long testLong;
@@ -207,50 +187,43 @@ public class TestParametersMethodProcessorTest {
       this.testString = testString;
     }
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testNameToStringifiedParametersMap = new LinkedHashMap<>();
-    }
-
     @Test
     public void test1() {
-      testNameToStringifiedParametersMap.put(
-          testName.getMethodName(),
-          String.format("%s,%s,%s,%s", testEnum, testLong, testBoolean, testString));
+      storeTestParametersForThisTest(testEnum, testLong, testBoolean, testString);
     }
 
     @Test
     public void test2() {
-      testNameToStringifiedParametersMap.put(
-          testName.getMethodName(),
-          String.format("%s,%s,%s,%s", testEnum, testLong, testBoolean, testString));
+      storeTestParametersForThisTest(testEnum, testLong, testBoolean, testString);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testNameToStringifiedParametersMap)
-          .containsExactly(
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put(
               "test1[{testEnum: ONE, testLong: 11, testBoolean: false, testString: ABC}]",
-              "ONE,11,false,ABC",
+              "ONE:11:false:ABC")
+          .put(
               "test1[{testEnum: TWO, testLong: 22, testBoolean: true, testString: DEF}]",
-              "TWO,22,true,DEF",
+              "TWO:22:true:DEF")
+          .put(
               "test1[{testEnum: null, testLong: 33, testBoolean: false, testString: null}]",
-              "null,33,false,null",
+              "null:33:false:null")
+          .put(
               "test2[{testEnum: ONE, testLong: 11, testBoolean: false, testString: ABC}]",
-              "ONE,11,false,ABC",
+              "ONE:11:false:ABC")
+          .put(
               "test2[{testEnum: TWO, testLong: 22, testBoolean: true, testString: DEF}]",
-              "TWO,22,true,DEF",
+              "TWO:22:true:DEF")
+          .put(
               "test2[{testEnum: null, testLong: 33, testBoolean: false, testString: null}]",
-              "null,33,false,null");
+              "null:33:false:null")
+          .build();
     }
   }
 
   @RunAsTest
-  public static class ConstructorAnnotationWithProvider {
-
-    @Rule public TestName testName = new TestName();
-
-    private static Map<String, TestEnum> testNameToParameterMap;
+  public static class ConstructorAnnotationWithProvider extends SuccessfulTestCaseBase {
 
     private final TestEnum testEnum;
 
@@ -259,59 +232,28 @@ public class TestParametersMethodProcessorTest {
       this.testEnum = testEnum;
     }
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testNameToParameterMap = new LinkedHashMap<>();
-    }
-
     @Test
-    public void test1() {
-      testNameToParameterMap.put(testName.getMethodName(), testEnum);
+    public void test() {
+      storeTestParametersForThisTest(testEnum);
     }
 
-    @Test
-    public void test2() {
-      testNameToParameterMap.put(testName.getMethodName(), testEnum);
-    }
-
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testNameToParameterMap)
-          .containsExactly(
-              "test1[one]", TestEnum.ONE,
-              "test1[two]", TestEnum.TWO,
-              "test1[null-case]", null,
-              "test2[one]", TestEnum.ONE,
-              "test2[two]", TestEnum.TWO,
-              "test2[null-case]", null);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[one]", "ONE")
+          .put("test[two]", "TWO")
+          .put("test[null-case]", "null")
+          .build();
     }
   }
 
-  public abstract static class BaseClassWithMethodAnnotation {
-    @Rule public TestName testName = new TestName();
-
-    static List<String> allTestNames;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      allTestNames = new ArrayList<>();
-    }
-
-    @Before
-    public void setUp() {
-      assertThat(allTestNames).doesNotContain(testName.getMethodName());
-    }
-
-    @After
-    public void tearDown() {
-      assertThat(allTestNames).contains(testName.getMethodName());
-    }
+  public abstract static class BaseClassWithMethodAnnotation extends SuccessfulTestCaseBase {
 
     @Test
     @TestParameters("{testEnum: ONE}")
     @TestParameters("{testEnum: TWO}")
     public void testInBase(TestEnum testEnum) {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(testEnum);
     }
   }
 
@@ -321,62 +263,41 @@ public class TestParametersMethodProcessorTest {
     @Test
     @TestParameters({"{testEnum: TWO}", "{testEnum: THREE}"})
     public void testInChild(TestEnum testEnum) {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(testEnum);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(allTestNames)
-          .containsExactly(
-              "testInBase[{testEnum: ONE}]",
-              "testInBase[{testEnum: TWO}]",
-              "testInChild[{testEnum: TWO}]",
-              "testInChild[{testEnum: THREE}]");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("testInChild[{testEnum: TWO}]", "TWO")
+          .put("testInChild[{testEnum: THREE}]", "THREE")
+          .put("testInBase[{testEnum: ONE}]", "ONE")
+          .put("testInBase[{testEnum: TWO}]", "TWO")
+          .build();
     }
   }
 
   @RunAsTest
-  public static class MixedWithTestParameterMethodAnnotation {
-    @Rule public TestName testName = new TestName();
+  public static class MixedWithTestParameterMethodAnnotation extends SuccessfulTestCaseBase {
 
-    private static List<String> allTestNames;
-    private static List<String> testNamesThatInvokedBefore;
-    private static List<String> testNamesThatInvokedAfter;
+    private final TestEnum testEnumFromConstructor;
 
     @TestParameters("{testEnum: ONE}")
     @TestParameters("{testEnum: TWO}")
-    public MixedWithTestParameterMethodAnnotation(TestEnum testEnum) {}
-
-    @BeforeClass
-    public static void resetStaticState() {
-      allTestNames = new ArrayList<>();
-      testNamesThatInvokedBefore = new ArrayList<>();
-      testNamesThatInvokedAfter = new ArrayList<>();
-    }
-
-    @Before
-    public void setUp() {
-      assertThat(allTestNames).doesNotContain(testName.getMethodName());
-      testNamesThatInvokedBefore.add(testName.getMethodName());
-    }
-
-    @After
-    public void tearDown() {
-      assertThat(allTestNames).contains(testName.getMethodName());
-      testNamesThatInvokedAfter.add(testName.getMethodName());
+    public MixedWithTestParameterMethodAnnotation(TestEnum testEnum) {
+      this.testEnumFromConstructor = testEnum;
     }
 
     @Test
     public void test1(@TestParameter TestEnum testEnum) {
-      assertThat(testNamesThatInvokedBefore).contains(testName.getMethodName());
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(testEnumFromConstructor, testEnum);
     }
 
     @Test
     @TestParameters("{testString: ABC}")
     @TestParameters("{testString: DEF}")
     public void test2(String testString) {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(testEnumFromConstructor, testString);
     }
 
     @Test
@@ -387,84 +308,77 @@ public class TestParametersMethodProcessorTest {
             + " ================================================================================="
             + "=============='}")
     public void test3_withLongNames(String testString) {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(testEnumFromConstructor, testString);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(allTestNames)
-          .containsExactly(
-              "test1[{testEnum: ONE},ONE]",
-              "test1[{testEnum: ONE},TWO]",
-              "test1[{testEnum: ONE},THREE]",
-              "test1[{testEnum: TWO},ONE]",
-              "test1[{testEnum: TWO},TWO]",
-              "test1[{testEnum: TWO},THREE]",
-              "test2[{testEnum: ONE},{testString: ABC}]",
-              "test2[{testEnum: ONE},{testString: DEF}]",
-              "test2[{testEnum: TWO},{testString: ABC}]",
-              "test2[{testEnum: TWO},{testString: DEF}]",
-              "test3_withLongNames[{testEnum: ONE},1.{testString: ABC}]",
-              "test3_withLongNames[{testEnum: ONE},2.{testString: 'This is a very long string"
-                  + " (240 characters) that would normally caus...]",
-              "test3_withLongNames[{testEnum: TWO},1.{testString: ABC}]",
-              "test3_withLongNames[{testEnum: TWO},2.{testString: 'This is a very long string"
-                  + " (240 characters) that would normally caus...]");
-
-      assertThat(testNamesThatInvokedBefore).containsExactlyElementsIn(allTestNames).inOrder();
-      assertThat(testNamesThatInvokedAfter).containsExactlyElementsIn(allTestNames).inOrder();
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test1[{testEnum: ONE},ONE]", "ONE:ONE")
+          .put("test1[{testEnum: ONE},TWO]", "ONE:TWO")
+          .put("test1[{testEnum: ONE},THREE]", "ONE:THREE")
+          .put("test1[{testEnum: TWO},ONE]", "TWO:ONE")
+          .put("test1[{testEnum: TWO},TWO]", "TWO:TWO")
+          .put("test1[{testEnum: TWO},THREE]", "TWO:THREE")
+          .put("test2[{testEnum: ONE},{testString: ABC}]", "ONE:ABC")
+          .put("test2[{testEnum: ONE},{testString: DEF}]", "ONE:DEF")
+          .put("test2[{testEnum: TWO},{testString: ABC}]", "TWO:ABC")
+          .put("test2[{testEnum: TWO},{testString: DEF}]", "TWO:DEF")
+          .put("test3_withLongNames[{testEnum: ONE},1.{testString: ABC}]", "ONE:ABC")
+          .put(
+              "test3_withLongNames[{testEnum: ONE},2.{testString: 'This is a very long string (240"
+                  + " characters) that would normally caus...]",
+              "ONE:This is a very long string (240 characters) that would normally cause Sponge+Tin"
+                  + " to exceed the filename limit of 255 characters."
+                  + " ==================================================================="
+                  + "============================")
+          .put("test3_withLongNames[{testEnum: TWO},1.{testString: ABC}]", "TWO:ABC")
+          .put(
+              "test3_withLongNames[{testEnum: TWO},2.{testString: 'This is a very long string (240"
+                  + " characters) that would normally caus...]",
+              "TWO:This is a very long string (240 characters) that would normally cause Sponge+Tin"
+                  + " to exceed the filename limit of 255 characters."
+                  + " ======================================================================"
+                  + "=========================")
+          .build();
     }
   }
 
   @RunAsTest
-  public static class MixedWithTestParameterFieldAnnotation {
-    @Rule public TestName testName = new TestName();
+  public static class MixedWithTestParameterFieldAnnotation extends SuccessfulTestCaseBase {
 
-    private static List<String> allTestNames;
+    private final TestEnum testEnumB;
 
     @TestParameter TestEnum testEnumA;
 
     @TestParameters("{testEnumB: ONE}")
     @TestParameters("{testEnumB: TWO}")
-    public MixedWithTestParameterFieldAnnotation(TestEnum testEnumB) {}
-
-    @BeforeClass
-    public static void resetStaticState() {
-      allTestNames = new ArrayList<>();
-    }
-
-    @Before
-    public void setUp() {
-      assertThat(allTestNames).doesNotContain(testName.getMethodName());
-    }
-
-    @After
-    public void tearDown() {
-      assertThat(allTestNames).contains(testName.getMethodName());
+    public MixedWithTestParameterFieldAnnotation(TestEnum testEnumB) {
+      this.testEnumB = testEnumB;
     }
 
     @Test
     @TestParameters({"{testString: ABC}", "{testString: DEF}"})
     public void test1(String testString) {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(testEnumA, testEnumB, testString);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(allTestNames)
-          .containsExactly(
-              "test1[{testEnumB: ONE},{testString: ABC},ONE]",
-              "test1[{testEnumB: ONE},{testString: ABC},TWO]",
-              "test1[{testEnumB: ONE},{testString: ABC},THREE]",
-              "test1[{testEnumB: ONE},{testString: DEF},ONE]",
-              "test1[{testEnumB: ONE},{testString: DEF},TWO]",
-              "test1[{testEnumB: ONE},{testString: DEF},THREE]",
-              "test1[{testEnumB: TWO},{testString: ABC},ONE]",
-              "test1[{testEnumB: TWO},{testString: ABC},TWO]",
-              "test1[{testEnumB: TWO},{testString: ABC},THREE]",
-              "test1[{testEnumB: TWO},{testString: DEF},ONE]",
-              "test1[{testEnumB: TWO},{testString: DEF},TWO]",
-              "test1[{testEnumB: TWO},{testString: DEF},THREE]");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test1[{testEnumB: ONE},{testString: ABC},ONE]", "ONE:ONE:ABC")
+          .put("test1[{testEnumB: ONE},{testString: ABC},TWO]", "TWO:ONE:ABC")
+          .put("test1[{testEnumB: ONE},{testString: ABC},THREE]", "THREE:ONE:ABC")
+          .put("test1[{testEnumB: ONE},{testString: DEF},ONE]", "ONE:ONE:DEF")
+          .put("test1[{testEnumB: ONE},{testString: DEF},TWO]", "TWO:ONE:DEF")
+          .put("test1[{testEnumB: ONE},{testString: DEF},THREE]", "THREE:ONE:DEF")
+          .put("test1[{testEnumB: TWO},{testString: ABC},ONE]", "ONE:TWO:ABC")
+          .put("test1[{testEnumB: TWO},{testString: ABC},TWO]", "TWO:TWO:ABC")
+          .put("test1[{testEnumB: TWO},{testString: ABC},THREE]", "THREE:TWO:ABC")
+          .put("test1[{testEnumB: TWO},{testString: DEF},ONE]", "ONE:TWO:DEF")
+          .put("test1[{testEnumB: TWO},{testString: DEF},TWO]", "TWO:TWO:DEF")
+          .put("test1[{testEnumB: TWO},{testString: DEF},THREE]", "THREE:TWO:DEF")
+          .build();
     }
   }
 
