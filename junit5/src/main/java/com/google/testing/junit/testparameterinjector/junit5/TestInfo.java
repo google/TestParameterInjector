@@ -64,7 +64,9 @@ abstract class TestInfo {
       return String.format(
           "%s[%s]",
           getMethod().getName(),
-          getParameters().stream().map(TestInfoParameter::getName).collect(joining(",")));
+          getParameters().stream()
+              .map(TestInfoParameter::getValueInTestName)
+              .collect(joining(",")));
     }
   }
 
@@ -114,7 +116,7 @@ abstract class TestInfo {
             .mapToObj(
                 parameterIndex -> {
                   TestInfoParameter parameter = getParameters().get(parameterIndex);
-                  return parameter.withName(
+                  return parameter.withValueInTestName(
                       parameterWithIndexToNewName.apply(parameter, parameterIndex));
                 })
             .collect(toImmutableList()),
@@ -147,7 +149,10 @@ abstract class TestInfo {
                         testInfos.stream()
                             .anyMatch(
                                 info ->
-                                    info.getParameters().get(parameterIndex).getName().length()
+                                    info.getParameters()
+                                            .get(parameterIndex)
+                                            .getValueInTestName()
+                                            .length()
                                         > getMaxCharactersPerParameter(info, numberOfParameters)))
                 .boxed()
                 .collect(toSet());
@@ -161,7 +166,7 @@ abstract class TestInfo {
                                 ? getShortenedName(
                                     parameter,
                                     getMaxCharactersPerParameter(info, numberOfParameters))
-                                : info.getParameters().get(parameterIndex).getName()))
+                                : info.getParameters().get(parameterIndex).getValueInTestName()))
             .collect(toImmutableList());
       }
     } else {
@@ -195,9 +200,9 @@ abstract class TestInfo {
       return String.valueOf(parameter.getIndexInValueSource() + 1);
     } else {
       String shortenedName =
-          parameter.getName().length() > maxCharactersPerParameter
-              ? parameter.getName().substring(0, maxCharactersPerParameter - 3) + "..."
-              : parameter.getName();
+          parameter.getValueInTestName().length() > maxCharactersPerParameter
+              ? parameter.getValueInTestName().substring(0, maxCharactersPerParameter - 3) + "..."
+              : parameter.getValueInTestName();
       return String.format("%s.%s", parameter.getIndexInValueSource() + 1, shortenedName);
     }
   }
@@ -244,8 +249,9 @@ abstract class TestInfo {
                             testInfo.withUpdatedParameterNames(
                                 (parameter, parameterIndex) ->
                                     indicesThatShouldGetSuffix.contains(parameterIndex)
-                                        ? parameter.getName() + getTypeSuffix(parameter.getValue())
-                                        : parameter.getName()));
+                                        ? parameter.getValueInTestName()
+                                            + getTypeSuffix(parameter.getValue())
+                                        : parameter.getValueInTestName()));
               }
             })
         .collect(toImmutableList());
@@ -273,7 +279,9 @@ abstract class TestInfo {
                   testInfo.withUpdatedParameterNames(
                       (parameter, parameterIndex) ->
                           String.format(
-                              "%s.%s", parameter.getIndexInValueSource() + 1, parameter.getName())))
+                              "%s.%s",
+                              parameter.getIndexInValueSource() + 1,
+                              parameter.getValueInTestName())))
           .collect(toImmutableList());
     }
   }
@@ -285,7 +293,7 @@ abstract class TestInfo {
   @AutoValue
   abstract static class TestInfoParameter {
 
-    abstract String getName();
+    abstract String getValueInTestName();
 
     @Nullable
     abstract Object getValue();
@@ -296,14 +304,15 @@ abstract class TestInfo {
      */
     abstract int getIndexInValueSource();
 
-    final TestInfoParameter withName(String newName) {
-      return create(newName, getValue(), getIndexInValueSource());
+    final TestInfoParameter withValueInTestName(String newValueInTestName) {
+      return create(newValueInTestName, getValue(), getIndexInValueSource());
     }
 
-    static TestInfoParameter create(String name, @Nullable Object value, int indexInValueSource) {
+    static TestInfoParameter create(
+        String valueInTestName, @Nullable Object value, int indexInValueSource) {
       checkArgument(indexInValueSource >= 0);
       return new AutoValue_TestInfo_TestInfoParameter(
-          checkNotNull(name), value, indexInValueSource);
+          checkNotNull(valueInTestName), value, indexInValueSource);
     }
   }
 }

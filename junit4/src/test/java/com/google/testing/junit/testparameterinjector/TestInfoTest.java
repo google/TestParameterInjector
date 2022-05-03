@@ -70,14 +70,18 @@ public class TestInfoTest {
         ImmutableList.of(
             fakeTestInfo(
                 TestInfoParameter.create(
-                    /* name= */ "short", /* value= */ 1, /* indexInValueSource= */ 1),
+                    /* valueInTestName= */ "short", /* value= */ 1, /* indexInValueSource= */ 1),
                 TestInfoParameter.create(
-                    /* name= */ "shorter", /* value= */ null, /* indexInValueSource= */ 3)),
+                    /* valueInTestName= */ "shorter",
+                    /* value= */ null,
+                    /* indexInValueSource= */ 3)),
             fakeTestInfo(
                 TestInfoParameter.create(
-                    /* name= */ "short", /* value= */ 1, /* indexInValueSource= */ 1),
+                    /* valueInTestName= */ "short", /* value= */ 1, /* indexInValueSource= */ 1),
                 TestInfoParameter.create(
-                    /* name= */ "shortest", /* value= */ 20, /* indexInValueSource= */ 0)));
+                    /* valueInTestName= */ "shortest",
+                    /* value= */ 20,
+                    /* indexInValueSource= */ 0)));
 
     ImmutableList<TestInfo> result = TestInfo.shortenNamesIfNecessary(givenTestInfos);
 
@@ -91,14 +95,20 @@ public class TestInfoTest {
             ImmutableList.of(
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "short", /* value= */ 1, /* indexInValueSource= */ 0),
+                        /* valueInTestName= */ "short",
+                        /* value= */ 1,
+                        /* indexInValueSource= */ 0),
                     TestInfoParameter.create(
-                        /* name= */ "shorter", /* value= */ null, /* indexInValueSource= */ 0)),
+                        /* valueInTestName= */ "shorter",
+                        /* value= */ null,
+                        /* indexInValueSource= */ 0)),
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "short", /* value= */ 1, /* indexInValueSource= */ 0),
+                        /* valueInTestName= */ "short",
+                        /* value= */ 1,
+                        /* indexInValueSource= */ 0),
                     TestInfoParameter.create(
-                        /* name= */ "very long parameter name for test"
+                        /* valueInTestName= */ "very long parameter name for test"
                             + " 00000000000000000000000000000000000000000000000000000000"
                             + "000000000000000000000000000000000000000000000000000000000"
                             + "0000000000000000000000000000000000000000000000",
@@ -120,10 +130,12 @@ public class TestInfoTest {
             ImmutableList.of(
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "shorter", /* value= */ null, /* indexInValueSource= */ 0)),
+                        /* valueInTestName= */ "shorter",
+                        /* value= */ null,
+                        /* indexInValueSource= */ 0)),
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "very long parameter name for test"
+                        /* valueInTestName= */ "very long parameter name for test"
                             + " 00000000000000000000000000000000000000000000000000000000"
                             + "000000000000000000000000000000000000000000000000000000000"
                             + "0000000000000000000000000000000000000000000000",
@@ -147,7 +159,9 @@ public class TestInfoTest {
                 .mapToObj(
                     i ->
                         TestInfoParameter.create(
-                            /* name= */ "short", /* value= */ i, /* indexInValueSource= */ i))
+                            /* valueInTestName= */ "short",
+                            /* value= */ i,
+                            /* indexInValueSource= */ i))
                 .toArray(TestInfoParameter[]::new));
 
     ImmutableList<TestInfo> result =
@@ -165,18 +179,21 @@ public class TestInfoTest {
         ImmutableList.of(
             fakeTestInfo(
                 TestInfoParameter.create(
-                    /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                    /* valueInTestName= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
                 TestInfoParameter.create(
-                    /* name= */ "bbb", /* value= */ null, /* indexInValueSource= */ 3)),
+                    /* valueInTestName= */ "bbb", /* value= */ null, /* indexInValueSource= */ 3)),
             fakeTestInfo(
                 TestInfoParameter.create(
-                    /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                    /* valueInTestName= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
                 TestInfoParameter.create(
-                    /* name= */ "ccc", /* value= */ 1, /* indexInValueSource= */ 0)));
+                    /* valueInTestName= */ "ccc", /* value= */ 1, /* indexInValueSource= */ 0)));
 
     ImmutableList<TestInfo> result = TestInfo.deduplicateTestNames(givenTestInfos);
 
     assertThat(result).containsExactlyElementsIn(givenTestInfos).inOrder();
+    assertThatTestNamesOf(result)
+        .containsExactly("toLowerCase[aaa,bbb]", "toLowerCase[aaa,ccc]")
+        .inOrder();
   }
 
   @Test
@@ -186,19 +203,25 @@ public class TestInfoTest {
             ImmutableList.of(
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                        /* valueInTestName= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
                     TestInfoParameter.create(
-                        /* name= */ "null", /* value= */ null, /* indexInValueSource= */ 3)),
+                        /* valueInTestName= */ "null",
+                        /* value= */ null,
+                        /* indexInValueSource= */ 3)),
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                        /* valueInTestName= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
                     TestInfoParameter.create(
-                        /* name= */ "null", /* value= */ "null", /* indexInValueSource= */ 0)),
+                        /* valueInTestName= */ "null",
+                        /* value= */ "null",
+                        /* indexInValueSource= */ 0)),
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
+                        /* valueInTestName= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 1),
                     TestInfoParameter.create(
-                        /* name= */ "bbb", /* value= */ "b", /* indexInValueSource= */ 0))));
+                        /* valueInTestName= */ "bbb",
+                        /* value= */ "b",
+                        /* indexInValueSource= */ 0))));
 
     assertThatTestNamesOf(result)
         .containsExactly(
@@ -215,19 +238,21 @@ public class TestInfoTest {
             ImmutableList.of(
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
+                        /* valueInTestName= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
                     TestInfoParameter.create(
-                        /* name= */ "bbb", /* value= */ 1, /* indexInValueSource= */ 0)),
+                        /* valueInTestName= */ "bbb", /* value= */ 1, /* indexInValueSource= */ 0)),
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
+                        /* valueInTestName= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
                     TestInfoParameter.create(
-                        /* name= */ "bbb", /* value= */ 1, /* indexInValueSource= */ 1)),
+                        /* valueInTestName= */ "bbb", /* value= */ 1, /* indexInValueSource= */ 1)),
                 fakeTestInfo(
                     TestInfoParameter.create(
-                        /* name= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
+                        /* valueInTestName= */ "aaa", /* value= */ 1, /* indexInValueSource= */ 0),
                     TestInfoParameter.create(
-                        /* name= */ "ccc", /* value= */ "b", /* indexInValueSource= */ 2))));
+                        /* valueInTestName= */ "ccc",
+                        /* value= */ "b",
+                        /* indexInValueSource= */ 2))));
 
     assertThatTestNamesOf(result)
         .containsExactly(
