@@ -16,30 +16,20 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.truth.Truth.assertThat;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.fail;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase;
 import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
-import com.google.testing.junit.testparameterinjector.TestParameterAnnotationMethodProcessorTest.ErrorNonStaticProviderClass.NonStaticProvider;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Function;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -84,205 +74,166 @@ public class TestParameterAnnotationMethodProcessorTest {
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class SingleAnnotationClass {
-
-    private static List<TestEnum> testedParameters;
+  public static class SingleAnnotationClass extends SuccessfulTestCaseBase {
 
     @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
     TestEnum enumParameter;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .put("test[THREE]", "THREE")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class MultipleAllEnumValuesAnnotationClass {
+  public static class MultipleAllEnumValuesAnnotationClass extends SuccessfulTestCaseBase {
 
-    private static List<String> testedParameters;
+    @TestParameter({"ONE", "THREE"})
+    TestEnum enumParameter1;
 
-    @TestParameter TestEnum enumParameter1;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
+    @TestParameter TestEnum2 enumParameter2;
 
     @Test
-    public void test(@TestParameter TestEnum enumParameter2) {
-      testedParameters.add(enumParameter1 + ":" + enumParameter2);
+    public void test(@TestParameter TestEnum2 enumParameter3) {
+      storeTestParametersForThisTest(enumParameter1, enumParameter2, enumParameter3);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).hasSize(TestEnum.values().length * TestEnum.values().length);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE,A,A]", "ONE:A:A")
+          .put("test[ONE,A,B]", "ONE:A:B")
+          .put("test[ONE,B,A]", "ONE:B:A")
+          .put("test[ONE,B,B]", "ONE:B:B")
+          .put("test[THREE,A,A]", "THREE:A:A")
+          .put("test[THREE,A,B]", "THREE:A:B")
+          .put("test[THREE,B,A]", "THREE:B:A")
+          .put("test[THREE,B,B]", "THREE:B:B")
+          .build();
+    }
+
+    enum TestEnum2 {
+      A,
+      B;
     }
   }
 
   @ClassTestResult(Result.SUCCESS_FOR_ALL_PLACEMENTS_ONLY)
-  public static class SingleParameterAnnotationClass {
-
-    private static List<TestEnum> testedParameters;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
+  public static class SingleParameterAnnotationClass extends SuccessfulTestCaseBase {
 
     @Test
     @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
     public void test(TestEnum enumParameter) {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .put("test[THREE]", "THREE")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class SingleAnnotatedParameterAnnotationClass {
-
-    private static List<TestEnum> testedParameters;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
+  public static class SingleAnnotatedParameterAnnotationClass extends SuccessfulTestCaseBase {
 
     @Test
     public void test(
         @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE}) TestEnum enumParameter) {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .put("test[THREE]", "THREE")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class AnnotatedSuperclassParameter {
-
-    private static List<Object> testedParameters;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
+  public static class AnnotatedSuperclassParameter extends SuccessfulTestCaseBase {
 
     @Test
     public void test(
         @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE}) Object enumParameter) {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .put("test[THREE]", "THREE")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class DuplicatedAnnotatedParameterAnnotationClass {
-
-    private static List<ImmutableList<TestEnum>> testedParameters;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
+  public static class DuplicatedAnnotatedParameterAnnotationClass extends SuccessfulTestCaseBase {
 
     @Test
     public void test(
         @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE}) TestEnum enumParameter,
         @EnumParameter({TestEnum.FOUR, TestEnum.FIVE}) TestEnum enumParameter2) {
-      testedParameters.add(ImmutableList.of(enumParameter, enumParameter2));
+      storeTestParametersForThisTest(enumParameter, enumParameter2);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters)
-          .containsExactly(
-              ImmutableList.of(TestEnum.ONE, TestEnum.FOUR),
-              ImmutableList.of(TestEnum.ONE, TestEnum.FIVE),
-              ImmutableList.of(TestEnum.TWO, TestEnum.FOUR),
-              ImmutableList.of(TestEnum.TWO, TestEnum.FIVE),
-              ImmutableList.of(TestEnum.THREE, TestEnum.FOUR),
-              ImmutableList.of(TestEnum.THREE, TestEnum.FIVE));
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE,FOUR]", "ONE:FOUR")
+          .put("test[ONE,FIVE]", "ONE:FIVE")
+          .put("test[TWO,FOUR]", "TWO:FOUR")
+          .put("test[TWO,FIVE]", "TWO:FIVE")
+          .put("test[THREE,FOUR]", "THREE:FOUR")
+          .put("test[THREE,FIVE]", "THREE:FIVE")
+          .build();
     }
   }
 
   @ClassTestResult(Result.FAILURE)
   public static class SingleAnnotatedParameterAnnotationClassWithMissingValue {
 
-    private static List<TestEnum> testedParameters;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
-    public void test(@EnumParameter TestEnum enumParameter) {
-      testedParameters.add(enumParameter);
-    }
-
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
-    }
+    public void test(@EnumParameter TestEnum enumParameter) {}
   }
 
   @ClassTestResult(Result.SUCCESS_FOR_ALL_PLACEMENTS_ONLY)
-  public static class MultipleAnnotationTestClass {
-
-    private static List<TestEnum> testedParameters;
+  public static class MultipleAnnotationTestClass extends SuccessfulTestCaseBase {
 
     @EnumParameter({TestEnum.ONE, TestEnum.TWO})
     TestEnum enumParameter;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     @EnumParameter({TestEnum.THREE})
     public void parameterized() {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder().put("parameterized[THREE]", "THREE").build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class TooLongTestNamesShortened {
-
-    @Rule public TestName testName = new TestName();
-
-    private static List<String> allTestNames;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      allTestNames = new ArrayList<>();
-    }
+  public static class TooLongTestNamesShortened extends SuccessfulTestCaseBase {
 
     @Test
     public void test1(
@@ -294,38 +245,31 @@ public class TestParameterAnnotationMethodProcessorTest {
                   + "==================================="
             })
             String testString) {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(testString);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(allTestNames)
-          .containsExactly(
-              "test1[1.ABC]",
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test1[1.ABC]", "ABC")
+          .put(
               "test1[2.This is a very long string (240 characters) that would normally cause"
                   + " Sponge+Tin to exceed the filename limit of 255 characters."
-                  + " =========================================================...]");
+                  + " =========================================================...]",
+              "This is a very long string (240 characters) that would normally cause Sponge+Tin to"
+                  + " exceed the filename limit of 255 characters."
+                  + " ============================================================================"
+                  + "==================================")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class DuplicateTestNames {
-
-    @Rule public TestName testName = new TestName();
-
-    private static List<String> allTestNames;
-    private static List<Object> allTestParameterValues;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      allTestNames = new ArrayList<>();
-      allTestParameterValues = new ArrayList<>();
-    }
+  public static class DuplicateTestNames extends SuccessfulTestCaseBase {
 
     @Test
     public void test1(@TestParameter({"ABC", "ABC"}) String testString) {
-      allTestNames.add(testName.getMethodName());
-      allTestParameterValues.add(testString);
+      storeTestParametersForThisTest(testString);
     }
 
     private static final class Test2Provider implements TestParameterValuesProvider {
@@ -337,28 +281,24 @@ public class TestParameterAnnotationMethodProcessorTest {
 
     @Test
     public void test2(@TestParameter(valuesProvider = Test2Provider.class) Object testObject) {
-      allTestNames.add(testName.getMethodName());
-      allTestParameterValues.add(testObject);
+      storeTestParametersForThisTest(testObject);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(allTestNames)
-          .containsExactly(
-              "test1[1.ABC]",
-              "test1[2.ABC]",
-              "test2[123 (Integer)]",
-              "test2[123 (String)]",
-              "test2[null (String)]",
-              "test2[null (null reference)]");
-      assertThat(allTestParameterValues).containsExactly("ABC", "ABC", 123, "123", "null", null);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test1[1.ABC]", "ABC")
+          .put("test1[2.ABC]", "ABC")
+          .put("test2[123 (Integer)]", "123")
+          .put("test2[123 (String)]", "123")
+          .put("test2[null (String)]", "null")
+          .put("test2[null (null reference)]", "null")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class DuplicateFieldAnnotationTestClass {
-
-    private static List<String> testedParameters;
+  public static class DuplicateFieldAnnotationTestClass extends SuccessfulTestCaseBase {
 
     @TestParameter({"foo", "bar"})
     String stringParameter;
@@ -366,26 +306,24 @@ public class TestParameterAnnotationMethodProcessorTest {
     @TestParameter({"baz", "qux"})
     String stringParameter2;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      testedParameters.add(stringParameter + ":" + stringParameter2);
+      storeTestParametersForThisTest(stringParameter, stringParameter2);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly("foo:baz", "foo:qux", "bar:baz", "bar:qux");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[foo,baz]", "foo:baz")
+          .put("test[foo,qux]", "foo:qux")
+          .put("test[bar,baz]", "bar:baz")
+          .put("test[bar,qux]", "bar:qux")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class DuplicateIdenticalFieldAnnotationTestClass {
-
-    private static List<String> testedParameters;
+  public static class DuplicateIdenticalFieldAnnotationTestClass extends SuccessfulTestCaseBase {
 
     @TestParameter({"foo", "bar"})
     String stringParameter;
@@ -393,19 +331,19 @@ public class TestParameterAnnotationMethodProcessorTest {
     @TestParameter({"foo", "bar"})
     String stringParameter2;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      testedParameters.add(stringParameter + ":" + stringParameter2);
+      storeTestParametersForThisTest(stringParameter, stringParameter2);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly("foo:foo", "foo:bar", "bar:foo", "bar:bar");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[foo,foo]", "foo:foo")
+          .put("test[foo,bar]", "foo:bar")
+          .put("test[bar,foo]", "bar:foo")
+          .put("test[bar,bar]", "bar:bar")
+          .build();
     }
   }
 
@@ -437,117 +375,83 @@ public class TestParameterAnnotationMethodProcessorTest {
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class SingleAnnotationTestClassWithAnnotation {
-
-    private static List<TestEnum> testedParameters;
+  public static class SingleAnnotationTestClassWithAnnotation extends SuccessfulTestCaseBase {
 
     @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
     TestEnum enumParameter;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .put("test[THREE]", "THREE")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class MultipleAnnotationTestClassWithAnnotation {
-
-    private static List<String> testedParameters;
+  public static class MultipleAnnotationTestClassWithAnnotation extends SuccessfulTestCaseBase {
 
     @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
     TestEnum enumParameter;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void parameterized(@TestParameter({"foo", "bar"}) String stringParameter) {
-      testedParameters.add(stringParameter + ":" + enumParameter);
+      storeTestParametersForThisTest(enumParameter, stringParameter);
     }
 
     @Test
     public void nonParameterized() {
-      testedParameters.add("none:" + enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters)
-          .containsExactly(
-              "none:ONE",
-              "none:TWO",
-              "none:THREE",
-              "foo:ONE",
-              "foo:TWO",
-              "foo:THREE",
-              "bar:ONE",
-              "bar:TWO",
-              "bar:THREE");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("parameterized[ONE,foo]", "ONE:foo")
+          .put("parameterized[ONE,bar]", "ONE:bar")
+          .put("parameterized[TWO,foo]", "TWO:foo")
+          .put("parameterized[TWO,bar]", "TWO:bar")
+          .put("parameterized[THREE,foo]", "THREE:foo")
+          .put("parameterized[THREE,bar]", "THREE:bar")
+          .put("nonParameterized[ONE]", "ONE")
+          .put("nonParameterized[TWO]", "TWO")
+          .put("nonParameterized[THREE]", "THREE")
+          .build();
     }
   }
 
-  public abstract static class BaseClassWithSingleTest {
-    @Rule public TestName testName = new TestName();
-
-    static List<String> allTestNames;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      allTestNames = new ArrayList<>();
-    }
-
+  public abstract static class BaseClassWithSingleTest extends SuccessfulTestCaseBase {
     @Test
     public void testInBase(@TestParameter boolean b) {
-      allTestNames.add(testName.getMethodName());
-    }
-
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(allTestNames).containsExactly("testInBase[b=true]", "testInBase[b=false]");
+      storeTestParametersForThisTest(b);
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class SimpleTestInheritedFromBaseClass extends BaseClassWithSingleTest {}
+  public static class SimpleTestInheritedFromBaseClass extends BaseClassWithSingleTest {
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("testInBase[b=false]", "false")
+          .put("testInBase[b=true]", "true")
+          .build();
+    }
+  }
 
-  public abstract static class BaseClassWithAnnotations {
-    @Rule public TestName testName = new TestName();
-
-    static List<String> allTestNames;
+  public abstract static class BaseClassWithAnnotations extends SuccessfulTestCaseBase {
 
     @TestParameter boolean boolInBase;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      allTestNames = new ArrayList<>();
-    }
-
-    @Before
-    public void setUp() {
-      assertThat(allTestNames).doesNotContain(testName.getMethodName());
-    }
-
-    @After
-    public void tearDown() {
-      assertThat(allTestNames).contains(testName.getMethodName());
-    }
-
     @Test
     public void testInBase(@TestParameter({"ONE", "TWO"}) TestEnum enumInBase) {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(boolInBase, enumInBase);
     }
 
     @Test
@@ -566,47 +470,47 @@ public class TestParameterAnnotationMethodProcessorTest {
 
     @Test
     public void testInChild(@TestParameter({"TWO", "THREE"}) TestEnum enumInChild) {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(boolInBase, boolInChild, enumInChild);
     }
 
     @Override
     public void abstractTestInBase() {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(boolInBase, boolInChild);
     }
 
     @Override
     public void overridableTestInBase() {
-      allTestNames.add(testName.getMethodName());
+      storeTestParametersForThisTest(boolInBase, boolInChild);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(allTestNames)
-          .containsExactly(
-              "testInBase[boolInChild=false,boolInBase=false,ONE]",
-              "testInBase[boolInChild=false,boolInBase=false,TWO]",
-              "testInBase[boolInChild=false,boolInBase=true,ONE]",
-              "testInBase[boolInChild=false,boolInBase=true,TWO]",
-              "testInBase[boolInChild=true,boolInBase=false,ONE]",
-              "testInBase[boolInChild=true,boolInBase=false,TWO]",
-              "testInBase[boolInChild=true,boolInBase=true,ONE]",
-              "testInBase[boolInChild=true,boolInBase=true,TWO]",
-              "testInChild[boolInChild=false,boolInBase=false,TWO]",
-              "testInChild[boolInChild=false,boolInBase=false,THREE]",
-              "testInChild[boolInChild=false,boolInBase=true,TWO]",
-              "testInChild[boolInChild=false,boolInBase=true,THREE]",
-              "testInChild[boolInChild=true,boolInBase=false,TWO]",
-              "testInChild[boolInChild=true,boolInBase=false,THREE]",
-              "testInChild[boolInChild=true,boolInBase=true,TWO]",
-              "testInChild[boolInChild=true,boolInBase=true,THREE]",
-              "abstractTestInBase[boolInChild=false,boolInBase=false]",
-              "abstractTestInBase[boolInChild=false,boolInBase=true]",
-              "abstractTestInBase[boolInChild=true,boolInBase=false]",
-              "abstractTestInBase[boolInChild=true,boolInBase=true]",
-              "overridableTestInBase[boolInChild=false,boolInBase=false]",
-              "overridableTestInBase[boolInChild=false,boolInBase=true]",
-              "overridableTestInBase[boolInChild=true,boolInBase=false]",
-              "overridableTestInBase[boolInChild=true,boolInBase=true]");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("testInChild[boolInChild=false,boolInBase=false,TWO]", "false:false:TWO")
+          .put("testInChild[boolInChild=false,boolInBase=false,THREE]", "false:false:THREE")
+          .put("testInChild[boolInChild=false,boolInBase=true,TWO]", "true:false:TWO")
+          .put("testInChild[boolInChild=false,boolInBase=true,THREE]", "true:false:THREE")
+          .put("testInChild[boolInChild=true,boolInBase=false,TWO]", "false:true:TWO")
+          .put("testInChild[boolInChild=true,boolInBase=false,THREE]", "false:true:THREE")
+          .put("testInChild[boolInChild=true,boolInBase=true,TWO]", "true:true:TWO")
+          .put("testInChild[boolInChild=true,boolInBase=true,THREE]", "true:true:THREE")
+          .put("abstractTestInBase[boolInChild=false,boolInBase=false]", "false:false")
+          .put("abstractTestInBase[boolInChild=false,boolInBase=true]", "true:false")
+          .put("abstractTestInBase[boolInChild=true,boolInBase=false]", "false:true")
+          .put("abstractTestInBase[boolInChild=true,boolInBase=true]", "true:true")
+          .put("overridableTestInBase[boolInChild=false,boolInBase=false]", "false:false")
+          .put("overridableTestInBase[boolInChild=false,boolInBase=true]", "true:false")
+          .put("overridableTestInBase[boolInChild=true,boolInBase=false]", "false:true")
+          .put("overridableTestInBase[boolInChild=true,boolInBase=true]", "true:true")
+          .put("testInBase[boolInChild=false,boolInBase=false,ONE]", "false:ONE")
+          .put("testInBase[boolInChild=false,boolInBase=false,TWO]", "false:TWO")
+          .put("testInBase[boolInChild=false,boolInBase=true,ONE]", "true:ONE")
+          .put("testInBase[boolInChild=false,boolInBase=true,TWO]", "true:TWO")
+          .put("testInBase[boolInChild=true,boolInBase=false,ONE]", "false:ONE")
+          .put("testInBase[boolInChild=true,boolInBase=false,TWO]", "false:TWO")
+          .put("testInBase[boolInChild=true,boolInBase=true,ONE]", "true:ONE")
+          .put("testInBase[boolInChild=true,boolInBase=true,TWO]", "true:TWO")
+          .build();
     }
   }
 
@@ -625,63 +529,46 @@ public class TestParameterAnnotationMethodProcessorTest {
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class MethodEvaluatorClass {
-
-    private static List<TestEnum> testedParameters;
+  public static class MethodEvaluatorClass extends SuccessfulTestCaseBase {
 
     @Test
     public void test(
         @EnumEvaluatorParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE}) TestEnum value) {
-      if (value == TestEnum.THREE) {
-        fail();
-      } else {
-        testedParameters.add(value);
-      }
+      storeTestParametersForThisTest(value);
     }
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class FieldEvaluatorClass {
-
-    private static List<TestEnum> testedParameters;
+  public static class FieldEvaluatorClass extends SuccessfulTestCaseBase {
 
     @EnumEvaluatorParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
     TestEnum value;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      if (value == TestEnum.THREE) {
-        fail();
-      } else {
-        testedParameters.add(value);
-      }
+      storeTestParametersForThisTest(value);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class ConstructorClass {
+  public static class ConstructorClass extends SuccessfulTestCaseBase {
 
-    private static List<TestEnum> testedParameters;
     final TestEnum enumParameter;
 
     public ConstructorClass(
@@ -689,51 +576,46 @@ public class TestParameterAnnotationMethodProcessorTest {
       this.enumParameter = enumParameter;
     }
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .put("test[THREE]", "THREE")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_FOR_ALL_PLACEMENTS_ONLY)
-  public static class MethodFieldOverrideClass {
-
-    private static List<TestEnum> testedParameters;
+  public static class MethodFieldOverrideClass extends SuccessfulTestCaseBase {
 
     @EnumParameter({TestEnum.ONE, TestEnum.TWO})
     TestEnum enumParameter;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
     public void test() {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .put("test[THREE]", "THREE")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_FOR_ALL_PLACEMENTS_ONLY)
-  public static class ErrorDuplicatedConstructorMethodAnnotation {
+  public static class ErrorDuplicatedConstructorMethodAnnotation extends SuccessfulTestCaseBase {
 
-    private static List<String> testedParameters;
     final TestEnum enumParameter;
 
     @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
@@ -741,21 +623,22 @@ public class TestParameterAnnotationMethodProcessorTest {
       this.enumParameter = enumParameter;
     }
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     @EnumParameter({TestEnum.ONE, TestEnum.TWO})
     public void test(TestEnum otherParameter) {
-      testedParameters.add(enumParameter + ":" + otherParameter);
+      storeTestParametersForThisTest(enumParameter, otherParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters)
-          .containsExactly("ONE:ONE", "ONE:TWO", "TWO:ONE", "TWO:TWO", "THREE:ONE", "THREE:TWO");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE,ONE]", "ONE:ONE")
+          .put("test[ONE,TWO]", "ONE:TWO")
+          .put("test[TWO,ONE]", "TWO:ONE")
+          .put("test[TWO,TWO]", "TWO:TWO")
+          .put("test[THREE,ONE]", "THREE:ONE")
+          .put("test[THREE,TWO]", "THREE:TWO")
+          .build();
     }
   }
 
@@ -763,25 +646,11 @@ public class TestParameterAnnotationMethodProcessorTest {
   @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
   public static class ErrorDuplicatedClassFieldAnnotation {
 
-    private static List<TestEnum> testedParameters;
-
     @EnumParameter({TestEnum.ONE, TestEnum.TWO})
     TestEnum enumParameter;
 
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
-    public void test() {
-      testedParameters.add(enumParameter);
-    }
-
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO);
-    }
+    public void test() {}
   }
 
   @ClassTestResult(Result.FAILURE)
@@ -850,46 +719,29 @@ public class TestParameterAnnotationMethodProcessorTest {
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class IndependentAnnotation {
+  public static class IndependentAnnotation extends SuccessfulTestCaseBase {
 
     @EnumAParameter EnumA enumA;
     @EnumBParameter EnumB enumB;
     @EnumCParameter EnumC enumC;
 
-    private static List<List<Object>> testedParameters;
-
-    @BeforeClass
-    public static void resetStaticState() {
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      testedParameters.add(ImmutableList.of(enumA, enumB, enumC));
+      storeTestParametersForThisTest(enumA, enumB, enumC);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      // Only 3 tests should have been sufficient to cover all cases.
-      assertThat(testedParameters).hasSize(3);
-      assertAllEnumsAreIncluded(EnumA.values());
-      assertAllEnumsAreIncluded(EnumB.values());
-      assertAllEnumsAreIncluded(EnumC.values());
-    }
-
-    private static <T extends Enum<T>> void assertAllEnumsAreIncluded(Enum<T>[] values) {
-      Set<Enum<T>> enumSet = new HashSet<>(Arrays.asList(values));
-      for (List<Object> enumList : testedParameters) {
-        enumSet.removeAll(enumList);
-      }
-      assertThat(enumSet).isEmpty();
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[A1,B1,C1]", "A1:B1:C1")
+          .put("test[A2,B2,C2]", "A2:B2:C2")
+          .put("test[A2,B2,C3]", "A2:B2:C3")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class TestNamesTest {
-
-    @Rule public TestName name = new TestName();
+  public static class TestNamesTest extends SuccessfulTestCaseBase {
 
     @TestParameter("8")
     long fieldParam;
@@ -897,33 +749,51 @@ public class TestParameterAnnotationMethodProcessorTest {
     @Test
     public void withPrimitives(
         @TestParameter("true") boolean param1, @TestParameter("2") int param2) {
-      assertThat(name.getMethodName())
-          .isEqualTo("withPrimitives[fieldParam=8,param1=true,param2=2]");
+      storeTestParametersForThisTest(fieldParam, param1, param2);
     }
 
     @Test
     public void withString(@TestParameter("AAA") String param1) {
-      assertThat(name.getMethodName()).isEqualTo("withString[fieldParam=8,AAA]");
+      storeTestParametersForThisTest(fieldParam, param1);
     }
 
     @Test
     public void withEnum(@EnumParameter(TestEnum.TWO) TestEnum param1) {
-      assertThat(name.getMethodName()).isEqualTo("withEnum[fieldParam=8,TWO]");
+      storeTestParametersForThisTest(fieldParam, param1);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("withString[fieldParam=8,AAA]", "8:AAA")
+          .put("withEnum[fieldParam=8,TWO]", "8:TWO")
+          .put("withPrimitives[fieldParam=8,param1=true,param2=2]", "8:true:2")
+          .build();
     }
   }
 
   @ClassTestResult(Result.SUCCESS_ALWAYS)
-  public static class MethodNameContainsOrderedParameterNames {
-
-    @Rule public TestName name = new TestName();
+  public static class MethodNameContainsOrderedParameterNames extends SuccessfulTestCaseBase {
 
     @Test
-    public void pretest(@TestParameter({"a", "b"}) String foo) {}
+    public void pretest(@TestParameter({"a", "b"}) String foo) {
+      storeTestParametersForThisTest(foo);
+    }
 
     @Test
     public void test(
         @EnumParameter({TestEnum.ONE, TestEnum.TWO}) TestEnum e, @TestParameter({"c"}) String foo) {
-      assertThat(name.getMethodName()).isEqualTo("test[" + e.name() + "," + foo + "]");
+      storeTestParametersForThisTest(e, foo);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("pretest[a]", "a")
+          .put("pretest[b]", "b")
+          .put("test[ONE,c]", "ONE:c")
+          .put("test[TWO,c]", "TWO:c")
+          .build();
     }
   }
 

@@ -14,11 +14,21 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static com.google.common.truth.Truth.assertWithMessage;
+import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.rules.TestName;
 import org.junit.runner.Runner;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunListener;
@@ -71,6 +81,65 @@ class SharedTestUtilitiesJUnit4 {
     testRunner.run(notifier);
 
     return failures.build();
+  }
+
+  private static String toCopyPastableJavaString(Map<String, String> map) {
+    StringBuilder resultBuilder = new StringBuilder();
+    resultBuilder.append("\n----------------------\n");
+    resultBuilder.append("ImmutableMap.<String, String>builder()\n");
+    map.forEach(
+        (key, value) ->
+            resultBuilder.append(String.format("    .put(\"%s\", \"%s\")\n", key, value)));
+    resultBuilder.append("    .build()\n");
+    resultBuilder.append("----------------------\n");
+    return resultBuilder.toString();
+  }
+
+  /**
+   * Base class for a test class that acts as a test case testing a single property of a
+   * TestParameterInjector-run test.
+   */
+  abstract static class SuccessfulTestCaseBase {
+
+    @Rule public TestName testName = new TestName();
+
+    private static Map<String, String> testNameToStringifiedParameters;
+    private static ImmutableMap<String, String> expectedTestNameToStringifiedParameters;
+
+    @BeforeClass
+    public static void checkStaticFieldAreNull() {
+      checkState(testNameToStringifiedParameters == null);
+      checkState(expectedTestNameToStringifiedParameters == null);
+    }
+
+    final void storeTestParametersForThisTest(Object... params) {
+      if (testNameToStringifiedParameters == null) {
+        testNameToStringifiedParameters = new LinkedHashMap<>();
+        // Copying this into a static field because @AfterAll methods have to be static
+        expectedTestNameToStringifiedParameters = expectedTestNameToStringifiedParameters();
+      }
+      checkState(
+          !testNameToStringifiedParameters.containsKey(testName.getMethodName()),
+          "Parameters for the test with name '%s' are already stored. This might mean that there"
+              + " are duplicate test names",
+          testName.getMethodName());
+      testNameToStringifiedParameters.put(
+          testName.getMethodName(), stream(params).map(String::valueOf).collect(joining(":")));
+    }
+
+    abstract ImmutableMap<String, String> expectedTestNameToStringifiedParameters();
+
+    @AfterClass
+    public static void completedAllTests() {
+      try {
+        assertWithMessage(toCopyPastableJavaString(testNameToStringifiedParameters))
+            .that(testNameToStringifiedParameters)
+            .isEqualTo(expectedTestNameToStringifiedParameters);
+      } finally {
+        testNameToStringifiedParameters = null;
+        expectedTestNameToStringifiedParameters = null;
+      }
+    }
   }
 
   private SharedTestUtilitiesJUnit4() {}
