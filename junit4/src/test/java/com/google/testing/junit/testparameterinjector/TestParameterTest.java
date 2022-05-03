@@ -15,15 +15,12 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import static java.util.stream.Collectors.joining;
 
 import com.google.common.base.CharMatcher;
-import com.google.common.base.Throwables;
 import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
 import java.lang.annotation.Retention;
 import java.util.ArrayList;
@@ -34,7 +31,6 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runner.notification.Failure;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
@@ -211,33 +207,12 @@ public class TestParameterTest {
 
   @Test
   public void test() throws Exception {
-    List<Failure> failures =
-        PluggableTestRunner.run(
-            new PluggableTestRunner(testClass) {
-              @Override
-              protected TestMethodProcessorList createTestMethodProcessorList() {
-                return TestMethodProcessorList.createNewParameterizedProcessors();
-              }
-            });
-
-    assertNoFailures(failures);
-  }
-
-  private static void assertNoFailures(List<Failure> failures) {
-    if (failures.size() == 1) {
-      throw new AssertionError(getOnlyElement(failures).getException());
-    } else if (failures.size() > 1) {
-      throw new AssertionError(
-          String.format(
-              "Test failed unexpectedly:\n\n%s",
-              failures.stream()
-                  .map(
-                      f ->
-                          String.format(
-                              "<<%s>> %s",
-                              f.getDescription(),
-                              Throwables.getStackTraceAsString(f.getException())))
-                  .collect(joining("\n------------------------------------\n"))));
-    }
+    SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
+        new PluggableTestRunner(testClass) {
+          @Override
+          protected TestMethodProcessorList createTestMethodProcessorList() {
+            return TestMethodProcessorList.createNewParameterizedProcessors();
+          }
+        });
   }
 }

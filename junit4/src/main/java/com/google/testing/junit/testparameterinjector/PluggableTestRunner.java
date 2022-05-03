@@ -17,7 +17,6 @@ package com.google.testing.junit.testparameterinjector;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedListMultimap;
@@ -37,9 +36,6 @@ import org.junit.internal.runners.statements.Fail;
 import org.junit.rules.MethodRule;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
-import org.junit.runner.notification.Failure;
-import org.junit.runner.notification.RunListener;
-import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.BlockJUnit4ClassRunner;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
@@ -125,25 +121,6 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
    */
   protected List<TestRule> getExtraTestRules() {
     return ImmutableList.of();
-  }
-
-  /**
-   * Runs a {@code testClass} with the {@link PluggableTestRunner}, and returns a list of test
-   * {@link Failure}, or an empty list if no failure occurred.
-   */
-  @VisibleForTesting
-  public static ImmutableList<Failure> run(PluggableTestRunner testRunner) throws Exception {
-    final ImmutableList.Builder<Failure> failures = ImmutableList.builder();
-    RunNotifier notifier = new RunNotifier();
-    notifier.addFirstListener(
-        new RunListener() {
-          @Override
-          public void testFailure(Failure failure) throws Exception {
-            failures.add(failure);
-          }
-        });
-    testRunner.run(notifier);
-    return failures.build();
   }
 
   @Override

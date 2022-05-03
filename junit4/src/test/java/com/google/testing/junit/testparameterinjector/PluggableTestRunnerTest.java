@@ -99,7 +99,7 @@ public class PluggableTestRunnerTest {
 
   @Test
   public void ruleThatIsBothTestRuleAndMethodRuleIsInvokedOnceOnly() throws Exception {
-    PluggableTestRunner.run(
+    SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
         new PluggableTestRunner(TestAndMethodRuleTestClass.class) {
           @Override
           protected TestMethodProcessorList createTestMethodProcessorList() {
@@ -130,7 +130,7 @@ public class PluggableTestRunnerTest {
 
   @Test
   public void rulesAreSortedCorrectly_withExplicitOrder() throws Exception {
-    PluggableTestRunner.run(
+    SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
         new PluggableTestRunner(RuleOrderingTestClassWithExplicitOrder.class) {
           @Override
           protected TestMethodProcessorList createTestMethodProcessorList() {
@@ -158,7 +158,7 @@ public class PluggableTestRunnerTest {
   @Test
   public void testMarkedWithCustomClassIsInvoked() throws Exception {
     testMethodInvocationCount = 0;
-    PluggableTestRunner.run(
+    SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
         new PluggableTestRunner(CustomTestAnnotationTestClass.class) {
           @Override
           protected TestMethodProcessorList createTestMethodProcessorList() {
@@ -195,7 +195,7 @@ public class PluggableTestRunnerTest {
   @Test
   public void testsAreSortedCorrectly() throws Exception {
     testOrder.clear();
-    PluggableTestRunner.run(
+    SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
         new PluggableTestRunner(SortedPluggableTestRunnerTestClass.class) {
           @Override
           protected TestMethodProcessorList createTestMethodProcessorList() {

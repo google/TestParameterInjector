@@ -15,14 +15,11 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.TruthJUnit.assume;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import static java.util.stream.Collectors.joining;
 import static org.junit.Assert.assertThrows;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
@@ -42,7 +39,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runner.notification.Failure;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
@@ -577,9 +573,7 @@ public class TestParametersMethodProcessorTest {
   public void test_success() throws Exception {
     assume().that(maybeFailureMessage.isPresent()).isFalse();
 
-    List<Failure> failures = PluggableTestRunner.run(newTestRunner());
-
-    assertNoFailures(failures);
+    SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(newTestRunner());
   }
 
   @Test
@@ -587,7 +581,9 @@ public class TestParametersMethodProcessorTest {
     assume().that(maybeFailureMessage.isPresent()).isTrue();
 
     IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> PluggableTestRunner.run(newTestRunner()));
+        assertThrows(
+            IllegalStateException.class,
+            () -> SharedTestUtilitiesJUnit4.runTestsAndGetFailures(newTestRunner()));
 
     assertThat(exception).hasMessageThat().isEqualTo(maybeFailureMessage.get());
   }
@@ -599,23 +595,5 @@ public class TestParametersMethodProcessorTest {
         return TestMethodProcessorList.createNewParameterizedProcessors();
       }
     };
-  }
-
-  private static void assertNoFailures(List<Failure> failures) {
-    if (failures.size() == 1) {
-      throw new AssertionError(getOnlyElement(failures).getException());
-    } else if (failures.size() > 1) {
-      throw new AssertionError(
-          String.format(
-              "Test failed unexpectedly:\n\n%s",
-              failures.stream()
-                  .map(
-                      f ->
-                          String.format(
-                              "<<%s>> %s",
-                              f.getDescription(),
-                              Throwables.getStackTraceAsString(f.getException())))
-                  .collect(joining("\n------------------------------------\n"))));
-    }
   }
 }

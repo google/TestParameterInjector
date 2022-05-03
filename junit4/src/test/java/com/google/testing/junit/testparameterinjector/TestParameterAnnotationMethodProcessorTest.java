@@ -15,15 +15,12 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import static java.util.stream.Collectors.joining;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
 import com.google.testing.junit.testparameterinjector.TestParameterAnnotationMethodProcessorTest.ErrorNonStaticProviderClass.NonStaticProvider;
@@ -44,7 +41,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runner.notification.Failure;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.junit.runners.model.TestClass;
@@ -956,17 +952,16 @@ public class TestParameterAnnotationMethodProcessorTest {
   public void test() throws Exception {
     switch (result) {
       case SUCCESS_ALWAYS:
-        assertNoFailures(
-            PluggableTestRunner.run(
-                newTestRunnerWithParameterizedSupport(
-                    testClass -> TestMethodProcessorList.createNewParameterizedProcessors())));
+        SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
+            newTestRunnerWithParameterizedSupport(
+                testClass -> TestMethodProcessorList.createNewParameterizedProcessors()));
         break;
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
         assertThrows(
             RuntimeException.class,
             () ->
-                PluggableTestRunner.run(
+                SharedTestUtilitiesJUnit4.runTestsAndGetFailures(
                     newTestRunnerWithParameterizedSupport(
                         testClass -> TestMethodProcessorList.createNewParameterizedProcessors())));
         break;
@@ -975,7 +970,7 @@ public class TestParameterAnnotationMethodProcessorTest {
         assertThrows(
             RuntimeException.class,
             () ->
-                PluggableTestRunner.run(
+                SharedTestUtilitiesJUnit4.runTestsAndGetFailures(
                     newTestRunnerWithParameterizedSupport(
                         testClass -> TestMethodProcessorList.createNewParameterizedProcessors())));
         break;
@@ -990,23 +985,5 @@ public class TestParameterAnnotationMethodProcessorTest {
         return processorListGenerator.apply(getTestClass());
       }
     };
-  }
-
-  private static void assertNoFailures(List<Failure> failures) {
-    if (failures.size() == 1) {
-      throw new AssertionError(getOnlyElement(failures).getException());
-    } else if (failures.size() > 1) {
-      throw new AssertionError(
-          String.format(
-              "Test failed unexpectedly:\n\n%s",
-              failures.stream()
-                  .map(
-                      f ->
-                          String.format(
-                              "<<%s>> %s",
-                              f.getDescription(),
-                              Throwables.getStackTraceAsString(f.getException())))
-                  .collect(joining("\n------------------------------------\n"))));
-    }
   }
 }
