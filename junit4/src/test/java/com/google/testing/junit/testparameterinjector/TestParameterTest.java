@@ -16,19 +16,16 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth.assertWithMessage;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.common.base.CharMatcher;
+import com.google.common.collect.ImmutableMap;
+import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase;
 import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
 import java.lang.annotation.Retention;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -48,132 +45,112 @@ public class TestParameterTest {
   }
 
   @RunAsTest
-  public static class AnnotatedField {
-    private static List<TestEnum> testedParameters;
+  public static class AnnotatedField extends SuccessfulTestCaseBase {
 
     @TestParameter TestEnum enumParameter;
 
-    @BeforeClass
-    public static void initializeStaticFields() {
-      assertWithMessage("Expecting this class to be run only once").that(testedParameters).isNull();
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      testedParameters.add(enumParameter);
+      storeTestParametersForThisTest(enumParameter);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters).containsExactly(TestEnum.ONE, TestEnum.TWO, TestEnum.THREE);
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE]", "ONE")
+          .put("test[TWO]", "TWO")
+          .put("test[THREE]", "THREE")
+          .build();
     }
   }
 
   @RunAsTest
-  public static class AnnotatedConstructorParameter {
-    private static List<String> testedParameters;
+  public static class AnnotatedConstructorParameter extends SuccessfulTestCaseBase {
 
     private final TestEnum constructorEnum;
+
+    @TestParameter TestEnum fieldEnum;
 
     public AnnotatedConstructorParameter(@TestParameter TestEnum constructorEnum) {
       this.constructorEnum = constructorEnum;
     }
 
-    @TestParameter TestEnum fieldEnum;
-
-    @BeforeClass
-    public static void initializeStaticFields() {
-      assertWithMessage("Expecting this class to be run only once").that(testedParameters).isNull();
-      testedParameters = new ArrayList<>();
-    }
-
     @Test
     public void test() {
-      testedParameters.add(String.format("%s:%s", fieldEnum, constructorEnum));
+      storeTestParametersForThisTest(fieldEnum, constructorEnum);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters)
-          .containsExactly(
-              "ONE:ONE",
-              "ONE:TWO",
-              "ONE:THREE",
-              "TWO:ONE",
-              "TWO:TWO",
-              "TWO:THREE",
-              "THREE:ONE",
-              "THREE:TWO",
-              "THREE:THREE");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE,ONE]", "ONE:ONE")
+          .put("test[ONE,TWO]", "ONE:TWO")
+          .put("test[ONE,THREE]", "ONE:THREE")
+          .put("test[TWO,ONE]", "TWO:ONE")
+          .put("test[TWO,TWO]", "TWO:TWO")
+          .put("test[TWO,THREE]", "TWO:THREE")
+          .put("test[THREE,ONE]", "THREE:ONE")
+          .put("test[THREE,TWO]", "THREE:TWO")
+          .put("test[THREE,THREE]", "THREE:THREE")
+          .build();
     }
   }
 
   @RunAsTest
-  public static class MultipleAnnotatedParameters {
-    private static List<String> testedParameters;
-
-    @BeforeClass
-    public static void initializeStaticFields() {
-      assertWithMessage("Expecting this class to be run only once").that(testedParameters).isNull();
-      testedParameters = new ArrayList<>();
-    }
+  public static class MultipleAnnotatedParameters extends SuccessfulTestCaseBase {
 
     @Test
     public void test(
         @TestParameter TestEnum enumParameterA,
         @TestParameter({"TWO", "THREE"}) TestEnum enumParameterB,
         @TestParameter({"!!binary 'ZGF0YQ=='", "data2"}) byte[] bytes) {
-      testedParameters.add(
-          String.format("%s:%s:%s", enumParameterA, enumParameterB, new String(bytes)));
+      storeTestParametersForThisTest(enumParameterA, enumParameterB, new String(bytes));
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters)
-          .containsExactly(
-              "ONE:TWO:data",
-              "ONE:THREE:data",
-              "TWO:TWO:data",
-              "TWO:THREE:data",
-              "THREE:TWO:data",
-              "THREE:THREE:data",
-              "ONE:TWO:data2",
-              "ONE:THREE:data2",
-              "TWO:TWO:data2",
-              "TWO:THREE:data2",
-              "THREE:TWO:data2",
-              "THREE:THREE:data2");
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE,TWO,[100, 97, 116, 97]]", "ONE:TWO:data")
+          .put("test[ONE,TWO,[100, 97, 116, 97, 50]]", "ONE:TWO:data2")
+          .put("test[ONE,THREE,[100, 97, 116, 97]]", "ONE:THREE:data")
+          .put("test[ONE,THREE,[100, 97, 116, 97, 50]]", "ONE:THREE:data2")
+          .put("test[TWO,TWO,[100, 97, 116, 97]]", "TWO:TWO:data")
+          .put("test[TWO,TWO,[100, 97, 116, 97, 50]]", "TWO:TWO:data2")
+          .put("test[TWO,THREE,[100, 97, 116, 97]]", "TWO:THREE:data")
+          .put("test[TWO,THREE,[100, 97, 116, 97, 50]]", "TWO:THREE:data2")
+          .put("test[THREE,TWO,[100, 97, 116, 97]]", "THREE:TWO:data")
+          .put("test[THREE,TWO,[100, 97, 116, 97, 50]]", "THREE:TWO:data2")
+          .put("test[THREE,THREE,[100, 97, 116, 97]]", "THREE:THREE:data")
+          .put("test[THREE,THREE,[100, 97, 116, 97, 50]]", "THREE:THREE:data2")
+          .build();
     }
   }
 
   @RunAsTest
-  public static class WithValuesProvider {
-    private static List<Object> testedParameters;
-
-    @BeforeClass
-    public static void initializeStaticFields() {
-      assertWithMessage("Expecting this class to be run only once").that(testedParameters).isNull();
-      testedParameters = new ArrayList<>();
-    }
+  public static class WithValuesProvider extends SuccessfulTestCaseBase {
 
     @Test
     public void stringTest(
         @TestParameter(valuesProvider = TestStringProvider.class) String string) {
-      testedParameters.add(string);
+      storeTestParametersForThisTest(string);
     }
 
     @Test
     public void charMatcherTest(
         @TestParameter(valuesProvider = CharMatcherProvider.class) CharMatcher charMatcher) {
-      testedParameters.add(charMatcher);
+      storeTestParametersForThisTest(charMatcher);
     }
 
-    @AfterClass
-    public static void completedAllParameterizedTests() {
-      assertThat(testedParameters)
-          .containsExactly(
-              "A", "B", null, CharMatcher.any(), CharMatcher.ascii(), CharMatcher.whitespace());
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("stringTest[A]", "A")
+          .put("stringTest[B]", "B")
+          .put("stringTest[null]", "null")
+          .put("charMatcherTest[CharMatcher.any()]", "CharMatcher.any()")
+          .put("charMatcherTest[CharMatcher.ascii()]", "CharMatcher.ascii()")
+          .put("charMatcherTest[CharMatcher.whitespace()]", "CharMatcher.whitespace()")
+          .build();
     }
 
     private static final class TestStringProvider implements TestParameterValuesProvider {
