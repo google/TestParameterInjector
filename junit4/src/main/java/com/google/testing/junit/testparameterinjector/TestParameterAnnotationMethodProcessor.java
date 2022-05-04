@@ -35,11 +35,14 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.protobuf.ByteString;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
+import com.google.testing.junit.testparameterinjector.TestParameterAnnotationMethodProcessor.TestParameterValue;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -124,14 +127,34 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
           && paramClass().isPresent()
           && namePattern.equals("{0}")
           && Primitives.unwrap(paramClass().get()).isPrimitive()) {
-        // If no custom name pattern was set and this parameter is a primitive (e.g.
-        // boolean
-        // or integer), prefix the parameter value with its field name. This is to avoid
-        // test names such as myMethod_success[true,false,2]. Instead, it'll be
+        // If no custom name pattern was set and this parameter is a primitive (e.g. boolean or
+        // integer), prefix the parameter value with its field name. This is to avoid test names
+        // such as myMethod_success[true,false,2]. Instead, it'll be
         // myMethod_success[dryRun=true,experimentFlag=false,retries=2].
-        return String.format("%s=%s", paramName().get(), value()).trim().replaceAll("\\s+", " ");
+        return String.format("%s=%s", paramName().get(), valueAsString())
+            .trim()
+            .replaceAll("\\s+", " ");
       } else {
-        return MessageFormat.format(namePattern, value()).trim().replaceAll("\\s+", " ");
+        return MessageFormat.format(namePattern, valueAsString()).trim().replaceAll("\\s+", " ");
+      }
+    }
+
+    private String valueAsString() {
+      if (value() != null && value().getClass().isArray()) {
+        StringBuilder resultBuider = new StringBuilder();
+        resultBuider.append("[");
+        for (int i = 0; i < Array.getLength(value()); i++) {
+          if (i > 0) {
+            resultBuider.append(", ");
+          }
+          resultBuider.append(Array.get(value(), i));
+        }
+        resultBuider.append("]");
+        return resultBuider.toString();
+      } else if (value() instanceof ByteString) {
+        return Arrays.toString(((ByteString) value()).toByteArray());
+      } else {
+        return String.valueOf(value());
       }
     }
 
