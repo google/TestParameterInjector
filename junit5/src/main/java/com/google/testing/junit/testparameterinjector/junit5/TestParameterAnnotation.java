@@ -19,6 +19,7 @@ import static com.google.common.base.Verify.verify;
 import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Primitives;
 import java.lang.annotation.Annotation;
@@ -29,7 +30,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.text.MessageFormat;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Annotation to define a test annotation used to have parameterized methods, in either a

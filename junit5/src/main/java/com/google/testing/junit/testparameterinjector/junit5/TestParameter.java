@@ -21,6 +21,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.toList;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Primitives;
 import com.google.protobuf.MessageLite;
@@ -32,7 +33,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Test parameter annotation that defines the values that a single parameter can have.
@@ -169,14 +169,15 @@ public @interface TestParameter {
     @Override
     public Class<?> getValueType(
         Class<? extends Annotation> annotationType, Optional<Class<?>> parameterClass) {
-      return parameterClass.orElseThrow(
-          () ->
-              new AssertionError(
-                  String.format(
-                      "An empty parameter class should not be possible since"
-                          + " @TestParameter can only target FIELD or PARAMETER, both"
-                          + " of which are supported for annotation %s.",
-                      annotationType)));
+      if (parameterClass.isPresent()) {
+        return parameterClass.get();
+      }
+      throw new AssertionError(
+          String.format(
+              "An empty parameter class should not be possible since"
+                  + " @TestParameter can only target FIELD or PARAMETER, both"
+                  + " of which are supported for annotation %s.",
+              annotationType));
     }
 
     private static Object parseStringValue(String value, Class<?> parameterClass) {

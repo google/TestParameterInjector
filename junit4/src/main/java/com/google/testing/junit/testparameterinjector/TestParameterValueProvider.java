@@ -14,9 +14,9 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import com.google.common.base.Optional;
 import java.lang.annotation.Annotation;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Interface which allows {@link TestParameterAnnotation} annotations to provide the values to test

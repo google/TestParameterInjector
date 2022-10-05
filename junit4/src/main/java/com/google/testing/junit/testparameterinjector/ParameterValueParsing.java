@@ -23,6 +23,7 @@ import static java.util.stream.Collectors.toMap;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.MessageLite;
 import java.lang.reflect.ParameterizedType;
@@ -204,6 +205,7 @@ final class ParameterValueParsing {
       }
 
       @SuppressWarnings("unchecked")
+      @CanIgnoreReturnValue
       <ParsedYamlT> SupportedJavaType<JavaT> supportParsedType(
           Class<ParsedYamlT> parsedYamlType, Function<ParsedYamlT, JavaT> transformation) {
         if (Primitives.wrap(supportedJavaType).isAssignableFrom(Primitives.wrap(javaType))) {

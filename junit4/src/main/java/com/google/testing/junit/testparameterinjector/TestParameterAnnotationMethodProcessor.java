@@ -218,9 +218,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       return valueProvider
           .getConstructor()
           .newInstance()
-          .provideValues(
-              annotation,
-              java.util.Optional.ofNullable(annotationWithMetadata.paramClass().orNull()));
+          .provideValues(annotation, annotationWithMetadata.paramClass());
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException(
           "Unexpected exception while invoking value provider " + valueProvider, e);
@@ -1252,10 +1250,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         annotationType.getAnnotation(TestParameterAnnotation.class);
     Class<? extends TestParameterValueProvider> valueProvider = testParameter.valueProvider();
     try {
-      return valueProvider
-          .getConstructor()
-          .newInstance()
-          .getValueType(annotationType, java.util.Optional.ofNullable(paramClass.orNull()));
+      return valueProvider.getConstructor().newInstance().getValueType(annotationType, paramClass);
     } catch (Exception e) {
       throw new RuntimeException(
           "Unexpected exception while invoking value provider " + valueProvider, e);
