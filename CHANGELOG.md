@@ -1,6 +1,8 @@
 ## 1.9
 
 - Bugfix: Support explicit ordering by the JUnit4 `@Rule`. For example: `@Rule(ordering=3)`.
+- Potential test name change: Test names are no longer dependent on the locale of the machine
+  running it (e.g. doubles with integer values are always formatted with a trailing `.0`)
 
 ## 1.8
 
