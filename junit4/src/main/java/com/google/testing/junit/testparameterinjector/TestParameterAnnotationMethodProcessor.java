@@ -18,9 +18,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import static java.util.Arrays.stream;
-import static java.util.stream.Collectors.toCollection;
-import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.auto.value.AutoValue;
@@ -30,14 +27,17 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ContiguousSet;
+import com.google.common.collect.DiscreteDomain;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Range;
 import com.google.common.primitives.Primitives;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
-import com.google.testing.junit.testparameterinjector.TestParameterAnnotationMethodProcessor.TestParameterValue;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
@@ -52,15 +52,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Predicate;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 
 /**
@@ -165,18 +161,21 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
           !specifiedValues.isEmpty(),
           "The number of parameter values should not be 0"
               + ", otherwise the parameter would cause the test to be skipped.");
-      return IntStream.range(0, specifiedValues.size())
-          .mapToObj(
+      return FluentIterable.from(
+              ContiguousSet.create(
+                  Range.closedOpen(0, specifiedValues.size()), DiscreteDomain.integers()))
+          .transform(
               valueIndex ->
-                  new AutoValue_TestParameterAnnotationMethodProcessor_TestParameterValue(
-                      AnnotationTypeOrigin.create(
-                          annotationWithMetadata.annotation().annotationType(), origin),
-                      specifiedValues.get(valueIndex),
-                      valueIndex,
-                      new ArrayList<>(specifiedValues),
-                      annotationWithMetadata.paramClass(),
-                      annotationWithMetadata.paramName()))
-          .collect(toImmutableList());
+                  (TestParameterValue)
+                      new AutoValue_TestParameterAnnotationMethodProcessor_TestParameterValue(
+                          AnnotationTypeOrigin.create(
+                              annotationWithMetadata.annotation().annotationType(), origin),
+                          specifiedValues.get(valueIndex),
+                          valueIndex,
+                          new ArrayList<>(specifiedValues),
+                          annotationWithMetadata.paramClass(),
+                          annotationWithMetadata.paramName()))
+          .toList();
     }
   }
   /**
@@ -189,13 +188,18 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       return annotationType -> Optional.absent();
     } else {
       return annotationType ->
-          Optional.fromNullable(
-              new TestParameterAnnotationMethodProcessor(/* onlyForFieldsAndParameters= */ false)
-                  .getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()).stream()
-                      .filter(matches(annotationType))
-                      .map(TestParameterValue::value)
-                      .findFirst()
-                      .orElse(null));
+          FluentIterable.from(
+                  new TestParameterAnnotationMethodProcessor(
+                          /* onlyForFieldsAndParameters= */ false)
+                      .getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
+              .filter(
+                  testParameterValue ->
+                      testParameterValue
+                          .annotationTypeOrigin()
+                          .annotationType()
+                          .equals(annotationType))
+              .transform(TestParameterValue::value)
+              .first();
     }
   }
 
@@ -223,11 +227,6 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       throw new RuntimeException(
           "Unexpected exception while invoking value provider " + valueProvider, e);
     }
-  }
-
-  private static Predicate<TestParameterValue> matches(Class<? extends Annotation> annotationType) {
-    return testParameterValue ->
-        testParameterValue.annotationTypeOrigin().annotationType().equals(annotationType);
   }
 
   /** The origin of an annotation type. */
@@ -347,33 +346,41 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     // @TestParameterAnnotation annotation.
     List<AnnotationTypeOrigin> fieldAnnotations =
         extractTestParameterAnnotations(
-            streamWithParents(testClass)
-                .flatMap(c -> stream(c.getDeclaredFields()))
-                .flatMap(field -> stream(field.getAnnotations())),
+            FluentIterable.from(listWithParents(testClass))
+                .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
+                .transformAndConcat(field -> Arrays.asList(field.getAnnotations()))
+                .toList(),
             Origin.FIELD);
     List<AnnotationTypeOrigin> methodAnnotations =
         extractTestParameterAnnotations(
-            stream(testClass.getMethods()).flatMap(method -> stream(method.getAnnotations())),
+            FluentIterable.from(testClass.getMethods())
+                .transformAndConcat(method -> Arrays.asList(method.getAnnotations()))
+                .toList(),
             Origin.METHOD);
     List<AnnotationTypeOrigin> parameterAnnotations =
         extractTestParameterAnnotations(
-            streamWithParents(testClass)
-                .flatMap(c -> stream(c.getDeclaredMethods()))
-                .flatMap(method -> stream(method.getParameterAnnotations()).flatMap(Stream::of)),
+            FluentIterable.from(listWithParents(testClass))
+                .transformAndConcat(c -> Arrays.asList(c.getDeclaredMethods()))
+                .transformAndConcat(method -> Arrays.asList(method.getParameterAnnotations()))
+                .transformAndConcat(Arrays::asList)
+                .toList(),
             Origin.METHOD_PARAMETER);
     List<AnnotationTypeOrigin> classAnnotations =
-        extractTestParameterAnnotations(stream(testClass.getAnnotations()), Origin.CLASS);
+        extractTestParameterAnnotations(Arrays.asList(testClass.getAnnotations()), Origin.CLASS);
     List<AnnotationTypeOrigin> constructorAnnotations =
         extractTestParameterAnnotations(
-            stream(testClass.getDeclaredConstructors())
-                .flatMap(constructor -> stream(constructor.getAnnotations())),
+            FluentIterable.from(testClass.getDeclaredConstructors())
+                .transformAndConcat(constructor -> Arrays.asList(constructor.getAnnotations()))
+                .toList(),
             Origin.CONSTRUCTOR);
     List<AnnotationTypeOrigin> constructorParameterAnnotations =
         extractTestParameterAnnotations(
-            stream(testClass.getDeclaredConstructors())
-                .flatMap(
+            FluentIterable.from(testClass.getDeclaredConstructors())
+                .transformAndConcat(
                     constructor ->
-                        stream(constructor.getParameterAnnotations()).flatMap(Stream::of)),
+                        FluentIterable.from(Arrays.asList(constructor.getParameterAnnotations()))
+                            .transformAndConcat(Arrays::asList))
+                .toList(),
             Origin.CONSTRUCTOR_PARAMETER);
 
     checkDuplicatedClassAndFieldAnnotations(
@@ -382,11 +389,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     checkDuplicatedFieldsAnnotations(methodAnnotations, fieldAnnotations);
 
     checkState(
-        constructorAnnotations.stream().distinct().count() == constructorAnnotations.size(),
+        FluentIterable.from(constructorAnnotations).toSet().size() == constructorAnnotations.size(),
         "Annotations should not be duplicated on the constructor.");
 
     checkState(
-        classAnnotations.stream().distinct().count() == classAnnotations.size(),
+        FluentIterable.from(classAnnotations).toSet().size() == classAnnotations.size(),
         "Annotations should not be duplicated on the class.");
 
     if (onlyForFieldsAndParameters) {
@@ -410,18 +417,16 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
           constructorAnnotations);
     }
 
-    return Stream.of(
-            // The order matters, since it will determine which annotation processor is
-            // called first.
-            classAnnotations.stream(),
-            fieldAnnotations.stream(),
-            constructorAnnotations.stream(),
-            constructorParameterAnnotations.stream(),
-            methodAnnotations.stream(),
-            parameterAnnotations.stream())
-        .flatMap(x -> x)
-        .distinct()
-        .collect(toImmutableList());
+    // The order matters, since it will determine which annotation processor is
+    // called first.
+    return FluentIterable.from(classAnnotations)
+        .append(fieldAnnotations)
+        .append(constructorAnnotations)
+        .append(constructorParameterAnnotations)
+        .append(methodAnnotations)
+        .append(parameterAnnotations)
+        .toSet()
+        .asList();
   }
 
   private ImmutableList<AnnotationTypeOrigin> getAnnotationTypeOrigins(
@@ -429,9 +434,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     Set<Origin> originsToFilterBy =
         ImmutableSet.<Origin>builder().add(firstOrigin).add(otherOrigins).build();
     try {
-      return annotationTypeOriginsCache.getUnchecked(testClass).stream()
+      return FluentIterable.from(annotationTypeOriginsCache.getUnchecked(testClass))
           .filter(annotationTypeOrigin -> originsToFilterBy.contains(annotationTypeOrigin.origin()))
-          .collect(toImmutableList());
+          .toList();
     } catch (UncheckedExecutionException e) {
       Throwables.throwIfInstanceOf(e.getCause(), IllegalStateException.class);
       throw e;
@@ -442,14 +447,17 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       List<AnnotationTypeOrigin> methodAnnotations, List<AnnotationTypeOrigin> fieldAnnotations) {
     // If an annotation is duplicated on two fields, then it becomes specific, and cannot be
     // overridden by a method.
-    if (fieldAnnotations.stream().distinct().count() != fieldAnnotations.size()) {
+    if (FluentIterable.from(fieldAnnotations).toSet().size() != fieldAnnotations.size()) {
       List<Class<? extends Annotation>> methodOrFieldAnnotations =
-          Stream.concat(methodAnnotations.stream(), fieldAnnotations.stream().distinct())
-              .map(AnnotationTypeOrigin::annotationType)
-              .collect(toCollection(ArrayList::new));
+          new ArrayList<>(
+              FluentIterable.from(methodAnnotations)
+                  .append(new HashSet<>(fieldAnnotations))
+                  .transform(AnnotationTypeOrigin::annotationType)
+                  .toList());
 
       checkState(
-          methodOrFieldAnnotations.stream().distinct().count() == methodOrFieldAnnotations.size(),
+          FluentIterable.from(methodOrFieldAnnotations).toSet().size()
+              == methodOrFieldAnnotations.size(),
           "Annotations should not be duplicated on a method and field"
               + " if they are present on multiple fields");
     }
@@ -460,18 +468,18 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       List<AnnotationTypeOrigin> classAnnotations,
       List<AnnotationTypeOrigin> fieldAnnotations) {
     ImmutableSet<? extends Class<? extends Annotation>> classAnnotationTypes =
-        classAnnotations.stream()
-            .map(AnnotationTypeOrigin::annotationType)
-            .collect(toImmutableSet());
+        FluentIterable.from(classAnnotations)
+            .transform(AnnotationTypeOrigin::annotationType)
+            .toSet();
 
-    ImmutableSet<Class<? extends Annotation>> uniqueFieldAnnotations =
-        fieldAnnotations.stream()
-            .map(AnnotationTypeOrigin::annotationType)
-            .collect(toImmutableSet());
-    ImmutableSet<Class<? extends Annotation>> uniqueConstructorAnnotations =
-        constructorAnnotations.stream()
-            .map(AnnotationTypeOrigin::annotationType)
-            .collect(toImmutableSet());
+    ImmutableSet<? extends Class<? extends Annotation>> uniqueFieldAnnotations =
+        FluentIterable.from(fieldAnnotations)
+            .transform(AnnotationTypeOrigin::annotationType)
+            .toSet();
+    ImmutableSet<? extends Class<? extends Annotation>> uniqueConstructorAnnotations =
+        FluentIterable.from(constructorAnnotations)
+            .transform(AnnotationTypeOrigin::annotationType)
+            .toSet();
 
     checkState(
         Collections.disjoint(classAnnotationTypes, uniqueFieldAnnotations),
@@ -486,14 +494,15 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         "Annotations should not be duplicated on a field and constructor");
   }
 
-  /** Returns a list of annotation types that are a {@link TestParameterAnnotation}. */
   private List<AnnotationTypeOrigin> extractTestParameterAnnotations(
-      Stream<Annotation> annotations, Origin origin) {
-    return annotations
-        .map(Annotation::annotationType)
-        .filter(annotationType -> annotationType.isAnnotationPresent(TestParameterAnnotation.class))
-        .map(annotationType -> AnnotationTypeOrigin.create(annotationType, origin))
-        .collect(toCollection(ArrayList::new));
+      List<Annotation> annotations, Origin origin) {
+    return new ArrayList<>(
+        FluentIterable.from(annotations)
+            .transform(Annotation::annotationType)
+            .filter(
+                annotationType -> annotationType.isAnnotationPresent(TestParameterAnnotation.class))
+            .transform(annotationType -> AnnotationTypeOrigin.create(annotationType, origin))
+            .toList());
   }
 
   @Override
@@ -579,7 +588,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       // Second, handle the case where the method parameter does not specify the test parameter,
       // and instead relies on the type matching, e.g. {@code public void test(Color c)}.
       if (!matchingTestParameterAnnotationFound) {
-        List<Class<? extends Annotation>> testParameterAnnotationTypes =
+        ImmutableList<? extends Class<? extends Annotation>> testParameterAnnotationTypes =
             getTestParameterAnnotations(
                 // Do not include METHOD_PARAMETER or CONSTRUCTOR_PARAMETER since they have already
                 // been evaluated.
@@ -740,12 +749,12 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       testInfos.add(
           originalTest
               .withExtraParameters(
-                  testParameterValues.stream()
-                      .map(
+                  FluentIterable.from(testParameterValues)
+                      .transform(
                           param ->
                               TestInfoParameter.create(
                                   param.toTestNameString(), param.value(), param.valueIndex()))
-                      .collect(toImmutableList()))
+                      .toList())
               .withExtraAnnotation(
                   TestIndexHolderFactory.create(
                       /* methodIndex= */ strictIndexOf(
@@ -767,18 +776,19 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
             List<List<TestParameterValue>> testParameterValuesList =
                 getAnnotationValuesForUsedAnnotationTypes(method, testClass);
 
-            return Lists.cartesianProduct(testParameterValuesList).stream()
+            return FluentIterable.from(Lists.cartesianProduct(testParameterValuesList))
                 .filter(
                     // Skip tests based on the annotations' {@link Validator#shouldSkip} return
                     // value.
                     testParameterValues ->
-                        testParameterValues.stream()
-                            .noneMatch(
+                        FluentIterable.from(testParameterValues)
+                            .filter(
                                 testParameterValue ->
                                     callShouldSkip(
                                         testParameterValue.annotationTypeOrigin().annotationType(),
-                                        testParameterValues)))
-                .collect(toImmutableList());
+                                        testParameterValues))
+                            .isEmpty())
+                .toList();
           });
     } catch (ExecutionException | UncheckedExecutionException e) {
       Throwables.throwIfUnchecked(e.getCause());
@@ -806,35 +816,38 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   private ImmutableList<List<TestParameterValue>> getAnnotationValuesForUsedAnnotationTypes(
       Method method, Class<?> testClass) {
     ImmutableList<AnnotationTypeOrigin> annotationTypes =
-        Stream.of(
-                getAnnotationTypeOrigins(testClass, Origin.CLASS).stream(),
-                getAnnotationTypeOrigins(testClass, Origin.FIELD).stream(),
-                getAnnotationTypeOrigins(testClass, Origin.CONSTRUCTOR).stream(),
-                getAnnotationTypeOrigins(testClass, Origin.CONSTRUCTOR_PARAMETER).stream(),
-                getAnnotationTypeOrigins(testClass, Origin.METHOD).stream(),
-                getAnnotationTypeOrigins(testClass, Origin.METHOD_PARAMETER).stream()
-                    .sorted(annotationComparator(method.getParameterAnnotations())))
-            .flatMap(x -> x)
-            .collect(toImmutableList());
+        FluentIterable.from(getAnnotationTypeOrigins(testClass, Origin.CLASS))
+            .append(getAnnotationTypeOrigins(testClass, Origin.FIELD))
+            .append(getAnnotationTypeOrigins(testClass, Origin.CONSTRUCTOR))
+            .append(getAnnotationTypeOrigins(testClass, Origin.CONSTRUCTOR_PARAMETER))
+            .append(getAnnotationTypeOrigins(testClass, Origin.METHOD))
+            .append(
+                ImmutableList.sortedCopyOf(
+                    annotationComparator(method.getParameterAnnotations()),
+                    getAnnotationTypeOrigins(testClass, Origin.METHOD_PARAMETER)))
+            .toList();
 
-    return removeOverrides(annotationTypes, testClass, method).stream()
-        .map(
+    return FluentIterable.from(removeOverrides(annotationTypes, testClass, method))
+        .transform(
             annotationTypeOrigin ->
                 getAnnotationFromParametersOrTestOrClass(annotationTypeOrigin, method, testClass))
         .filter(l -> !l.isEmpty())
-        .flatMap(List::stream)
-        .collect(toImmutableList());
+        .transformAndConcat(i -> i)
+        .toList();
   }
 
   private Comparator<AnnotationTypeOrigin> annotationComparator(
       Annotation[][] parameterAnnotations) {
     ImmutableList<String> annotationOrdering =
-        stream(parameterAnnotations)
-            .flatMap(Arrays::stream)
-            .map(Annotation::annotationType)
-            .map(Class::getName)
-            .collect(toImmutableList());
-    return Comparator.comparingInt(o -> annotationOrdering.indexOf(o.annotationType().getName()));
+        FluentIterable.from(parameterAnnotations)
+            .transformAndConcat(Arrays::asList)
+            .transform(Annotation::annotationType)
+            .transform(Class::getName)
+            .toList();
+    return (annotationTypeOrigin, t1) ->
+        Integer.compare(
+            annotationOrdering.indexOf(annotationTypeOrigin.annotationType().getName()),
+            annotationOrdering.indexOf(t1.annotationType().getName()));
   }
 
   /**
@@ -847,20 +860,21 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   private List<AnnotationTypeOrigin> removeOverrides(
       List<AnnotationTypeOrigin> annotationTypeOrigins, Class<?> testClass, Method method) {
     return removeOverrides(
-        annotationTypeOrigins.stream()
-            .filter(
-                annotationTypeOrigin -> {
-                  switch (annotationTypeOrigin.origin()) {
-                    case FIELD: // Fall through.
-                    case CLASS:
-                      return getAnnotationListWithType(
-                              method.getAnnotations(), annotationTypeOrigin.annotationType())
-                          .isEmpty();
-                    default:
-                      return true;
-                  }
-                })
-            .collect(toCollection(ArrayList::new)),
+        new ArrayList<>(
+            FluentIterable.from(annotationTypeOrigins)
+                .filter(
+                    annotationTypeOrigin -> {
+                      switch (annotationTypeOrigin.origin()) {
+                        case FIELD: // Fall through.
+                        case CLASS:
+                          return getAnnotationListWithType(
+                                  method.getAnnotations(), annotationTypeOrigin.annotationType())
+                              .isEmpty();
+                        default:
+                          return true;
+                      }
+                    })
+                .toList()),
         testClass);
   }
 
@@ -869,21 +883,22 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
    */
   private List<AnnotationTypeOrigin> removeOverrides(
       List<AnnotationTypeOrigin> annotationTypeOrigins, Class<?> testClass) {
-    return annotationTypeOrigins.stream()
-        .filter(
-            annotationTypeOrigin -> {
-              switch (annotationTypeOrigin.origin()) {
-                case FIELD: // Fall through.
-                case CLASS:
-                  return getAnnotationListWithType(
-                          getOnlyConstructor(testClass).getAnnotations(),
-                          annotationTypeOrigin.annotationType())
-                      .isEmpty();
-                default:
-                  return true;
-              }
-            })
-        .collect(toCollection(ArrayList::new));
+    return new ArrayList<>(
+        FluentIterable.from(annotationTypeOrigins)
+            .filter(
+                annotationTypeOrigin -> {
+                  switch (annotationTypeOrigin.origin()) {
+                    case FIELD: // Fall through.
+                    case CLASS:
+                      return getAnnotationListWithType(
+                              getOnlyConstructor(testClass).getAnnotations(),
+                              annotationTypeOrigin.annotationType())
+                          .isEmpty();
+                    default:
+                      return true;
+                  }
+                })
+            .toList());
   }
 
   /**
@@ -928,16 +943,18 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       }
     } else if (origin == Origin.FIELD) {
       List<AnnotationWithMetadata> annotations =
-          streamWithParents(testClass)
-              .flatMap(c -> stream(c.getDeclaredFields()))
-              .flatMap(
-                  field ->
-                      getAnnotationListWithType(field.getAnnotations(), annotationType).stream()
-                          .map(
-                              annotation ->
-                                  AnnotationWithMetadata.withMetadata(
-                                      annotation, field.getType(), field.getName())))
-              .collect(toCollection(ArrayList::new));
+          new ArrayList<>(
+              FluentIterable.from(listWithParents(testClass))
+                  .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
+                  .transformAndConcat(
+                      field ->
+                          FluentIterable.from(
+                                  getAnnotationListWithType(field.getAnnotations(), annotationType))
+                              .transform(
+                                  annotation ->
+                                      AnnotationWithMetadata.withMetadata(
+                                          annotation, field.getType(), field.getName())))
+                  .toList());
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
       }
@@ -953,9 +970,12 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
   private static ImmutableList<List<TestParameterValue>> toTestParameterValueList(
       List<AnnotationWithMetadata> annotationWithMetadatas, Origin origin) {
-    return annotationWithMetadatas.stream()
-        .map(annotationWithMetadata -> TestParameterValue.create(annotationWithMetadata, origin))
-        .collect(toImmutableList());
+    return FluentIterable.from(annotationWithMetadatas)
+        .transform(
+            annotationWithMetadata ->
+                (List<TestParameterValue>)
+                    new ArrayList<>(TestParameterValue.create(annotationWithMetadata, origin)))
+        .toList();
   }
 
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
@@ -984,8 +1004,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   @SuppressWarnings("AndroidJdkLibsChecker")
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
       Parameter[] parameters, Class<? extends Annotation> annotationType) {
-    return stream(parameters)
-        .map(
+    return FluentIterable.from(parameters)
+        .transform(
             parameter -> {
               Annotation annotation = parameter.getAnnotation(annotationType);
               return annotation == null
@@ -996,7 +1016,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                       : AnnotationWithMetadata.withMetadata(annotation, parameter.getType());
             })
         .filter(Objects::nonNull)
-        .collect(toImmutableList());
+        .toList();
   }
 
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
@@ -1018,9 +1038,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
   private ImmutableList<Annotation> getAnnotationListWithType(
       Annotation[] annotations, Class<? extends Annotation> annotationType) {
-    return stream(annotations)
+    return FluentIterable.from(annotations)
         .filter(annotation -> annotation.annotationType().equals(annotationType))
-        .collect(toImmutableList());
+        .toList();
   }
 
   private static Constructor<?> getOnlyConstructor(Class<?> testClass) {
@@ -1049,9 +1069,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         List<TestParameterValue> remainingTestParameterValuesForFieldInjection =
             new ArrayList<>(testParameterValuesForFieldInjection);
         for (Field declaredField :
-            streamWithParents(testInstance.getClass())
-                .flatMap(c -> stream(c.getDeclaredFields()))
-                .collect(toImmutableList())) {
+            FluentIterable.from(listWithParents(testInstance.getClass()))
+                .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
+                .toList()) {
           for (TestParameterValue testParameterValue :
               remainingTestParameterValuesForFieldInjection) {
             if (declaredField.isAnnotationPresent(
@@ -1076,11 +1096,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   private static ImmutableList<TestParameterValue> filterByOrigin(
       List<TestParameterValue> testParameterValues, Origin... origins) {
     Set<Origin> originsToFilterBy = ImmutableSet.copyOf(origins);
-    return testParameterValues.stream()
+    return FluentIterable.from(testParameterValues)
         .filter(
             testParameterValue ->
                 originsToFilterBy.contains(testParameterValue.annotationTypeOrigin().origin()))
-        .collect(toImmutableList());
+        .toList();
   }
 
   /**
@@ -1090,9 +1110,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   private static ImmutableList<AnnotationTypeOrigin> filterAnnotationTypeOriginsByOrigin(
       List<AnnotationTypeOrigin> annotationTypeOrigins, Origin... origins) {
     List<Origin> originList = Arrays.asList(origins);
-    return annotationTypeOrigins.stream()
+    return FluentIterable.from(annotationTypeOrigins)
         .filter(annotationTypeOrigin -> originList.contains(annotationTypeOrigin.origin()))
-        .collect(toImmutableList());
+        .toList();
   }
 
   /** Returns a {@link TestParameterAnnotation}'s value for a method or constructor parameter. */
@@ -1200,7 +1220,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
     public ValidatorContext(List<TestParameterValue> testParameterValues) {
       this.testParameterValues = testParameterValues;
-      this.valueList = testParameterValues.stream().map(TestParameterValue::value).collect(toSet());
+      this.valueList =
+          FluentIterable.from(testParameterValues)
+              .transform(TestParameterValue::value)
+              .filter(Objects::nonNull)
+              .toSet();
     }
 
     @Override
@@ -1226,11 +1250,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     }
 
     private Optional<TestParameterValue> getParameter(Class<? extends Annotation> testParameter) {
-      return Optional.fromNullable(
-          testParameterValues.stream()
-              .filter(value -> value.annotationTypeOrigin().annotationType().equals(testParameter))
-              .findAny()
-              .orElse(null));
+      return FluentIterable.from(testParameterValues)
+          .firstMatch(value -> value.annotationTypeOrigin().annotationType().equals(testParameter));
     }
   }
 
@@ -1258,17 +1279,17 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   }
 
   /** Returns the TestParameterAnnotation annotation types defined for a method or constructor. */
-  private ImmutableList<Class<? extends Annotation>> getTestParameterAnnotations(
+  private ImmutableList<? extends Class<? extends Annotation>> getTestParameterAnnotations(
       List<AnnotationTypeOrigin> annotationTypeOrigins,
       final Class<?> testClass,
       AnnotatedElement methodOrConstructor) {
-    return annotationTypeOrigins.stream()
-        .map(AnnotationTypeOrigin::annotationType)
+    return FluentIterable.from(annotationTypeOrigins)
+        .transform(AnnotationTypeOrigin::annotationType)
         .filter(
             annotationType ->
                 testClass.isAnnotationPresent(annotationType)
                     || methodOrConstructor.isAnnotationPresent(annotationType))
-        .collect(toImmutableList());
+        .toList();
   }
 
   private <T> int strictIndexOf(List<T> haystack, T needle) {
@@ -1286,8 +1307,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     return resultBuilder.build();
   }
 
-  private static Stream<Class<?>> streamWithParents(Class<?> clazz) {
-    Stream.Builder<Class<?>> resultBuilder = Stream.builder();
+  private static ImmutableList<Class<?>> listWithParents(Class<?> clazz) {
+    ImmutableList.Builder<Class<?>> resultBuilder = ImmutableList.builder();
 
     Class<?> currentClass = clazz;
     while (currentClass != null) {
@@ -1296,15 +1317,5 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     }
 
     return resultBuilder.build();
-  }
-
-  // Immutable collectors are re-implemented here because they are missing from the Android
-  // collection library.
-  private static <E> Collector<E, ?, ImmutableList<E>> toImmutableList() {
-    return Collectors.collectingAndThen(Collectors.toList(), ImmutableList::copyOf);
-  }
-
-  private static <E> Collector<E, ?, ImmutableSet<E>> toImmutableSet() {
-    return Collectors.collectingAndThen(Collectors.toList(), ImmutableSet::copyOf);
   }
 }

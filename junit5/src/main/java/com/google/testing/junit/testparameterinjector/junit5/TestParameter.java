@@ -18,11 +18,11 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import static java.util.Arrays.stream;
-import static java.util.stream.Collectors.toList;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.protobuf.MessageLite;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameter.InternalImplementationOfThisParameter;
@@ -32,6 +32,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -146,16 +147,17 @@ public @interface TestParameter {
           annotation);
 
       if (valueIsSet) {
-        return stream(annotation.value())
-            .map(v -> parseStringValue(v, parameterClass))
-            .collect(toList());
+        return Lists.newArrayList(
+            FluentIterable.from(annotation.value())
+                .transform(v -> parseStringValue(v, parameterClass))
+                .toArray(Object.class));
       } else if (valuesProviderIsSet) {
         return getValuesFromProvider(annotation.valuesProvider());
       } else {
         if (Enum.class.isAssignableFrom(parameterClass)) {
-          return ImmutableList.copyOf(parameterClass.asSubclass(Enum.class).getEnumConstants());
+          return Arrays.asList((Object[]) parameterClass.asSubclass(Enum.class).getEnumConstants());
         } else if (Primitives.wrap(parameterClass).equals(Boolean.class)) {
-          return ImmutableList.of(false, true);
+          return Arrays.asList(false, true);
         } else {
           throw new IllegalStateException(
               String.format(

@@ -14,12 +14,12 @@
 
 package com.google.testing.junit.testparameterinjector.junit5;
 
-import static java.util.stream.Collectors.toList;
-
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -67,11 +67,11 @@ final class TestMethodProcessorList {
                 testMethod, testClass, ImmutableList.copyOf(testMethod.getAnnotations())));
 
     for (final TestMethodProcessor testMethodProcessor : testMethodProcessors) {
-      testInfos =
-          testInfos.stream()
-              .flatMap(
-                  lastTestInfo -> testMethodProcessor.calculateTestInfos(lastTestInfo).stream())
-              .collect(toList());
+      List<TestInfo> list = new ArrayList<>();
+      for (TestInfo lastTestInfo : testInfos) {
+        list.addAll(testMethodProcessor.calculateTestInfos(lastTestInfo));
+      }
+      testInfos = list;
     }
 
     testInfos = TestInfo.deduplicateTestNames(TestInfo.shortenNamesIfNecessary(testInfos));
@@ -85,17 +85,18 @@ final class TestMethodProcessorList {
    * <p>This method is never called for a parameterless constructor.
    */
   public List<Object> getConstructorParameters(Constructor<?> constructor, TestInfo testInfo) {
-    return testMethodProcessors.stream()
-        .map(processor -> processor.maybeGetConstructorParameters(constructor, testInfo))
+    return FluentIterable.from(testMethodProcessors)
+        .transform(processor -> processor.maybeGetConstructorParameters(constructor, testInfo))
         .filter(Optional::isPresent)
-        .map(Optional::get)
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new IllegalStateException(
-                    String.format(
-                        "Could not generate parameter values for %s. Did you forget an annotation?",
-                        constructor)));
+        .transform(Optional::get)
+        .first()
+        .or(
+            () -> {
+              throw new IllegalStateException(
+                  String.format(
+                      "Could not generate parameter values for %s. Did you forget an annotation?",
+                      constructor));
+            });
   }
 
   /**
@@ -104,17 +105,18 @@ final class TestMethodProcessorList {
    * <p>This method is never called for a parameterless {@code testInfo.getMethod()}.
    */
   public List<Object> getTestMethodParameters(TestInfo testInfo) {
-    return testMethodProcessors.stream()
-        .map(processor -> processor.maybeGetTestMethodParameters(testInfo))
+    return FluentIterable.from(testMethodProcessors)
+        .transform(processor -> processor.maybeGetTestMethodParameters(testInfo))
         .filter(Optional::isPresent)
-        .map(Optional::get)
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new IllegalStateException(
-                    String.format(
-                        "Could not generate parameter values for %s. Did you forget an annotation?",
-                        testInfo.getMethod())));
+        .transform(Optional::get)
+        .first()
+        .or(
+            () -> {
+              throw new IllegalStateException(
+                  String.format(
+                      "Could not generate parameter values for %s. Did you forget an annotation?",
+                      testInfo.getMethod()));
+            });
   }
 
   /**
@@ -128,19 +130,17 @@ final class TestMethodProcessorList {
 
   /** Optionally validates the given constructor. */
   public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
-    return testMethodProcessors.stream()
-        .map(processor -> processor.validateConstructor(constructor))
-        .filter(ExecutableValidationResult::wasValidated)
-        .findFirst()
-        .orElse(ExecutableValidationResult.notValidated());
+    return FluentIterable.from(testMethodProcessors)
+        .transform(processor -> processor.validateConstructor(constructor))
+        .firstMatch(ExecutableValidationResult::wasValidated)
+        .or(ExecutableValidationResult.notValidated());
   }
 
   /** Optionally validates the given method. */
   public ExecutableValidationResult validateTestMethod(Method testMethod, Class<?> testClass) {
-    return testMethodProcessors.stream()
-        .map(processor -> processor.validateTestMethod(testMethod, testClass))
-        .filter(ExecutableValidationResult::wasValidated)
-        .findFirst()
-        .orElse(ExecutableValidationResult.notValidated());
+    return FluentIterable.from(testMethodProcessors)
+        .transform(processor -> processor.validateTestMethod(testMethod, testClass))
+        .firstMatch(ExecutableValidationResult::wasValidated)
+        .or(ExecutableValidationResult.notValidated());
   }
 }

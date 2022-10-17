@@ -18,14 +18,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertWithMessage;
-import static java.util.Arrays.stream;
-import static java.util.stream.Collectors.joining;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -52,14 +53,14 @@ class SharedTestUtilitiesJUnit4 {
       throw new AssertionError(
           String.format(
               "Test failed unexpectedly:\n\n%s",
-              failures.stream()
-                  .map(
+              FluentIterable.from(failures)
+                  .transform(
                       f ->
                           String.format(
                               "<<%s>> %s",
                               f.getDescription(),
                               Throwables.getStackTraceAsString(f.getException())))
-                  .collect(joining("\n------------------------------------\n"))));
+                  .join(Joiner.on("\n------------------------------------\n"))));
     }
   }
 
@@ -88,9 +89,11 @@ class SharedTestUtilitiesJUnit4 {
     StringBuilder resultBuilder = new StringBuilder();
     resultBuilder.append("\n----------------------\n");
     resultBuilder.append("ImmutableMap.<String, String>builder()\n");
-    map.forEach(
-        (key, value) ->
-            resultBuilder.append(String.format("    .put(\"%s\", \"%s\")\n", key, value)));
+    for (Entry<String, String> entry : map.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      resultBuilder.append(String.format("    .put(\"%s\", \"%s\")\n", key, value));
+    }
     resultBuilder.append("    .build()\n");
     resultBuilder.append("----------------------\n");
     return resultBuilder.toString();
@@ -125,7 +128,8 @@ class SharedTestUtilitiesJUnit4 {
               + " are duplicate test names",
           testName.getMethodName());
       testNameToStringifiedParameters.put(
-          testName.getMethodName(), stream(params).map(String::valueOf).collect(joining(":")));
+          testName.getMethodName(),
+          FluentIterable.from(params).transform(String::valueOf).join(Joiner.on(":")));
     }
 
     abstract ImmutableMap<String, String> expectedTestNameToStringifiedParameters();

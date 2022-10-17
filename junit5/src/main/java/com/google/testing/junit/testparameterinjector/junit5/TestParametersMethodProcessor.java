@@ -17,8 +17,6 @@ package com.google.testing.junit.testparameterinjector.junit5;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static java.util.Arrays.stream;
-import static java.util.stream.Collectors.toList;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.common.base.Optional;
@@ -26,6 +24,7 @@ import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -47,10 +46,6 @@ import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /** {@code TestMethodProcessor} implementation for supporting {@link TestParameters}. */
 @SuppressWarnings("AndroidJdkLibsChecker") // Parameter is not available on old Android SDKs.
@@ -127,25 +122,22 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
         testInfos.add(
             originalTest
                 .withExtraParameters(
-                    Stream.of(
-                            constructorParameters
-                                .transform(
-                                    param ->
-                                        TestInfoParameter.create(
-                                            param.name(),
-                                            param.parametersMap(),
-                                            constructorParametersIndexCopy))
-                                .orNull(),
-                            methodParameters
-                                .transform(
-                                    param ->
-                                        TestInfoParameter.create(
-                                            param.name(),
-                                            param.parametersMap(),
-                                            methodParametersIndexCopy))
-                                .orNull())
-                        .filter(Objects::nonNull)
-                        .collect(toImmutableList()))
+                    FluentIterable.of(
+                            constructorParameters.transform(
+                                param ->
+                                    TestInfoParameter.create(
+                                        param.name(),
+                                        param.parametersMap(),
+                                        constructorParametersIndexCopy)),
+                            methodParameters.transform(
+                                param ->
+                                    TestInfoParameter.create(
+                                        param.name(),
+                                        param.parametersMap(),
+                                        methodParametersIndexCopy)))
+                        .filter(Optional::isPresent)
+                        .transform(Optional::get)
+                        .toList())
                 .withExtraAnnotation(
                     TestIndexHolderFactory.create(
                         constructorParametersIndex, methodParametersIndex)));
@@ -158,16 +150,16 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
       getConstructorParametersOrSingleAbsentElement(Class<?> testClass) {
     Constructor<?> constructor = getOnlyConstructor(testClass);
     return hasRelevantAnnotation(constructor)
-        ? getConstructorParameters(constructor).stream()
-            .map(Optional::of)
-            .collect(toImmutableList())
+        ? FluentIterable.from(getConstructorParameters(constructor))
+            .transform(Optional::of)
+            .toList()
         : ImmutableList.of(Optional.absent());
   }
 
   private ImmutableList<Optional<TestParametersValues>> getMethodParametersOrSingleAbsentElement(
       Method method) {
     return hasRelevantAnnotation(method)
-        ? getMethodParameters(method).stream().map(Optional::of).collect(toImmutableList())
+        ? FluentIterable.from(getMethodParameters(method)).transform(Optional::of).toList()
         : ImmutableList.of(Optional.absent());
   }
 
@@ -261,9 +253,10 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
       }
 
       if (valueIsSet) {
-        return stream(annotation.value())
-            .map(yamlMap -> toParameterValues(yamlMap, parametersList, annotation.customName()))
-            .collect(toImmutableList());
+        return FluentIterable.from(annotation.value())
+            .transform(
+                yamlMap -> toParameterValues(yamlMap, parametersList, annotation.customName()))
+            .toList();
       } else {
         return toParameterValuesList(annotation.valuesProvider(), parametersList);
       }
@@ -273,14 +266,14 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
           "This method should only be called for executables with at least one relevant"
               + " annotation");
 
-      return stream(executable.getAnnotation(RepeatedTestParameters.class).value())
-          .map(
+      return FluentIterable.from(executable.getAnnotation(RepeatedTestParameters.class).value())
+          .transform(
               annotation ->
                   toParameterValues(
                       validateAndGetSingleValueFromRepeatedAnnotation(annotation, executable),
                       parametersList,
                       annotation.customName()))
-          .collect(toImmutableList());
+          .toList();
     }
   }
 
@@ -290,9 +283,11 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
       Constructor<? extends TestParametersValuesProvider> constructor =
           valuesProvider.getDeclaredConstructor();
       constructor.setAccessible(true);
-      return constructor.newInstance().provideValues().stream()
-          .peek(values -> validateThatValuesMatchParameters(values, parameters))
-          .collect(toImmutableList());
+      List<TestParametersValues> testParametersValues = constructor.newInstance().provideValues();
+      for (TestParametersValues testParametersValue : testParametersValues) {
+        validateThatValuesMatchParameters(testParametersValue, parameters);
+      }
+      return ImmutableList.copyOf(testParametersValues);
     } catch (NoSuchMethodException e) {
       if (!Modifier.isStatic(valuesProvider.getModifiers()) && valuesProvider.isMemberClass()) {
         throw new IllegalStateException(
@@ -314,7 +309,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private static void checkParameterNamesArePresent(Executable executable) {
     checkState(
-        stream(executable.getParameters()).allMatch(Parameter::isNamePresent),
+        FluentIterable.from(executable.getParameters()).allMatch(Parameter::isNamePresent),
         ""
             + "No parameter name could be found for %s, which likely means that parameter names"
             + " aren't available at runtime. Please ensure that the this test was built with the"
@@ -442,9 +437,11 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private static List<Object> toParameterList(
       TestParametersValues parametersValues, Parameter[] parameters) {
-    return stream(parameters)
-        .map(parameter -> parametersValues.parametersMap().get(parameter.getName()))
-        .collect(toList());
+    return Arrays.asList(
+        FluentIterable.from(Arrays.asList(parameters))
+            .transform(Parameter::getName)
+            .transform(name -> parametersValues.parametersMap().get(name))
+            .toArray(Object.class));
   }
 
   private static Constructor<?> getOnlyConstructor(Class<?> testClass) {
@@ -453,12 +450,6 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
     checkState(
         constructors.size() == 1, "Expected exactly one constructor, but got %s", constructors);
     return getOnlyElement(constructors);
-  }
-
-  // Immutable collectors are re-implemented here because they are missing from the Android
-  // collection library.
-  private static <E> Collector<E, ?, ImmutableList<E>> toImmutableList() {
-    return Collectors.collectingAndThen(Collectors.toList(), ImmutableList::copyOf);
   }
 
   /**

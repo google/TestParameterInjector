@@ -14,10 +14,10 @@
 
 package com.google.testing.junit.testparameterinjector;
 
-import static java.util.Comparator.comparing;
-import static java.util.stream.Collectors.joining;
-
+import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Lists;
@@ -25,10 +25,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.internal.runners.model.ReflectiveCallable;
@@ -96,14 +95,17 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
    * <p>This should be deterministic. The order should not change, even when tests are added/removed
    * or between releases.
    */
-  protected Stream<FrameworkMethod> sortTestMethods(Stream<FrameworkMethod> methods) {
+  protected ImmutableList<FrameworkMethod> sortTestMethods(ImmutableList<FrameworkMethod> methods) {
     if (!shouldSortTestMethodsDeterministically()) {
       return methods;
     }
-
-    return methods.sorted(
-        comparing((FrameworkMethod method) -> method.getName().hashCode())
-            .thenComparing(FrameworkMethod::getName));
+    return FluentIterable.from(methods)
+        .toSortedList(
+            (o1, o2) ->
+                ComparisonChain.start()
+                    .compare(o1.getName().hashCode(), o2.getName().hashCode())
+                    .compare(o1.getName(), o2.getName())
+                    .result());
   }
 
   /**
@@ -125,14 +127,11 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   @Override
   protected final ImmutableList<FrameworkMethod> computeTestMethods() {
-    Stream<FrameworkMethod> processedMethods =
-        getSupportedTestAnnotations().stream()
-            .flatMap(annotation -> getTestClass().getAnnotatedMethods(annotation).stream())
-            .flatMap(method -> processMethod(method).stream());
-
-    processedMethods = sortTestMethods(processedMethods);
-
-    return processedMethods.collect(toImmutableList());
+    return sortTestMethods(
+        FluentIterable.from(getSupportedTestAnnotations())
+            .transformAndConcat(annotation -> getTestClass().getAnnotatedMethods(annotation))
+            .transformAndConcat(this::processMethod)
+            .toList());
   }
 
   /** Implementation of a JUnit FrameworkMethod where the name and annotation list is overridden. */
@@ -182,11 +181,13 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   private ImmutableList<FrameworkMethod> processMethod(FrameworkMethod initialMethod) {
-    return getTestMethodProcessors()
-        .calculateTestInfos(initialMethod.getMethod(), getTestClass().getJavaClass())
-        .stream()
-        .map(testInfo -> new OverriddenFrameworkMethod(testInfo.getMethod(), testInfo))
-        .collect(toImmutableList());
+    return FluentIterable.from(
+            getTestMethodProcessors()
+                .calculateTestInfos(initialMethod.getMethod(), getTestClass().getJavaClass()))
+        .transform(
+            testInfo ->
+                (FrameworkMethod) new OverriddenFrameworkMethod(testInfo.getMethod(), testInfo))
+        .toList();
   }
 
   // Note: This is a copy of the parent implementation, except that instead of calling
@@ -257,15 +258,16 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
     testClass.collectAnnotatedMethodValues(target, Rule.class, TestRule.class, collector::accept);
     testClass.collectAnnotatedFieldValues(target, Rule.class, TestRule.class, collector::accept);
 
+    ArrayList<Integer> keys = new ArrayList<>(orderToRulesMultimap.keySet());
+    Collections.sort(keys);
     ImmutableList<Object> orderedRules =
-        orderToRulesMultimap.keySet().stream()
-            .sorted()
-            .flatMap(
+        FluentIterable.from(keys)
+            .transformAndConcat(
                 // Execute the rules in the reverse order of when the fields occurred. This may look
                 // counter-intuitive, but that is what the default JUnit4 runner does, and there is
                 // no reason to deviate from that here.
-                key -> Lists.reverse(orderToRulesMultimap.get(key)).stream())
-            .collect(toImmutableList());
+                key -> Lists.reverse(orderToRulesMultimap.get(key)))
+            .toList();
 
     // Note: The perceived order* is the reverse of the order in which the code below applies the
     // rules to the statements because each subsequent rule wraps the previous statement.
@@ -334,9 +336,9 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   @Override
   protected final void validateTestMethods(List<Throwable> errorsReturned) {
     List<FrameworkMethod> testMethods =
-        getSupportedTestAnnotations().stream()
-            .flatMap(annotation -> getTestClass().getAnnotatedMethods(annotation).stream())
-            .collect(toImmutableList());
+        FluentIterable.from(getSupportedTestAnnotations())
+            .transformAndConcat(annotation -> getTestClass().getAnnotatedMethods(annotation))
+            .toList();
     for (FrameworkMethod testMethod : testMethods) {
       ExecutableValidationResult validationResult =
           getTestMethodProcessors()
@@ -371,9 +373,9 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
           String.format(
               "Found %s issues while initializing the test runner:\n\n  - %s\n\n\n",
               errors.size(),
-              errors.stream()
-                  .map(Throwables::getStackTraceAsString)
-                  .collect(joining("\n\n\n  - "))));
+              FluentIterable.from(errors)
+                  .transform(Throwables::getStackTraceAsString)
+                  .join(Joiner.on("\n\n\n  - "))));
     }
   }
 
@@ -413,9 +415,5 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
         }
       };
     }
-  }
-
-  private static <E> Collector<E, ?, ImmutableList<E>> toImmutableList() {
-    return Collectors.collectingAndThen(Collectors.toList(), ImmutableList::copyOf);
   }
 }

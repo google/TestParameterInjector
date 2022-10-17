@@ -18,8 +18,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.min;
 
+import com.google.common.collect.FluentIterable;
 import java.lang.annotation.Annotation;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -45,10 +45,17 @@ abstract class BaseTestParameterValidator implements TestParameterValidator {
       // so that we can easily determine which parameter value should be used for validating the
       // other parameters (e.g. should this test be for (a1, b1, c1), (a2, b2, c2), or
       // (a2, b2, c3). The test parameter 'C' will be the 'leadingParameter'.
+
       Class<? extends Annotation> leadingParameter =
-          parameters.stream()
-              .max(Comparator.comparing(parameter -> context.getSpecifiedValues(parameter).size()))
-              .get();
+          FluentIterable.from(parameters)
+              .toSortedList(
+                  (o1, o2) ->
+                      Integer.compare(
+                          context.getSpecifiedValues(o1).size(),
+                          context.getSpecifiedValues(o2).size()))
+              .reverse()
+              .get(0);
+
       // Second, determine which index is the current value in the specified value list of
       // the leading parameter.  In the example above, the index of the current value 'c2' of the
       // leading parameter 'C' would be '1', given the specified values (c1, c2, c3).

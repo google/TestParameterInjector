@@ -16,22 +16,21 @@ package com.google.testing.junit.testparameterinjector.junit5;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toSet;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.base.Joiner;
+import com.google.common.collect.ContiguousSet;
+import com.google.common.collect.DiscreteDomain;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.Range;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.function.BiFunction;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 
 /** A POJO containing information about a test (name and anotations). */
@@ -64,9 +63,9 @@ abstract class TestInfo {
       return String.format(
           "%s[%s]",
           getMethod().getName(),
-          getParameters().stream()
-              .map(TestInfoParameter::getValueInTestName)
-              .collect(joining(",")));
+          FluentIterable.from(getParameters())
+              .transform(TestInfoParameter::getValueInTestName)
+              .join(Joiner.on(",")));
     }
   }
 
@@ -108,18 +107,20 @@ abstract class TestInfo {
    *     #getParameters()} list to the new name.
    */
   private TestInfo withUpdatedParameterNames(
-      BiFunction<TestInfoParameter, Integer, String> parameterWithIndexToNewName) {
+      Java8BiFunction<TestInfoParameter, Integer, String> parameterWithIndexToNewName) {
     return new AutoValue_TestInfo(
         getMethod(),
         getTestClass(),
-        IntStream.range(0, getParameters().size())
-            .mapToObj(
+        FluentIterable.from(
+                ContiguousSet.create(
+                    Range.closedOpen(0, getParameters().size()), DiscreteDomain.integers()))
+            .transform(
                 parameterIndex -> {
                   TestInfoParameter parameter = getParameters().get(parameterIndex);
                   return parameter.withValueInTestName(
                       parameterWithIndexToNewName.apply(parameter, parameterIndex));
                 })
-            .collect(toImmutableList()),
+            .toList(),
         getAnnotations());
   }
 
@@ -136,17 +137,20 @@ abstract class TestInfo {
   }
 
   static ImmutableList<TestInfo> shortenNamesIfNecessary(List<TestInfo> testInfos) {
-    if (testInfos.stream().anyMatch(info -> info.getName().length() > MAX_TEST_NAME_LENGTH)) {
+    if (FluentIterable.from(testInfos)
+        .anyMatch(info -> info.getName().length() > MAX_TEST_NAME_LENGTH)) {
       int numberOfParameters = testInfos.get(0).getParameters().size();
 
       if (numberOfParameters == 0) {
         return ImmutableList.copyOf(testInfos);
       } else {
         Set<Integer> parameterIndicesThatNeedUpdate =
-            IntStream.range(0, numberOfParameters)
+            FluentIterable.from(
+                    ContiguousSet.create(
+                        Range.closedOpen(0, numberOfParameters), DiscreteDomain.integers()))
                 .filter(
                     parameterIndex ->
-                        testInfos.stream()
+                        FluentIterable.from(testInfos)
                             .anyMatch(
                                 info ->
                                     info.getParameters()
@@ -154,11 +158,10 @@ abstract class TestInfo {
                                             .getValueInTestName()
                                             .length()
                                         > getMaxCharactersPerParameter(info, numberOfParameters)))
-                .boxed()
-                .collect(toSet());
+                .toSet();
 
-        return testInfos.stream()
-            .map(
+        return FluentIterable.from(testInfos)
+            .transform(
                 info ->
                     info.withUpdatedParameterNames(
                         (parameter, parameterIndex) ->
@@ -167,7 +170,7 @@ abstract class TestInfo {
                                     parameter,
                                     getMaxCharactersPerParameter(info, numberOfParameters))
                                 : info.getParameters().get(parameterIndex).getValueInTestName()))
-            .collect(toImmutableList());
+            .toList();
       }
     } else {
       return ImmutableList.copyOf(testInfos);
@@ -184,7 +187,8 @@ abstract class TestInfo {
   }
 
   static ImmutableList<TestInfo> deduplicateTestNames(List<TestInfo> testInfos) {
-    long uniqueTestNameCount = testInfos.stream().map(TestInfo::getName).distinct().count();
+    long uniqueTestNameCount =
+        FluentIterable.from(testInfos).transform(TestInfo::getName).toSet().size();
     if (testInfos.size() == uniqueTestNameCount) {
       // Return early if there are no duplicates
       return ImmutableList.copyOf(testInfos);
@@ -214,37 +218,38 @@ abstract class TestInfo {
       testNameToInfo.put(testInfo.getName(), testInfo);
     }
 
-    return testNameToInfo.keySet().stream()
-        .flatMap(
+    return FluentIterable.from(testNameToInfo.keySet())
+        .transformAndConcat(
             testName -> {
               Collection<TestInfo> matchedInfos = testNameToInfo.get(testName);
               if (matchedInfos.size() == 1) {
                 // There was only one method with this name, so no deduplication is necessary
-                return matchedInfos.stream();
+                return matchedInfos;
               } else {
                 // Found tests with duplicate test names
                 int numParameters = matchedInfos.iterator().next().getParameters().size();
                 Set<Integer> indicesThatShouldGetSuffix =
                     // Find parameter indices for which a suffix would allow the reader to
                     // differentiate
-                    IntStream.range(0, numParameters)
+                    FluentIterable.from(
+                            ContiguousSet.create(
+                                Range.closedOpen(0, numParameters), DiscreteDomain.integers()))
                         .filter(
                             parameterIndex ->
-                                matchedInfos.stream()
-                                        .map(
+                                FluentIterable.from(matchedInfos)
+                                        .transform(
                                             info ->
                                                 getTypeSuffix(
                                                     info.getParameters()
                                                         .get(parameterIndex)
                                                         .getValue()))
-                                        .distinct()
-                                        .count()
+                                        .toSet()
+                                        .size()
                                     > 1)
-                        .boxed()
-                        .collect(toSet());
+                        .toSet();
 
-                return matchedInfos.stream()
-                    .map(
+                return FluentIterable.from(matchedInfos)
+                    .transform(
                         testInfo ->
                             testInfo.withUpdatedParameterNames(
                                 (parameter, parameterIndex) ->
@@ -254,7 +259,7 @@ abstract class TestInfo {
                                         : parameter.getValueInTestName()));
               }
             })
-        .collect(toImmutableList());
+        .toList();
   }
 
   private static String getTypeSuffix(@Nullable Object value) {
@@ -267,14 +272,15 @@ abstract class TestInfo {
 
   private static ImmutableList<TestInfo> deduplicateWithNumberPrefixes(
       ImmutableList<TestInfo> testInfos) {
-    long uniqueTestNameCount = testInfos.stream().map(TestInfo::getName).distinct().count();
+    long uniqueTestNameCount =
+        FluentIterable.from(testInfos).transform(TestInfo::getName).toSet().size();
     if (testInfos.size() == uniqueTestNameCount) {
       return ImmutableList.copyOf(testInfos);
     } else {
       // There are still duplicates, even after adding type suffixes. As a last resort: add a
       // counter to all parameters to guarantee that each case is unique.
-      return testInfos.stream()
-          .map(
+      return FluentIterable.from(testInfos)
+          .transform(
               testInfo ->
                   testInfo.withUpdatedParameterNames(
                       (parameter, parameterIndex) ->
@@ -282,12 +288,8 @@ abstract class TestInfo {
                               "%s.%s",
                               parameter.getIndexInValueSource() + 1,
                               parameter.getValueInTestName())))
-          .collect(toImmutableList());
+          .toList();
     }
-  }
-
-  private static <E> Collector<E, ?, ImmutableList<E>> toImmutableList() {
-    return Collectors.collectingAndThen(Collectors.toList(), ImmutableList::copyOf);
   }
 
   @AutoValue
@@ -314,5 +316,10 @@ abstract class TestInfo {
       return new AutoValue_TestInfo_TestInfoParameter(
           checkNotNull(valueInTestName), value, indexInValueSource);
     }
+  }
+
+  /** Copy of Java8's java.util.BiFunction which is not available in older versions of the JDK */
+  interface Java8BiFunction<I, J, K> {
+    K apply(I a, J b);
   }
 }

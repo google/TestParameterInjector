@@ -15,15 +15,14 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.truth.Truth.assertThat;
-import static java.util.Comparator.comparing;
 
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Stream;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -203,8 +202,10 @@ public class PluggableTestRunnerTest {
           }
 
           @Override
-          protected Stream<FrameworkMethod> sortTestMethods(Stream<FrameworkMethod> methods) {
-            return methods.sorted(comparing(FrameworkMethod::getName).reversed());
+          protected ImmutableList<FrameworkMethod> sortTestMethods(
+              ImmutableList<FrameworkMethod> methods) {
+            return FluentIterable.from(methods)
+                .toSortedList((o1, o2) -> o2.getName().compareTo(o1.getName())); // reversed
           }
         });
     assertThat(testOrder).containsExactly("c", "b", "a");

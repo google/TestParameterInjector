@@ -17,9 +17,8 @@ package com.google.testing.junit.testparameterinjector.junit5;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
 
+import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
@@ -27,10 +26,11 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.MessageLite;
 import java.lang.reflect.ParameterizedType;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.Map.Entry;
 import javax.annotation.Nullable;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -64,7 +64,7 @@ final class ParameterValueParsing {
     return new Yaml(new SafeConstructor()).load(yamlString);
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings({"unchecked"})
   static Object parseYamlObjectToJavaType(Object parsedYaml, TypeToken<?> javaType) {
     // Pass along null so we don't have to worry about it below
     if (parsedYaml == null) {
@@ -76,7 +76,7 @@ final class ParameterValueParsing {
 
     yamlValueTransformer
         .ifJavaType(String.class)
-        .supportParsedType(String.class, identity())
+        .supportParsedType(String.class, self -> self)
         // Also support other primitives because it's easy to accidentally write e.g. a number when
         // a string was intended in YAML
         .supportParsedType(Boolean.class, Object::toString)
@@ -84,25 +84,25 @@ final class ParameterValueParsing {
         .supportParsedType(Long.class, Object::toString)
         .supportParsedType(Double.class, Object::toString);
 
-    yamlValueTransformer.ifJavaType(Boolean.class).supportParsedType(Boolean.class, identity());
+    yamlValueTransformer.ifJavaType(Boolean.class).supportParsedType(Boolean.class, self -> self);
 
-    yamlValueTransformer.ifJavaType(Integer.class).supportParsedType(Integer.class, identity());
+    yamlValueTransformer.ifJavaType(Integer.class).supportParsedType(Integer.class, self -> self);
 
     yamlValueTransformer
         .ifJavaType(Long.class)
-        .supportParsedType(Long.class, identity())
+        .supportParsedType(Long.class, self -> self)
         .supportParsedType(Integer.class, Integer::longValue);
 
     yamlValueTransformer
         .ifJavaType(Float.class)
-        .supportParsedType(Float.class, identity())
+        .supportParsedType(Float.class, self -> self)
         .supportParsedType(Double.class, Double::floatValue)
         .supportParsedType(Integer.class, Integer::floatValue)
         .supportParsedType(String.class, Float::valueOf);
 
     yamlValueTransformer
         .ifJavaType(Double.class)
-        .supportParsedType(Double.class, identity())
+        .supportParsedType(Double.class, self -> self)
         .supportParsedType(Integer.class, Integer::doubleValue)
         .supportParsedType(Long.class, Long::doubleValue)
         .supportParsedType(String.class, Double::valueOf);
@@ -123,8 +123,11 @@ final class ParameterValueParsing {
 
     yamlValueTransformer
         .ifJavaType(byte[].class)
-        .supportParsedType(byte[].class, identity())
-        .supportParsedType(String.class, s -> s.getBytes(StandardCharsets.UTF_8));
+        .supportParsedType(byte[].class, self -> self)
+        // Uses String based charset because StandardCharsets was not introduced until later
+        // versions of Android
+        // See https://developer.android.com/reference/java/nio/charset/StandardCharsets.
+        .supportParsedType(String.class, s -> s.getBytes(Charset.forName("UTF-8")));
 
     yamlValueTransformer
         .ifJavaType(ByteString.class)
@@ -150,16 +153,15 @@ final class ParameterValueParsing {
   }
 
   private static Map<?, ?> parseYamlMapToJavaMap(Map<?, ?> map, TypeToken<?> javaType) {
-    return map.entrySet().stream()
-        .collect(
-            toMap(
-                entry ->
-                    parseYamlObjectToJavaType(
-                        entry.getKey(), getGenericParameterType(javaType, /* parameterIndex= */ 0)),
-                entry ->
-                    parseYamlObjectToJavaType(
-                        entry.getValue(),
-                        getGenericParameterType(javaType, /* parameterIndex= */ 1))));
+    Map<Object, Object> returnedMap = new LinkedHashMap<>();
+    for (Entry<?, ?> entry : map.entrySet()) {
+      returnedMap.put(
+          parseYamlObjectToJavaType(
+              entry.getKey(), getGenericParameterType(javaType, /* parameterIndex= */ 0)),
+          parseYamlObjectToJavaType(
+              entry.getValue(), getGenericParameterType(javaType, /* parameterIndex= */ 1)));
+    }
+    return returnedMap;
   }
 
   private static TypeToken<?> getGenericParameterType(TypeToken<?> typeToken, int parameterIndex) {
