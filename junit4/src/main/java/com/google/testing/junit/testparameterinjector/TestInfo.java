@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.FluentIterable;
@@ -58,11 +59,11 @@ abstract class TestInfo {
 
   public final String getName() {
     if (getParameters().isEmpty()) {
-      return getMethod().getName();
+      return getRealMethodName();
     } else {
       return String.format(
           "%s[%s]",
-          getMethod().getName(),
+          getRealMethodName(),
           FluentIterable.from(getParameters())
               .transform(TestInfoParameter::getValueInTestName)
               .join(Joiner.on(",")));
@@ -124,6 +125,20 @@ abstract class TestInfo {
         getAnnotations());
   }
 
+  private String getRealMethodName() {
+    String candidate = getMethod().getName();
+    if (candidate.contains("-")) {
+      // Kotlin hack:
+      // Method names can normally not contain the '-' character. However, when a Kotlin method gets
+      // a @JvmInline value class as parameter, a method with a hash suffix will show up in the
+      // TestParameterInjector's reflection results. These are of the form realMethodName-fiSAjMM().
+      // The code below strips off this suffix.
+      return Splitter.on('-').omitEmptyStrings().split(candidate).iterator().next();
+    } else {
+      return candidate;
+    }
+  }
+
   public static TestInfo legacyCreate(
       Method method, Class<?> testClass, String name, List<Annotation> annotations) {
     return new AutoValue_TestInfo(
@@ -180,7 +195,7 @@ abstract class TestInfo {
   private static int getMaxCharactersPerParameter(TestInfo testInfo, int numberOfParameters) {
     int maxLengthOfAllParameters =
         // Subtract 2 characters for square brackets
-        MAX_TEST_NAME_LENGTH - testInfo.getMethod().getName().length() - 2;
+        MAX_TEST_NAME_LENGTH - testInfo.getRealMethodName().length() - 2;
 
     // Subtract 4 characters to leave place for joining commas and the parameter index.
     return maxLengthOfAllParameters / numberOfParameters - 4;
