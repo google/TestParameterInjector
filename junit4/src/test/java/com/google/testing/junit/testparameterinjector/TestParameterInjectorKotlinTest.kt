@@ -17,6 +17,7 @@ package com.google.testing.junit.testparameterinjector
 import com.google.common.collect.ImmutableList
 import com.google.common.collect.ImmutableMap
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase
+import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider
 import java.util.Arrays
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -127,6 +128,30 @@ class TestParameterInjectorKotlinTest {
         .put("test[width=1]", "1")
         .put("test[width=2]", "2")
         .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
+  internal class TestParameter_Field_WithValueClass : SuccessfulTestCaseBase() {
+    @TestParameter(valuesProvider = DoubleValueClassProvider::class)
+    var width: DoubleValueClass? = null
+
+    @Test
+    fun test() {
+      storeTestParametersForThisTest(width?.onlyValue)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test[DoubleValueClass(onlyValue=1.0)]", "1.0")
+        .put("test[DoubleValueClass(onlyValue=2.5)]", "2.5")
+        .buildOrThrow()
+    }
+
+    private class DoubleValueClassProvider : TestParameterValuesProvider {
+      override fun provideValues(): List<DoubleValueClass> {
+        return ImmutableList.of(DoubleValueClass(1.0), DoubleValueClass(2.5))
+      }
     }
   }
 
