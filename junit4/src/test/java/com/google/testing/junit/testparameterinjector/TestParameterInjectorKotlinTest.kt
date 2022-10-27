@@ -152,6 +152,23 @@ class TestParameterInjectorKotlinTest {
   }
 
   @RunAsTest
+  internal class TestParameters_MethodParam_WithValueClasses : SuccessfulTestCaseBase() {
+    @TestParameters("{width: 3, height: 8}")
+    @TestParameters("{width: 5, height: 2.5}")
+    @Test
+    fun test(width: Int, height: DoubleValueClass) {
+      storeTestParametersForThisTest(width, height.onlyValue)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test-lvZ97mM[{width: 3, height: 8}]", "3:8.0")
+        .put("test-lvZ97mM[{width: 5, height: 2.5}]", "5:2.5")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
   internal class TestParameters_ConstructorParam : SuccessfulTestCaseBase {
     val width: Int
 
