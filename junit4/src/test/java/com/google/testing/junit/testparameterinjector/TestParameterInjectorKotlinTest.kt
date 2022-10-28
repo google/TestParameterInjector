@@ -73,6 +73,48 @@ class TestParameterInjectorKotlinTest {
   }
 
   @RunAsTest
+  internal class TestParameter_MethodParam_WithValueClasses : SuccessfulTestCaseBase() {
+    @Test
+    fun testString(@TestParameter("a", "b") param: StringValueClass) {
+      storeTestParametersForThisTest(param.onlyValue)
+    }
+
+    @Test
+    fun testEnum_selection(@TestParameter("RED", "GREEN") param: ColorValueClass) {
+      storeTestParametersForThisTest(param.onlyValue)
+    }
+
+    @Test
+    fun testEnum_all(@TestParameter param: ColorValueClass) {
+      storeTestParametersForThisTest(param.onlyValue)
+    }
+
+    @Test
+    fun testMixed(
+      @TestParameter("1", "8") width: Int,
+      @TestParameter("1", "5.5") height: DoubleValueClass,
+    ) {
+      storeTestParametersForThisTest(width, height.onlyValue)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("testString-HMW45e8[a]", "a")
+        .put("testString-HMW45e8[b]", "b")
+        .put("testEnum_selection-fiSAjMM[RED]", "RED")
+        .put("testEnum_selection-fiSAjMM[GREEN]", "GREEN")
+        .put("testEnum_all-fiSAjMM[RED]", "RED")
+        .put("testEnum_all-fiSAjMM[BLUE]", "BLUE")
+        .put("testEnum_all-fiSAjMM[GREEN]", "GREEN")
+        .put("testMixed-lvZ97mM[width=1,height=1.0]", "1:1.0")
+        .put("testMixed-lvZ97mM[width=1,height=5.5]", "1:5.5")
+        .put("testMixed-lvZ97mM[width=8,height=1.0]", "8:1.0")
+        .put("testMixed-lvZ97mM[width=8,height=5.5]", "8:5.5")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
   internal class TestParameter_Field : SuccessfulTestCaseBase() {
     @TestParameter("1", "2") var width: Int? = null
 
