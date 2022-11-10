@@ -36,7 +36,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Range;
 import com.google.common.primitives.Primitives;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-import com.google.protobuf.ByteString;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
@@ -147,8 +146,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         }
         resultBuider.append("]");
         return resultBuider.toString();
-      } else if (value() instanceof ByteString) {
-        return Arrays.toString(((ByteString) value()).toByteArray());
+      } else if (ByteStringReflection.isInstanceOfByteString(value())) {
+        return Arrays.toString(ByteStringReflection.byteStringToByteArray(value()));
       } else {
         return String.valueOf(value());
       }
