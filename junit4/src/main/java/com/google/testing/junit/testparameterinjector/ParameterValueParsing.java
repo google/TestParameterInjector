@@ -24,7 +24,6 @@ import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.MessageLite;
 import java.lang.reflect.ParameterizedType;
 import java.nio.charset.Charset;
 import java.util.LinkedHashMap;
@@ -41,10 +40,6 @@ final class ParameterValueParsing {
   @SuppressWarnings("unchecked")
   static <E extends Enum<E>> Enum<?> parseEnum(String str, Class<?> enumType) {
     return Enum.valueOf((Class<E>) enumType, str);
-  }
-
-  static MessageLite parseTextprotoMessage(String textprotoString, Class<?> javaType) {
-    return getProtoValueParser().parseTextprotoMessage(textprotoString, javaType);
   }
 
   static boolean isValidYamlString(String yamlString) {
@@ -111,15 +106,6 @@ final class ParameterValueParsing {
         .ifJavaType(Enum.class)
         .supportParsedType(
             String.class, str -> ParameterValueParsing.parseEnum(str, javaType.getRawType()));
-
-    yamlValueTransformer
-        .ifJavaType(MessageLite.class)
-        .supportParsedType(String.class, str -> parseTextprotoMessage(str, javaType.getRawType()))
-        .supportParsedType(
-            Map.class,
-            map ->
-                getProtoValueParser()
-                    .parseProtobufMessage((Map<String, Object>) map, javaType.getRawType()));
 
     yamlValueTransformer
         .ifJavaType(byte[].class)
@@ -230,22 +216,6 @@ final class ParameterValueParsing {
 
         return this;
       }
-    }
-  }
-
-  static ProtoValueParsing getProtoValueParser() {
-    try {
-      // This is called reflectively so that the android target doesn't have to build in
-      // ProtoValueParsing, which has no Android-compatible target.
-      Class<?> clazz =
-          Class.forName("com.google.testing.junit.testparameterinjector.ProtoValueParsingImpl");
-      return (ProtoValueParsing) clazz.getDeclaredConstructor().newInstance();
-    } catch (ClassNotFoundException unused) {
-      throw new UnsupportedOperationException(
-          "Textproto support is not available when using the Android version of"
-              + " testparameterinjector.");
-    } catch (ReflectiveOperationException e) {
-      throw new AssertionError(e);
     }
   }
 

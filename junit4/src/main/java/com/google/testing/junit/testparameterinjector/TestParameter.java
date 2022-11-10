@@ -24,7 +24,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
-import com.google.protobuf.MessageLite;
 import com.google.testing.junit.testparameterinjector.TestParameter.InternalImplementationOfThisParameter;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
@@ -187,12 +186,6 @@ public @interface TestParameter {
         return value.equals("null") ? null : value;
       } else if (Enum.class.isAssignableFrom(parameterClass)) {
         return value.equals("null") ? null : ParameterValueParsing.parseEnum(value, parameterClass);
-      } else if (MessageLite.class.isAssignableFrom(parameterClass)) {
-        if (ParameterValueParsing.isValidYamlString(value)) {
-          return ParameterValueParsing.parseYamlStringToJavaType(value, parameterClass);
-        } else {
-          return ParameterValueParsing.parseTextprotoMessage(value, parameterClass);
-        }
       } else {
         return ParameterValueParsing.parseYamlStringToJavaType(value, parameterClass);
       }
