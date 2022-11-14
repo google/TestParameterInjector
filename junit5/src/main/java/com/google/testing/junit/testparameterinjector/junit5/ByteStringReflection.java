@@ -58,7 +58,7 @@ final class ByteStringReflection {
   private static Optional<Class<?>> maybeGetByteStringClass() {
     try {
       return Optional.of(Class.forName("com.google.protobuf.ByteString"));
-    } catch (ClassNotFoundException unused) {
+    } catch (ClassNotFoundException | LinkageError unused) {
       return Optional.absent();
     }
   }
