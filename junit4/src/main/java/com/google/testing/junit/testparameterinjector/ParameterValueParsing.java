@@ -23,7 +23,6 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
-import com.google.protobuf.ByteString;
 import java.lang.reflect.ParameterizedType;
 import java.nio.charset.Charset;
 import java.util.LinkedHashMap;
@@ -115,10 +114,12 @@ final class ParameterValueParsing {
         // See https://developer.android.com/reference/java/nio/charset/StandardCharsets.
         .supportParsedType(String.class, s -> s.getBytes(Charset.forName("UTF-8")));
 
-    yamlValueTransformer
-        .ifJavaType(ByteString.class)
-        .supportParsedType(String.class, ByteString::copyFromUtf8)
-        .supportParsedType(byte[].class, ByteString::copyFrom);
+    if (ByteStringReflection.MAYBE_BYTE_STRING_CLASS.isPresent()) {
+      yamlValueTransformer
+          .ifJavaType((Class<Object>) ByteStringReflection.MAYBE_BYTE_STRING_CLASS.get())
+          .supportParsedType(String.class, ByteStringReflection::copyFromUtf8)
+          .supportParsedType(byte[].class, ByteStringReflection::copyFrom);
+    }
 
     // Added mainly for protocol buffer parsing
     yamlValueTransformer

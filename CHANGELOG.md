@@ -1,3 +1,8 @@
+## 1.10
+
+- Removed dependency on `protobuf-javalite` (see
+  [issue #24](https://github.com/google/TestParameterInjector/issues/24))
+
 ## 1.9
 
 - Bugfix: Support explicit ordering by the JUnit4 `@Rule`. For example: `@Rule(ordering=3)`.
