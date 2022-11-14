@@ -176,6 +176,7 @@
           <testSource>1.8</testSource>
           <testTarget>1.8</testTarget>
           <parameters>true</parameters>
+          <compilerArgument>-Xlint:deprecation</compilerArgument>
           <annotationProcessorPaths>
             <path>
               <groupId>com.google.auto.value</groupId>
