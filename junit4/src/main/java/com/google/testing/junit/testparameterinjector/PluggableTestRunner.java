@@ -28,10 +28,12 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.internal.runners.model.ReflectiveCallable;
 import org.junit.internal.runners.statements.Fail;
+import org.junit.internal.runners.statements.FailOnTimeout;
 import org.junit.rules.MethodRule;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
@@ -209,11 +211,27 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
     Statement statement = methodInvoker(method, testObject);
     statement = possiblyExpectingExceptions(method, testObject, statement);
-    statement = withPotentialTimeout(method, testObject, statement);
+    statement = withPotentialTimeoutInternal(method, testObject, statement);
     statement = withBefores(method, testObject, statement);
     statement = withAfters(method, testObject, statement);
     statement = withRules(method, testObject, statement);
     return statement;
+  }
+
+  // Note: This does the same as BlockJUnit4ClassRunner.withPotentialTimeout(), which is deprecated
+  // and will soon be private.
+  private Statement withPotentialTimeoutInternal(
+      FrameworkMethod method, Object test, Statement next) {
+    Test testAnnotation = method.getAnnotation(Test.class);
+    if (testAnnotation == null) {
+      return next;
+    } else if (testAnnotation.timeout() <= 0) {
+      return next;
+    } else {
+      return FailOnTimeout.builder()
+          .withTimeout(testAnnotation.timeout(), TimeUnit.MILLISECONDS)
+          .build(next);
+    }
   }
 
   @Override
