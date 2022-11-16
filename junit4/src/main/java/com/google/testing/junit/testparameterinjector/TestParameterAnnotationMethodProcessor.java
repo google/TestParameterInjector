@@ -567,7 +567,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
             Class<?> valueMethodReturnType =
                 getValueMethodReturnType(
                     testParameterAnnotationType.annotationType(),
-                    /* paramClass = */ Optional.of(parameterType));
+                    /* paramClass= */ Optional.of(parameterType));
             if (!parameterType.isAssignableFrom(valueMethodReturnType)) {
               errors.add(
                   new IllegalStateException(
@@ -600,7 +600,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
             testParameterAnnotationTypes) {
           if (parameterType.isAssignableFrom(
               getValueMethodReturnType(
-                  testParameterAnnotationType, /* paramClass = */ Optional.absent()))) {
+                  testParameterAnnotationType, /* paramClass= */ Optional.absent()))) {
             if (matchingTestParameterAnnotationFound) {
               errors.add(
                   new IllegalStateException(
@@ -1151,7 +1151,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       if (methodParameterType.isAssignableFrom(
           getValueMethodReturnType(
               testParameterValue.annotationTypeOrigin().annotationType(),
-              /* paramClass = */ Optional.absent()))) {
+              /* paramClass= */ Optional.absent()))) {
         return testParameterValue.value();
       }
     }
