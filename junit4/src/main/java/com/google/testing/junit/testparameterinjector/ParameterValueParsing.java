@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import javax.annotation.Nullable;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
@@ -43,7 +44,7 @@ final class ParameterValueParsing {
 
   static boolean isValidYamlString(String yamlString) {
     try {
-      new Yaml(new SafeConstructor()).load(yamlString);
+      new Yaml(new SafeConstructor(new LoaderOptions())).load(yamlString);
       return true;
     } catch (RuntimeException e) {
       return false;
@@ -55,7 +56,7 @@ final class ParameterValueParsing {
   }
 
   static Object parseYamlStringToObject(String yamlString) {
-    return new Yaml(new SafeConstructor()).load(yamlString);
+    return new Yaml(new SafeConstructor(new LoaderOptions())).load(yamlString);
   }
 
   @SuppressWarnings({"unchecked"})
