@@ -46,7 +46,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -116,11 +115,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
      */
     String toTestNameString() {
       Class<? extends Annotation> annotationType = annotationTypeOrigin().annotationType();
-      String namePattern = annotationType.getAnnotation(TestParameterAnnotation.class).name();
 
       if (paramName().isPresent()
           && paramClass().isPresent()
-          && namePattern.equals("{0}")
           && Primitives.unwrap(paramClass().get()).isPrimitive()) {
         // If no custom name pattern was set and this parameter is a primitive (e.g. boolean or
         // integer), prefix the parameter value with its field name. This is to avoid test names
@@ -130,7 +127,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
             .trim()
             .replaceAll("\\s+", " ");
       } else {
-        return MessageFormat.format(namePattern, valueAsString()).trim().replaceAll("\\s+", " ");
+        return valueAsString().trim().replaceAll("\\s+", " ");
       }
     }
 

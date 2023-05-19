@@ -28,7 +28,6 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.text.MessageFormat;
 import java.util.List;
 
 /**
@@ -143,12 +142,6 @@ import java.util.List;
 @Retention(RUNTIME)
 @Target({ANNOTATION_TYPE})
 @interface TestParameterAnnotation {
-  /**
-   * Pattern of the {@link MessageFormat} format to derive the test's name from the parameters.
-   *
-   * @see {@code Parameters#name()}
-   */
-  String name() default "{0}";
 
   /** Specifies a validator for the parameter to determine whether test should be skipped. */
   Class<? extends TestParameterValidator> validator() default DefaultValidator.class;
