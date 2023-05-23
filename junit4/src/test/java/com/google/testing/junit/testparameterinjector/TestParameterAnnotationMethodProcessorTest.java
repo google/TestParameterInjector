@@ -289,10 +289,10 @@ public class TestParameterAnnotationMethodProcessorTest {
       return ImmutableMap.<String, String>builder()
           .put("test1[1.ABC]", "ABC")
           .put("test1[2.ABC]", "ABC")
-          .put("test2[123 (Integer)]", "123")
-          .put("test2[123 (String)]", "123")
-          .put("test2[null (String)]", "null")
-          .put("test2[null (null reference)]", "null")
+          .put("test2[testObject=123 (Integer)]", "123")
+          .put("test2[testObject=123 (String)]", "123")
+          .put("test2[testObject=null (String)]", "null")
+          .put("test2[testObject=null (null reference)]", "null")
           .build();
     }
   }

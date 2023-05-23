@@ -21,6 +21,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.auto.value.AutoValue;
+import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
@@ -114,13 +115,17 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
      * brackets).
      */
     String toTestNameString() {
-      Class<? extends Annotation> annotationType = annotationTypeOrigin().annotationType();
-
       if (paramName().isPresent()
-          && paramClass().isPresent()
-          && Primitives.unwrap(paramClass().get()).isPrimitive()) {
-        // If no custom name pattern was set and this parameter is a primitive (e.g. boolean or
-        // integer), prefix the parameter value with its field name. This is to avoid test names
+          && (value() == null
+              ||
+              // Primitives are often ambiguous
+              Primitives.unwrap(value().getClass()).isPrimitive()
+              // Ambiguous String cases
+              || value().equals("null")
+              || (value() instanceof CharSequence
+                  && CharMatcher.anyOf("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                      .matchesNoneOf((CharSequence) value())))) {
+        // Prefix the parameter value with its field name. This is to avoid test names
         // such as myMethod_success[true,false,2]. Instead, it'll be
         // myMethod_success[dryRun=true,experimentFlag=false,retries=2].
         return String.format("%s=%s", paramName().get(), valueAsString())

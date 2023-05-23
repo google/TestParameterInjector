@@ -131,8 +131,8 @@ public class TestParameterTest {
 
     @Test
     public void stringTest(
-        @TestParameter(valuesProvider = TestStringProvider.class) String string) {
-      storeTestParametersForThisTest(string);
+        @TestParameter(valuesProvider = TestStringProvider.class) String stringParam) {
+      storeTestParametersForThisTest(stringParam);
     }
 
     @Test
@@ -146,7 +146,7 @@ public class TestParameterTest {
       return ImmutableMap.<String, String>builder()
           .put("stringTest[A]", "A")
           .put("stringTest[B]", "B")
-          .put("stringTest[null]", "null")
+          .put("stringTest[stringParam=null]", "null")
           .put("charMatcherTest[CharMatcher.any()]", "CharMatcher.any()")
           .put("charMatcherTest[CharMatcher.ascii()]", "CharMatcher.ascii()")
           .put("charMatcherTest[CharMatcher.whitespace()]", "CharMatcher.whitespace()")
