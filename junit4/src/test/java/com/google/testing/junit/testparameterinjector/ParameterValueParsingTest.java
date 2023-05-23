@@ -16,7 +16,10 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Optional;
 import com.google.protobuf.ByteString;
+import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -138,6 +141,37 @@ public class ParameterValueParsingTest {
             parseYamlValueToJavaTypeCases.yamlString, parseYamlValueToJavaTypeCases.javaClass);
 
     assertThat(result).isEqualTo(parseYamlValueToJavaTypeCases.expectedResult);
+  }
+
+  enum FormatTestNameStringTestCases {
+    NULL_REFERENCE(/* value= */ null, /* expectedResult= */ "param=null"),
+    BOOLEAN(/* value= */ false, /* expectedResult= */ "param=false"),
+    INTEGER(/* value= */ 123, /* expectedResult= */ "param=123"),
+    REGULAR_STRING(/* value= */ "abc", /* expectedResult= */ "abc"),
+    EMPTY_STRING(/* value= */ "", /* expectedResult= */ "param="),
+    NULL_STRING(/* value= */ "null", /* expectedResult= */ "param=null"),
+    INTEGER_STRING(/* value= */ "123", /* expectedResult= */ "param=123"),
+    ARRAY(/* value= */ new byte[] {2, 3, 4}, /* expectedResult= */ "[2, 3, 4]"),
+    CHAR_MATCHER(/* value= */ CharMatcher.any(), /* expectedResult= */ "CharMatcher.any()"),
+    LAST(/* value= */ "123", /* expectedResult= */ "param=123");
+
+    @Nullable final Object value;
+    final String expectedResult;
+
+    FormatTestNameStringTestCases(@Nullable Object value, String expectedResult) {
+      this.value = value;
+      this.expectedResult = expectedResult;
+    }
+  }
+
+  @Test
+  public void formatTestNameString_success(@TestParameter FormatTestNameStringTestCases testCase)
+      throws Exception {
+    String result =
+        ParameterValueParsing.formatTestNameString(
+            /* parameterName= */ Optional.of("param"), /* value= */ testCase.value);
+
+    assertThat(result).isEqualTo(testCase.expectedResult);
   }
 
   private enum TestEnum {

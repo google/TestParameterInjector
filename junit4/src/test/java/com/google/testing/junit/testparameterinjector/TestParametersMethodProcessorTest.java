@@ -54,7 +54,7 @@ public class TestParametersMethodProcessorTest {
     public List<TestParametersValues> provideValues() {
       return ImmutableList.of(
           TestParametersValues.builder().name("one").addParameter("testEnum", TestEnum.ONE).build(),
-          TestParametersValues.builder().name("two").addParameter("testEnum", TestEnum.TWO).build(),
+          TestParametersValues.builder().addParameter("testEnum", TestEnum.TWO).build(),
           TestParametersValues.builder().name("null-case").addParameter("testEnum", null).build());
     }
   }
@@ -241,9 +241,42 @@ public class TestParametersMethodProcessorTest {
     ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
       return ImmutableMap.<String, String>builder()
           .put("test[one]", "ONE")
-          .put("test[two]", "TWO")
+          .put("test[{TWO}]", "TWO")
           .put("test[null-case]", "null")
           .build();
+    }
+  }
+
+  @RunAsTest
+  public static class MethodAnnotationWithProvider extends SuccessfulTestCaseBase {
+
+    @TestParameters(valuesProvider = CustomProvider.class)
+    @Test
+    public void test(int testInt, TestEnum testEnum) {
+      storeTestParametersForThisTest(testInt, testEnum);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[{testInt=5, ONE}]", "5:ONE")
+          .put("test[{testInt=10, TWO}]", "10:TWO")
+          .build();
+    }
+
+    private static final class CustomProvider implements TestParametersValuesProvider {
+      @Override
+      public List<TestParametersValues> provideValues() {
+        return ImmutableList.of(
+            TestParametersValues.builder()
+                .addParameter("testInt", 5)
+                .addParameter("testEnum", TestEnum.ONE)
+                .build(),
+            TestParametersValues.builder()
+                .addParameter("testInt", 10)
+                .addParameter("testEnum", TestEnum.TWO)
+                .build());
+      }
     }
   }
 

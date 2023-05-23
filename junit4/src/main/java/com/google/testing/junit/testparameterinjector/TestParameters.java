@@ -14,14 +14,15 @@
 
 package com.google.testing.junit.testparameterinjector;
 
-import static com.google.common.base.Preconditions.checkState;
 import static java.lang.annotation.ElementType.CONSTRUCTOR;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Collections.unmodifiableMap;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -207,6 +208,8 @@ public @interface TestParameters {
       /**
        * Sets a name for this set of parameters that will be used for describing this test.
        *
+       * <p>Setting a name is optional. If unset, one will be generated from the parameter values.
+       *
        * <p>Example: If a test method is called "personIsAdult" and this name is "teenager", the
        * name of the resulting test will be "personIsAdult[teenager]".
        */
@@ -233,7 +236,21 @@ public @interface TestParameters {
       }
 
       public TestParametersValues build() {
-        checkState(name != null, "This set of parameters needs a name (%s)", parametersMap);
+        if (name == null) {
+          // Name is not set. Auto-generate one based on the parameter name and values
+          StringBuilder nameBuilder = new StringBuilder();
+          nameBuilder.append('{');
+          for (String parameterName : parametersMap.keySet()) {
+            if (nameBuilder.length() > 1) {
+              nameBuilder.append(", ");
+            }
+            nameBuilder.append(
+                ParameterValueParsing.formatTestNameString(
+                    Optional.of(parameterName), parametersMap.get(parameterName)));
+          }
+          nameBuilder.append('}');
+          name = nameBuilder.toString();
+        }
         return new AutoValue_TestParameters_TestParametersValues(
             name, unmodifiableMap(new LinkedHashMap<>(parametersMap)));
       }

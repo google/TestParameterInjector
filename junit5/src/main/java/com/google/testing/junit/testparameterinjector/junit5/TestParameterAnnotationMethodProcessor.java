@@ -21,7 +21,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.auto.value.AutoValue;
-import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
@@ -35,14 +34,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Range;
-import com.google.common.primitives.Primitives;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.testing.junit.testparameterinjector.junit5.TestInfo.TestInfoParameter;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -115,44 +112,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
      * brackets).
      */
     String toTestNameString() {
-      if (paramName().isPresent()
-          && (value() == null
-              ||
-              // Primitives are often ambiguous
-              Primitives.unwrap(value().getClass()).isPrimitive()
-              // Ambiguous String cases
-              || value().equals("null")
-              || (value() instanceof CharSequence
-                  && CharMatcher.anyOf("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-                      .matchesNoneOf((CharSequence) value())))) {
-        // Prefix the parameter value with its field name. This is to avoid test names
-        // such as myMethod_success[true,false,2]. Instead, it'll be
-        // myMethod_success[dryRun=true,experimentFlag=false,retries=2].
-        return String.format("%s=%s", paramName().get(), valueAsString())
-            .trim()
-            .replaceAll("\\s+", " ");
-      } else {
-        return valueAsString().trim().replaceAll("\\s+", " ");
-      }
-    }
-
-    private String valueAsString() {
-      if (value() != null && value().getClass().isArray()) {
-        StringBuilder resultBuider = new StringBuilder();
-        resultBuider.append("[");
-        for (int i = 0; i < Array.getLength(value()); i++) {
-          if (i > 0) {
-            resultBuider.append(", ");
-          }
-          resultBuider.append(Array.get(value(), i));
-        }
-        resultBuider.append("]");
-        return resultBuider.toString();
-      } else if (ByteStringReflection.isInstanceOfByteString(value())) {
-        return Arrays.toString(ByteStringReflection.byteStringToByteArray(value()));
-      } else {
-        return String.valueOf(value());
-      }
+      return ParameterValueParsing.formatTestNameString(paramName(), value());
     }
 
     public static ImmutableList<TestParameterValue> create(

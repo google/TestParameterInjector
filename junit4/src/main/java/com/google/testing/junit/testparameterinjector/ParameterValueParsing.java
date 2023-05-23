@@ -18,13 +18,17 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
+import com.google.common.base.CharMatcher;
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import java.lang.reflect.Array;
 import java.lang.reflect.ParameterizedType;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -218,6 +222,46 @@ final class ParameterValueParsing {
 
         return this;
       }
+    }
+  }
+
+  static String formatTestNameString(Optional<String> parameterName, @Nullable Object value) {
+    String result = valueAsString(value);
+    if (parameterName.isPresent()) {
+      if (value == null
+          ||
+          // Primitives are often ambiguous
+          Primitives.unwrap(value.getClass()).isPrimitive()
+          // Ambiguous String cases
+          || value.equals("null")
+          || (value instanceof CharSequence
+              && CharMatcher.anyOf("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                  .matchesNoneOf((CharSequence) value))) {
+        // Prefix the parameter value with its field name. This is to avoid test names
+        // such as myMethod_success[true,false,2]. Instead, it'll be
+        // myMethod_success[dryRun=true,experimentFlag=false,retries=2].
+        result = String.format("%s=%s", parameterName.get(), valueAsString(value));
+      }
+    }
+    return result.trim().replaceAll("\\s+", " ");
+  }
+
+  private static String valueAsString(Object value) {
+    if (value != null && value.getClass().isArray()) {
+      StringBuilder resultBuider = new StringBuilder();
+      resultBuider.append("[");
+      for (int i = 0; i < Array.getLength(value); i++) {
+        if (i > 0) {
+          resultBuider.append(", ");
+        }
+        resultBuider.append(Array.get(value, i));
+      }
+      resultBuider.append("]");
+      return resultBuider.toString();
+    } else if (ByteStringReflection.isInstanceOfByteString(value)) {
+      return Arrays.toString(ByteStringReflection.byteStringToByteArray(value));
+    } else {
+      return String.valueOf(value);
     }
   }
 
