@@ -1,3 +1,13 @@
+## 1.12
+
+- Tweak to the test name generation: Show the parameter name if its value is potentially
+  ambiguous (e.g. null, "" or "123").
+- Made `TestParametersValues.name()` optional. If missing, a name will be generated.
+
+## 1.11
+
+- Replaced deprecated call to org.yaml.snakeyaml.constructor.SafeConstructor
+
 ## 1.10
 
 - Removed dependency on `protobuf-javalite` (see
