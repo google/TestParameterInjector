@@ -215,6 +215,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
     statement = withBefores(method, testObject, statement);
     statement = withAfters(method, testObject, statement);
     statement = withRules(method, testObject, statement);
+    statement = withInterruptIsolation(statement);
     return statement;
   }
 

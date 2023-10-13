@@ -1,3 +1,10 @@
+## 1.13
+
+- Add support for `BigInteger` and `UnsignedLong`
+- JUnit4: Fix for interrupted test cases causing random failures with thread
+  reuse (porting [the earlier fix in
+  JUnit4](https://github.com/junit-team/junit4/issues/1365)) 
+
 ## 1.12
 
 - Tweak to the test name generation: Show the parameter name if its value is potentially
