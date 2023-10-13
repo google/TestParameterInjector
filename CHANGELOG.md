@@ -1,5 +1,18 @@
 ## 1.13
 
+- Add support for setting a custom name for a `@TestParameter` value given via a provider: 
+
+```java
+private static final class FruitProvider implements TestParameterValuesProvider {
+  @Override
+  public List<?> provideValues() {
+    return ImmutableList.of(
+        value(new Apple()).withName("apple"),
+        value(new Banana()).withName("banana"));
+  }
+}
+```
+
 - Add support for `BigInteger` and `UnsignedLong`
 - JUnit4: Fix for interrupted test cases causing random failures with thread
   reuse (porting [the earlier fix in
