@@ -345,9 +345,26 @@ private static final class CharMatcherProvider implements TestParameterValuesPro
 }
 ```
 
-Note that `provideValues()` dynamically construct the returned list, e.g. by
-reading a file. There are no restrictions on the object types returned, but note
-that `toString()` will be used for the test names.
+Notes:
+
+-   The `provideValues()` method can dynamically construct the returned list,
+    e.g. by reading a file.
+-   There are no restrictions on the object types returned.
+-   The `provideValues()` method is called before `@BeforeClass`, so don't rely
+    on any static state initialized in there.
+-   The returned objects' `toString()` will be used for the test names. If you
+    want to customize the value names, you can do that as follows:
+
+    ```
+    private static final class FruitProvider implements TestParameterValuesProvider {
+      @Override
+      public List<?> provideValues() {
+        return ImmutableList.of(
+            value(new Apple()).withName("apple"),
+            value(new Banana()).withName("banana"));
+      }
+    }
+    ```
 
 ### Dynamic parameter generation for `@TestParameters`
 
