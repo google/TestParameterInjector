@@ -96,12 +96,6 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     abstract List<Object> specifiedValues();
 
     /**
-     * The class of the parameter or field that is being annotated. In case the annotation is
-     * annotating a method, constructor or class, {@code paramClass} is an absent optional.
-     */
-    abstract Optional<Class<?>> paramClass();
-
-    /**
      * The name of the parameter or field that is being annotated. In case the annotation is
      * annotating a method, constructor or class, {@code paramName} is an absent optional.
      */
@@ -145,7 +139,6 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                           newArrayList(
                               FluentIterable.from(specifiedValues)
                                   .transform(TestParameterValue::getWrappedValue)),
-                          annotationWithMetadata.paramClass(),
                           annotationWithMetadata.paramName()))
           .toList();
     }
