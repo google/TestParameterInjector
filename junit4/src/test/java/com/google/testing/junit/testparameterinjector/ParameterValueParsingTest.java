@@ -178,8 +178,7 @@ public class ParameterValueParsingTest {
     NULL_STRING(/* value= */ "null", /* expectedResult= */ "param=null"),
     INTEGER_STRING(/* value= */ "123", /* expectedResult= */ "param=123"),
     ARRAY(/* value= */ new byte[] {2, 3, 4}, /* expectedResult= */ "[2, 3, 4]"),
-    CHAR_MATCHER(/* value= */ CharMatcher.any(), /* expectedResult= */ "CharMatcher.any()"),
-    LAST(/* value= */ "123", /* expectedResult= */ "param=123");
+    CHAR_MATCHER(/* value= */ CharMatcher.any(), /* expectedResult= */ "CharMatcher.any()");
 
     @Nullable final Object value;
     final String expectedResult;

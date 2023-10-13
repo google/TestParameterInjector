@@ -17,6 +17,7 @@ package com.google.testing.junit.testparameterinjector;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.auto.value.AutoAnnotation;
@@ -68,7 +69,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
    * value()} method.
    */
   @AutoValue
-  abstract static class TestParameterValue implements Serializable {
+  abstract static class TestParameterValueHolder implements Serializable {
 
     private static final long serialVersionUID = -6491624726743872379L;
 
@@ -82,8 +83,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
      * annotation's {@code value()} method (e.g. 'true' or 'false' in the case of a Boolean
      * parameter).
      */
-    @Nullable
-    abstract Object value();
+    abstract TestParameterValue wrappedValue();
 
     /** The index of this value in {@link #specifiedValues()}. */
     abstract int valueIndex();
@@ -108,16 +108,25 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     abstract Optional<String> paramName();
 
     /**
+     * Returns {@link #wrappedValue()} without the {@link TestParameterValue} wrapper if it exists.
+     */
+    @Nullable
+    Object unwrappedValue() {
+      return wrappedValue().getWrappedValue();
+    }
+
+    /**
      * Returns a String that represents this value and is fit for use in a test name (between
      * brackets).
      */
     String toTestNameString() {
-      return ParameterValueParsing.formatTestNameString(paramName(), value());
+      return ParameterValueParsing.formatTestNameString(paramName(), wrappedValue());
     }
 
-    public static ImmutableList<TestParameterValue> create(
+    public static ImmutableList<TestParameterValueHolder> create(
         AnnotationWithMetadata annotationWithMetadata, Origin origin) {
-      List<Object> specifiedValues = getParametersAnnotationValues(annotationWithMetadata);
+      List<TestParameterValue> specifiedValues =
+          getParametersAnnotationValues(annotationWithMetadata);
       checkState(
           !specifiedValues.isEmpty(),
           "The number of parameter values should not be 0"
@@ -127,13 +136,15 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                   Range.closedOpen(0, specifiedValues.size()), DiscreteDomain.integers()))
           .transform(
               valueIndex ->
-                  (TestParameterValue)
-                      new AutoValue_TestParameterAnnotationMethodProcessor_TestParameterValue(
+                  (TestParameterValueHolder)
+                      new AutoValue_TestParameterAnnotationMethodProcessor_TestParameterValueHolder(
                           AnnotationTypeOrigin.create(
                               annotationWithMetadata.annotation().annotationType(), origin),
                           specifiedValues.get(valueIndex),
                           valueIndex,
-                          new ArrayList<>(specifiedValues),
+                          newArrayList(
+                              FluentIterable.from(specifiedValues)
+                                  .transform(TestParameterValue::getWrappedValue)),
                           annotationWithMetadata.paramClass(),
                           annotationWithMetadata.paramName()))
           .toList();
@@ -160,7 +171,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                           .annotationTypeOrigin()
                           .annotationType()
                           .equals(annotationType))
-              .transform(TestParameterValue::value)
+              .transform(TestParameterValueHolder::unwrappedValue)
               .first();
     }
   }
@@ -174,17 +185,24 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     return getTestParameterValues(testInfo).getValue(annotationType);
   }
 
-  private static List<Object> getParametersAnnotationValues(
+  private static ImmutableList<TestParameterValue> getParametersAnnotationValues(
       AnnotationWithMetadata annotationWithMetadata) {
     Annotation annotation = annotationWithMetadata.annotation();
     TestParameterAnnotation testParameter =
         annotation.annotationType().getAnnotation(TestParameterAnnotation.class);
     Class<? extends TestParameterValueProvider> valueProvider = testParameter.valueProvider();
     try {
-      return valueProvider
-          .getConstructor()
-          .newInstance()
-          .provideValues(annotation, annotationWithMetadata.paramClass());
+      return FluentIterable.from(
+              valueProvider
+                  .getConstructor()
+                  .newInstance()
+                  .provideValues(annotation, annotationWithMetadata.paramClass()))
+          .transform(
+              value ->
+                  (value instanceof TestParameterValue)
+                      ? (TestParameterValue) value
+                      : TestParameterValue.wrap(value))
+          .toList();
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException(
           "Unexpected exception while invoking value provider " + valueProvider, e);
@@ -270,7 +288,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
           CacheBuilder.newBuilder()
               .maximumSize(1000)
               .build(CacheLoader.from(this::calculateAnnotationTypeOrigins));
-  private final Cache<Method, List<List<TestParameterValue>>> parameterValuesCache =
+  private final Cache<Method, List<List<TestParameterValueHolder>>> parameterValuesCache =
       CacheBuilder.newBuilder().maximumSize(1000).build();
 
   private TestParameterAnnotationMethodProcessor(boolean onlyForFieldsAndParameters) {
@@ -605,14 +623,14 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       return Optional.absent();
     } else {
       TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
-      List<TestParameterValue> testParameterValues =
+      List<TestParameterValueHolder> testParameterValues =
           getParameterValuesForTest(testIndexHolder, testInfo.getTestClass());
 
       Class<?>[] parameterTypes = constructor.getParameterTypes();
       Annotation[][] parameterAnnotations = constructor.getParameterAnnotations();
       List<Object> parameterValues = new ArrayList<>(/* initialCapacity= */ parameterTypes.length);
       List<Class<? extends Annotation>> processedAnnotationTypes = new ArrayList<>();
-      List<TestParameterValue> parameterValuesForConstructor =
+      List<TestParameterValueHolder> parameterValuesForConstructor =
           filterByOrigin(
               testParameterValues, Origin.CLASS, Origin.CONSTRUCTOR, Origin.CONSTRUCTOR_PARAMETER);
       for (int i = 0; i < parameterTypes.length; i++) {
@@ -646,7 +664,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     } else {
       TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
       checkState(testIndexHolder != null);
-      List<TestParameterValue> testParameterValues =
+      List<TestParameterValueHolder> testParameterValues =
           filterByOrigin(
               getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()),
               Origin.CLASS,
@@ -695,7 +713,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
    */
   @Override
   public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
-    List<List<TestParameterValue>> parameterValuesForMethod =
+    List<List<TestParameterValueHolder>> parameterValuesForMethod =
         getParameterValuesForMethod(originalTest.getMethod(), originalTest.getTestClass());
 
     if (parameterValuesForMethod.equals(ImmutableList.of(ImmutableList.of()))) {
@@ -707,7 +725,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     for (int parametersIndex = 0;
         parametersIndex < parameterValuesForMethod.size();
         ++parametersIndex) {
-      List<TestParameterValue> testParameterValues = parameterValuesForMethod.get(parametersIndex);
+      List<TestParameterValueHolder> testParameterValues =
+          parameterValuesForMethod.get(parametersIndex);
       testInfos.add(
           originalTest
               .withExtraParameters(
@@ -715,7 +734,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                       .transform(
                           param ->
                               TestInfoParameter.create(
-                                  param.toTestNameString(), param.value(), param.valueIndex()))
+                                  param.toTestNameString(),
+                                  param.unwrappedValue(),
+                                  param.valueIndex()))
                       .toList())
               .withExtraAnnotation(
                   TestIndexHolderFactory.create(
@@ -729,13 +750,13 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     return testInfos.build();
   }
 
-  private List<List<TestParameterValue>> getParameterValuesForMethod(
+  private List<List<TestParameterValueHolder>> getParameterValuesForMethod(
       Method method, Class<?> testClass) {
     try {
       return parameterValuesCache.get(
           method,
           () -> {
-            List<List<TestParameterValue>> testParameterValuesList =
+            List<List<TestParameterValueHolder>> testParameterValuesList =
                 getAnnotationValuesForUsedAnnotationTypes(method, testClass);
 
             return FluentIterable.from(Lists.cartesianProduct(testParameterValuesList))
@@ -758,7 +779,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     }
   }
 
-  private List<TestParameterValue> getParameterValuesForTest(
+  private List<TestParameterValueHolder> getParameterValuesForTest(
       TestIndexHolder testIndexHolder, Class<?> testClass) {
     verify(
         testIndexHolder.testClassName().equals(testClass.getName()),
@@ -775,7 +796,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
    * Returns the list of annotation index for all annotations defined in a given test method and its
    * class.
    */
-  private ImmutableList<List<TestParameterValue>> getAnnotationValuesForUsedAnnotationTypes(
+  private ImmutableList<List<TestParameterValueHolder>> getAnnotationValuesForUsedAnnotationTypes(
       Method method, Class<?> testClass) {
     ImmutableList<AnnotationTypeOrigin> annotationTypes =
         FluentIterable.from(getAnnotationTypeOrigins(testClass, Origin.CLASS))
@@ -871,7 +892,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
    * method, and the one defined on the method takes precedence over the same annotation defined on
    * the class.
    */
-  private ImmutableList<List<TestParameterValue>> getAnnotationFromParametersOrTestOrClass(
+  private ImmutableList<List<TestParameterValueHolder>> getAnnotationFromParametersOrTestOrClass(
       AnnotationTypeOrigin annotationTypeOrigin, Method method, Class<?> testClass) {
     Origin origin = annotationTypeOrigin.origin();
     Class<? extends Annotation> annotationType = annotationTypeOrigin.annotationType();
@@ -887,7 +908,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       Annotation annotation = getOnlyConstructor(testClass).getAnnotation(annotationType);
       if (annotation != null) {
         return ImmutableList.of(
-            TestParameterValue.create(AnnotationWithMetadata.withoutMetadata(annotation), origin));
+            TestParameterValueHolder.create(
+                AnnotationWithMetadata.withoutMetadata(annotation), origin));
       }
 
     } else if (origin == Origin.METHOD_PARAMETER) {
@@ -899,7 +921,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     } else if (origin == Origin.METHOD) {
       if (method.isAnnotationPresent(annotationType)) {
         return ImmutableList.of(
-            TestParameterValue.create(
+            TestParameterValueHolder.create(
                 AnnotationWithMetadata.withoutMetadata(method.getAnnotation(annotationType)),
                 origin));
       }
@@ -924,19 +946,21 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       Annotation annotation = testClass.getAnnotation(annotationType);
       if (annotation != null) {
         return ImmutableList.of(
-            TestParameterValue.create(AnnotationWithMetadata.withoutMetadata(annotation), origin));
+            TestParameterValueHolder.create(
+                AnnotationWithMetadata.withoutMetadata(annotation), origin));
       }
     }
     return ImmutableList.of();
   }
 
-  private static ImmutableList<List<TestParameterValue>> toTestParameterValueList(
+  private static ImmutableList<List<TestParameterValueHolder>> toTestParameterValueList(
       List<AnnotationWithMetadata> annotationWithMetadatas, Origin origin) {
     return FluentIterable.from(annotationWithMetadatas)
         .transform(
             annotationWithMetadata ->
-                (List<TestParameterValue>)
-                    new ArrayList<>(TestParameterValue.create(annotationWithMetadata, origin)))
+                (List<TestParameterValueHolder>)
+                    new ArrayList<>(
+                        TestParameterValueHolder.create(annotationWithMetadata, origin)))
         .toList();
   }
 
@@ -1019,27 +1043,27 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
     try {
       if (testIndexHolder != null) {
-        List<TestParameterValue> testParameterValues =
+        List<TestParameterValueHolder> testParameterValues =
             getParameterValuesForTest(testIndexHolder, testInfo.getTestClass());
 
         // Do not include {@link Origin#METHOD_PARAMETER} nor {@link Origin#CONSTRUCTOR_PARAMETER}
         // annotations.
-        List<TestParameterValue> testParameterValuesForFieldInjection =
+        List<TestParameterValueHolder> testParameterValuesForFieldInjection =
             filterByOrigin(testParameterValues, Origin.CLASS, Origin.FIELD, Origin.METHOD);
         // The annotationType corresponding to the annotationIndex, e.g. ColorParameter.class
         // in the example above.
-        List<TestParameterValue> remainingTestParameterValuesForFieldInjection =
+        List<TestParameterValueHolder> remainingTestParameterValuesForFieldInjection =
             new ArrayList<>(testParameterValuesForFieldInjection);
         for (Field declaredField :
             FluentIterable.from(listWithParents(testInstance.getClass()))
                 .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
                 .toList()) {
-          for (TestParameterValue testParameterValue :
+          for (TestParameterValueHolder testParameterValue :
               remainingTestParameterValuesForFieldInjection) {
             if (declaredField.isAnnotationPresent(
                 testParameterValue.annotationTypeOrigin().annotationType())) {
               declaredField.setAccessible(true);
-              declaredField.set(testInstance, testParameterValue.value());
+              declaredField.set(testInstance, testParameterValue.unwrappedValue());
               remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
               break;
             }
@@ -1052,11 +1076,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   }
 
   /**
-   * Returns an {@link TestParameterValue} list that contains only the values originating from one
-   * of the {@code origins}.
+   * Returns an {@link TestParameterValueHolder} list that contains only the values originating from
+   * one of the {@code origins}.
    */
-  private static ImmutableList<TestParameterValue> filterByOrigin(
-      List<TestParameterValue> testParameterValues, Origin... origins) {
+  private static ImmutableList<TestParameterValueHolder> filterByOrigin(
+      List<TestParameterValueHolder> testParameterValues, Origin... origins) {
     Set<Origin> originsToFilterBy = ImmutableSet.copyOf(origins);
     return FluentIterable.from(testParameterValues)
         .filter(
@@ -1079,12 +1103,12 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
   /** Returns a {@link TestParameterAnnotation}'s value for a method or constructor parameter. */
   private Object getParameterValue(
-      List<TestParameterValue> testParameterValues,
+      List<TestParameterValueHolder> testParameterValues,
       Class<?> methodParameterType,
       Annotation[] parameterAnnotations,
       List<Class<? extends Annotation>> processedAnnotationTypes) {
     List<Class<? extends Annotation>> iteratedAnnotationTypes = new ArrayList<>();
-    for (TestParameterValue testParameterValue : testParameterValues) {
+    for (TestParameterValueHolder testParameterValue : testParameterValues) {
       // The annotationType corresponding to the annotationIndex, e.g. ColorParameter.class
       // in the example above.
       for (Annotation parameterAnnotation : parameterAnnotations) {
@@ -1101,21 +1125,21 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
           if (Collections.frequency(processedAnnotationTypes, annotationType)
               == Collections.frequency(iteratedAnnotationTypes, annotationType)) {
             processedAnnotationTypes.add(annotationType);
-            return testParameterValue.value();
+            return testParameterValue.unwrappedValue();
           }
           iteratedAnnotationTypes.add(annotationType);
         }
       }
     }
     // If no annotation matches, use the method parameter type.
-    for (TestParameterValue testParameterValue : testParameterValues) {
+    for (TestParameterValueHolder testParameterValue : testParameterValues) {
       // The annotationType corresponding to the annotationIndex, e.g. ColorParameter.class
       // in the example above.
       if (methodParameterType.isAssignableFrom(
           getValueMethodReturnType(
               testParameterValue.annotationTypeOrigin().annotationType(),
               /* paramClass= */ Optional.absent()))) {
-        return testParameterValue.value();
+        return testParameterValue.unwrappedValue();
       }
     }
     throw new IllegalStateException(
@@ -1158,10 +1182,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
   /**
    * Returns whether the test should be skipped according to the {@code annotationType}'s {@link
-   * TestParameterValidator} and the current list of {@link TestParameterValue}.
+   * TestParameterValidator} and the current list of {@link TestParameterValueHolder}.
    */
   private static boolean callShouldSkip(
-      Class<? extends Annotation> annotationType, List<TestParameterValue> testParameterValues) {
+      Class<? extends Annotation> annotationType,
+      List<TestParameterValueHolder> testParameterValues) {
     TestParameterAnnotation annotation =
         annotationType.getAnnotation(TestParameterAnnotation.class);
     Class<? extends TestParameterValidator> validator = annotation.validator();
@@ -1177,14 +1202,14 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
   private static class ValidatorContext implements TestParameterValidator.Context {
 
-    private final List<TestParameterValue> testParameterValues;
+    private final List<TestParameterValueHolder> testParameterValues;
     private final Set<Object> valueList;
 
-    public ValidatorContext(List<TestParameterValue> testParameterValues) {
+    public ValidatorContext(List<TestParameterValueHolder> testParameterValues) {
       this.testParameterValues = testParameterValues;
       this.valueList =
           FluentIterable.from(testParameterValues)
-              .transform(TestParameterValue::value)
+              .transform(TestParameterValueHolder::unwrappedValue)
               .filter(Objects::nonNull)
               .toSet();
     }
@@ -1201,17 +1226,18 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
     @Override
     public Optional<Object> getValue(Class<? extends Annotation> testParameter) {
-      return getParameter(testParameter).transform(TestParameterValue::value);
+      return getParameter(testParameter).transform(TestParameterValueHolder::unwrappedValue);
     }
 
     @Override
     public List<Object> getSpecifiedValues(Class<? extends Annotation> testParameter) {
       return getParameter(testParameter)
-          .transform(TestParameterValue::specifiedValues)
+          .transform(TestParameterValueHolder::specifiedValues)
           .or(ImmutableList.of());
     }
 
-    private Optional<TestParameterValue> getParameter(Class<? extends Annotation> testParameter) {
+    private Optional<TestParameterValueHolder> getParameter(
+        Class<? extends Annotation> testParameter) {
       return FluentIterable.from(testParameterValues)
           .firstMatch(value -> value.annotationTypeOrigin().annotationType().equals(testParameter));
     }

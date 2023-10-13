@@ -303,6 +303,7 @@ class TestParameterInjectorJUnit5Test {
           .put("stringTest[A]", "A")
           .put("stringTest[B]", "B")
           .put("stringTest[string=null]", "null")
+          .put("stringTest[wizard]", "harry")
           .put("charMatcherTest[CharMatcher.any()]", "CharMatcher.any()")
           .put("charMatcherTest[CharMatcher.ascii()]", "CharMatcher.ascii()")
           .put("charMatcherTest[CharMatcher.whitespace()]", "CharMatcher.whitespace()")
@@ -311,8 +312,8 @@ class TestParameterInjectorJUnit5Test {
 
     private static final class TestStringProvider implements TestParameterValuesProvider {
       @Override
-      public List<String> provideValues() {
-        return newArrayList("A", "B", null);
+      public List<?> provideValues() {
+        return newArrayList("A", "B", null, value("harry").withName("wizard"));
       }
     }
 

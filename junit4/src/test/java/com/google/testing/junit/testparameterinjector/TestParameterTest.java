@@ -129,34 +129,85 @@ public class TestParameterTest {
   @RunAsTest
   public static class WithValuesProvider extends SuccessfulTestCaseBase {
 
+    private final int number1;
+
+    @TestParameter(valuesProvider = TestNumberProvider.class)
+    private int number2;
+
+    public WithValuesProvider(
+        @TestParameter(valuesProvider = TestNumberProvider.class) int number1) {
+      this.number1 = number1;
+    }
+
     @Test
     public void stringTest(
         @TestParameter(valuesProvider = TestStringProvider.class) String stringParam) {
-      storeTestParametersForThisTest(stringParam);
+      storeTestParametersForThisTest(number1, number2, stringParam);
     }
 
     @Test
     public void charMatcherTest(
         @TestParameter(valuesProvider = CharMatcherProvider.class) CharMatcher charMatcher) {
-      storeTestParametersForThisTest(charMatcher);
+      storeTestParametersForThisTest(number1, number2, charMatcher);
     }
 
     @Override
     ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
       return ImmutableMap.<String, String>builder()
-          .put("stringTest[A]", "A")
-          .put("stringTest[B]", "B")
-          .put("stringTest[stringParam=null]", "null")
-          .put("charMatcherTest[CharMatcher.any()]", "CharMatcher.any()")
-          .put("charMatcherTest[CharMatcher.ascii()]", "CharMatcher.ascii()")
-          .put("charMatcherTest[CharMatcher.whitespace()]", "CharMatcher.whitespace()")
+          .put("stringTest[one,one,A]", "1:1:A")
+          .put("stringTest[one,one,B]", "1:1:B")
+          .put("stringTest[one,one,stringParam=null]", "1:1:null")
+          .put("stringTest[one,one,nothing]", "1:1:null")
+          .put("stringTest[one,one,wizard]", "1:1:harry")
+          .put("stringTest[one,number1=2,A]", "2:1:A")
+          .put("stringTest[one,number1=2,B]", "2:1:B")
+          .put("stringTest[one,number1=2,stringParam=null]", "2:1:null")
+          .put("stringTest[one,number1=2,nothing]", "2:1:null")
+          .put("stringTest[one,number1=2,wizard]", "2:1:harry")
+          .put("stringTest[number2=2,one,A]", "1:2:A")
+          .put("stringTest[number2=2,one,B]", "1:2:B")
+          .put("stringTest[number2=2,one,stringParam=null]", "1:2:null")
+          .put("stringTest[number2=2,one,nothing]", "1:2:null")
+          .put("stringTest[number2=2,one,wizard]", "1:2:harry")
+          .put("stringTest[number2=2,number1=2,A]", "2:2:A")
+          .put("stringTest[number2=2,number1=2,B]", "2:2:B")
+          .put("stringTest[number2=2,number1=2,stringParam=null]", "2:2:null")
+          .put("stringTest[number2=2,number1=2,nothing]", "2:2:null")
+          .put("stringTest[number2=2,number1=2,wizard]", "2:2:harry")
+          .put("charMatcherTest[one,one,CharMatcher.any()]", "1:1:CharMatcher.any()")
+          .put("charMatcherTest[one,one,CharMatcher.ascii()]", "1:1:CharMatcher.ascii()")
+          .put("charMatcherTest[one,one,CharMatcher.whitespace()]", "1:1:CharMatcher.whitespace()")
+          .put("charMatcherTest[one,number1=2,CharMatcher.any()]", "2:1:CharMatcher.any()")
+          .put("charMatcherTest[one,number1=2,CharMatcher.ascii()]", "2:1:CharMatcher.ascii()")
+          .put(
+              "charMatcherTest[one,number1=2,CharMatcher.whitespace()]",
+              "2:1:CharMatcher.whitespace()")
+          .put("charMatcherTest[number2=2,one,CharMatcher.any()]", "1:2:CharMatcher.any()")
+          .put("charMatcherTest[number2=2,one,CharMatcher.ascii()]", "1:2:CharMatcher.ascii()")
+          .put(
+              "charMatcherTest[number2=2,one,CharMatcher.whitespace()]",
+              "1:2:CharMatcher.whitespace()")
+          .put("charMatcherTest[number2=2,number1=2,CharMatcher.any()]", "2:2:CharMatcher.any()")
+          .put(
+              "charMatcherTest[number2=2,number1=2,CharMatcher.ascii()]", "2:2:CharMatcher.ascii()")
+          .put(
+              "charMatcherTest[number2=2,number1=2,CharMatcher.whitespace()]",
+              "2:2:CharMatcher.whitespace()")
           .build();
+    }
+
+    private static final class TestNumberProvider implements TestParameterValuesProvider {
+      @Override
+      public List<?> provideValues() {
+        return newArrayList(value(1).withName("one"), 2);
+      }
     }
 
     private static final class TestStringProvider implements TestParameterValuesProvider {
       @Override
-      public List<String> provideValues() {
-        return newArrayList("A", "B", null);
+      public List<?> provideValues() {
+        return newArrayList(
+            "A", "B", null, value(null).withName("nothing"), value("harry").withName("wizard"));
       }
     }
 

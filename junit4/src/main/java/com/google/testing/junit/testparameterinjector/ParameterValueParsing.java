@@ -248,21 +248,33 @@ final class ParameterValueParsing {
   }
 
   static String formatTestNameString(Optional<String> parameterName, @Nullable Object value) {
-    String result = valueAsString(value);
-    if (parameterName.isPresent()) {
-      if (value == null
+    Object unwrappedValue;
+    Optional<String> customName;
+
+    if (value instanceof TestParameterValue) {
+      TestParameterValue tpValue = (TestParameterValue) value;
+      unwrappedValue = tpValue.getWrappedValue();
+      customName = tpValue.getCustomName();
+    } else {
+      unwrappedValue = value;
+      customName = Optional.absent();
+    }
+
+    String result = customName.or(() -> valueAsString(unwrappedValue));
+    if (parameterName.isPresent() && !customName.isPresent()) {
+      if (unwrappedValue == null
           ||
           // Primitives are often ambiguous
-          Primitives.unwrap(value.getClass()).isPrimitive()
+          Primitives.unwrap(unwrappedValue.getClass()).isPrimitive()
           // Ambiguous String cases
-          || value.equals("null")
-          || (value instanceof CharSequence
+          || unwrappedValue.equals("null")
+          || (unwrappedValue instanceof CharSequence
               && CharMatcher.anyOf("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-                  .matchesNoneOf((CharSequence) value))) {
+                  .matchesNoneOf((CharSequence) unwrappedValue))) {
         // Prefix the parameter value with its field name. This is to avoid test names
         // such as myMethod_success[true,false,2]. Instead, it'll be
         // myMethod_success[dryRun=true,experimentFlag=false,retries=2].
-        result = String.format("%s=%s", parameterName.get(), valueAsString(value));
+        result = String.format("%s=%s", parameterName.get(), valueAsString(unwrappedValue));
       }
     }
     return result.trim().replaceAll("\\s+", " ");

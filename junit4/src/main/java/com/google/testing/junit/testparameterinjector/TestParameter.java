@@ -33,6 +33,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Test parameter annotation that defines the values that a single parameter can have.
@@ -119,6 +120,19 @@ public @interface TestParameter {
   /** Interface for custom providers of test parameter values. */
   interface TestParameterValuesProvider {
     List<?> provideValues();
+
+    /**
+     * Wraps the given value in an object that allows you to give the parameter value a different
+     * name. The TestParameterInjector framework will recognize the returned {@link
+     * TestParameterValue} instances and unwrap them at injection time.
+     *
+     * <p>Usage: {@code value(file.content).withName(file.name)}.
+     *
+     * <p>Do not override this method.
+     */
+    default TestParameterValue value(@Nullable Object wrappedValue) {
+      return TestParameterValue.wrap(wrappedValue);
+    }
   }
 
   /** Default {@link TestParameterValuesProvider} implementation that does nothing. */
