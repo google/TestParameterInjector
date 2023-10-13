@@ -23,10 +23,12 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
+import com.google.common.primitives.UnsignedLong;
 import com.google.common.reflect.TypeToken;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.lang.reflect.Array;
 import java.lang.reflect.ParameterizedType;
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -63,6 +65,11 @@ final class ParameterValueParsing {
     return new Yaml(new SafeConstructor(new LoaderOptions())).load(yamlString);
   }
 
+  private static UnsignedLong parseYamlSignedLongToUnsignedLong(long number) {
+    checkState(number >= 0, "%s should be greater than or equal to zero", number);
+    return UnsignedLong.fromLongBits(number);
+  }
+
   @SuppressWarnings({"unchecked"})
   static Object parseYamlObjectToJavaType(Object parsedYaml, TypeToken<?> javaType) {
     // Pass along null so we don't have to worry about it below
@@ -91,6 +98,21 @@ final class ParameterValueParsing {
         .ifJavaType(Long.class)
         .supportParsedType(Long.class, self -> self)
         .supportParsedType(Integer.class, Integer::longValue);
+
+    yamlValueTransformer
+        .ifJavaType(UnsignedLong.class)
+        .supportParsedType(Long.class, self -> parseYamlSignedLongToUnsignedLong(self.longValue()))
+        .supportParsedType(
+            Integer.class, self -> parseYamlSignedLongToUnsignedLong(self.longValue()))
+        // UnsignedLong::valueOf(BigInteger) will validate that BigInteger is in the valid range and
+        // throws otherwise.
+        .supportParsedType(BigInteger.class, UnsignedLong::valueOf);
+
+    yamlValueTransformer
+        .ifJavaType(BigInteger.class)
+        .supportParsedType(Long.class, self -> BigInteger.valueOf(self.longValue()))
+        .supportParsedType(Integer.class, self -> BigInteger.valueOf(self.longValue()))
+        .supportParsedType(BigInteger.class, self -> self);
 
     yamlValueTransformer
         .ifJavaType(Float.class)

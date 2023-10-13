@@ -18,7 +18,9 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
+import com.google.common.primitives.UnsignedLong;
 import com.google.protobuf.ByteString;
+import java.math.BigInteger;
 import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -56,6 +58,30 @@ public class ParameterValueParsingTest {
         /* yamlString= */ "442147483648",
         /* javaClass= */ String.class,
         /* expectedResult= */ "442147483648"),
+    BIG_INTEGER_TO_BIGINTEGER(
+        /* yamlString= */ "1000000000000000000000000000",
+        /* javaClass= */ BigInteger.class,
+        /* expectedResult= */ new BigInteger("1000000000000000000000000000")),
+    BIG_INTEGER_TO_UNSIGNED_LONG(
+        /* yamlString= */ "18446744073709551615", // This is UnsignedLong.MAX_VALUE.
+        /* javaClass= */ UnsignedLong.class,
+        /* expectedResult= */ UnsignedLong.MAX_VALUE),
+    LONG_TO_UNSIGNED_LONG(
+        /* yamlString= */ "10000000000000",
+        /* javaClass= */ UnsignedLong.class,
+        /* expectedResult= */ UnsignedLong.fromLongBits(10000000000000L)),
+    LONG_TO_BIG_INTEGER(
+        /* yamlString= */ "10000000000000",
+        /* javaClass= */ BigInteger.class,
+        /* expectedResult= */ BigInteger.valueOf(10000000000000L)),
+    INTEGER_TO_BIG_INTEGER(
+        /* yamlString= */ "1000000",
+        /* javaClass= */ BigInteger.class,
+        /* expectedResult= */ BigInteger.valueOf(1000000)),
+    INTEGER_TO_UNSIGNED_LONG(
+        /* yamlString= */ "1000000",
+        /* javaClass= */ UnsignedLong.class,
+        /* expectedResult= */ UnsignedLong.fromLongBits(1000000)),
     DOUBLE_TO_STRING(
         /* yamlString= */ "1.23", /* javaClass= */ String.class, /* expectedResult= */ "1.23"),
 
