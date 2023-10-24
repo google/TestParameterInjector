@@ -867,7 +867,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                     case FIELD: // Fall through.
                     case CLASS:
                       return getAnnotationListWithType(
-                              getOnlyConstructor(testClass).getAnnotations(),
+                              TestParameterInjectorUtils.getOnlyConstructor(testClass)
+                                  .getAnnotations(),
                               annotationTypeOrigin.annotationType())
                           .isEmpty();
                     default:
@@ -890,7 +891,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     Origin origin = annotationTypeOrigin.origin();
     Class<? extends Annotation> annotationType = annotationTypeOrigin.annotationType();
     if (origin == Origin.CONSTRUCTOR_PARAMETER) {
-      Constructor<?> constructor = getOnlyConstructor(testClass);
+      Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
       List<AnnotationWithMetadata> annotations =
           getAnnotationWithMetadataListWithType(constructor, annotationType);
 
@@ -898,7 +899,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         return toTestParameterValueList(annotations, origin);
       }
     } else if (origin == Origin.CONSTRUCTOR) {
-      Annotation annotation = getOnlyConstructor(testClass).getAnnotation(annotationType);
+      Annotation annotation =
+          TestParameterInjectorUtils.getOnlyConstructor(testClass).getAnnotation(annotationType);
       if (annotation != null) {
         return ImmutableList.of(
             TestParameterValueHolder.create(
@@ -1020,15 +1022,6 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     return FluentIterable.from(annotations)
         .filter(annotation -> annotation.annotationType().equals(annotationType))
         .toList();
-  }
-
-  private static Constructor<?> getOnlyConstructor(Class<?> testClass) {
-    Constructor<?>[] constructors = testClass.getDeclaredConstructors();
-    checkState(
-        constructors.length == 1,
-        "a single public constructor is required for class %s",
-        testClass);
-    return constructors[0];
   }
 
   @Override

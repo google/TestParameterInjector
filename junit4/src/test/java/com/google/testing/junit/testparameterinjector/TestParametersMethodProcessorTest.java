@@ -494,6 +494,14 @@ public class TestParametersMethodProcessorTest {
     public void test1(TestEnum testEnum) {}
   }
 
+  @RunAsTest(failsWithMessage = "Test class should have exactly one public constructor")
+  public static class InvalidTestBecausePackagePrivateConstructor {
+    InvalidTestBecausePackagePrivateConstructor() {}
+
+    @Test
+    public void test1() {}
+  }
+
   @Parameters(name = "{0}")
   public static Collection<Object[]> parameters() {
     return Arrays.stream(TestParametersMethodProcessorTest.class.getClasses())
@@ -527,12 +535,12 @@ public class TestParametersMethodProcessorTest {
   public void test_failure() throws Exception {
     assume().that(maybeFailureMessage.isPresent()).isTrue();
 
-    IllegalStateException exception =
+    Exception exception =
         assertThrows(
-            IllegalStateException.class,
+            Exception.class,
             () -> SharedTestUtilitiesJUnit4.runTestsAndGetFailures(newTestRunner()));
 
-    assertThat(exception).hasMessageThat().isEqualTo(maybeFailureMessage.get());
+    assertThat(exception).hasMessageThat().contains(maybeFailureMessage.get());
   }
 
   private PluggableTestRunner newTestRunner() throws Exception {

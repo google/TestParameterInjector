@@ -16,7 +16,6 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
-import static com.google.common.collect.Iterables.getOnlyElement;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.common.base.Optional;
@@ -90,7 +89,8 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   @Override
   public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
     boolean constructorIsParameterized =
-        hasRelevantAnnotation(getOnlyConstructor(originalTest.getTestClass()));
+        hasRelevantAnnotation(
+            TestParameterInjectorUtils.getOnlyConstructor(originalTest.getTestClass()));
     boolean methodIsParameterized = hasRelevantAnnotation(originalTest.getMethod());
 
     if (!constructorIsParameterized && !methodIsParameterized) {
@@ -148,7 +148,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private ImmutableList<Optional<TestParametersValues>>
       getConstructorParametersOrSingleAbsentElement(Class<?> testClass) {
-    Constructor<?> constructor = getOnlyConstructor(testClass);
+    Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
     return hasRelevantAnnotation(constructor)
         ? FluentIterable.from(getConstructorParameters(constructor))
             .transform(Optional::of)
@@ -442,14 +442,6 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
             .transform(Parameter::getName)
             .transform(name -> parametersValues.parametersMap().get(name))
             .toArray(Object.class));
-  }
-
-  private static Constructor<?> getOnlyConstructor(Class<?> testClass) {
-    ImmutableList<Constructor<?>> constructors =
-        ImmutableList.copyOf(testClass.getDeclaredConstructors());
-    checkState(
-        constructors.size() == 1, "Expected exactly one constructor, but got %s", constructors);
-    return getOnlyElement(constructors);
   }
 
   /**

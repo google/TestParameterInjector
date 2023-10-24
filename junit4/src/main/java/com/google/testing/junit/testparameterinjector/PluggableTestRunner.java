@@ -316,7 +316,8 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   private Object createTestForMethod(FrameworkMethod method) throws Exception {
     TestInfo testInfo = ((OverriddenFrameworkMethod) method).getTestInfo();
-    Constructor<?> constructor = getTestClass().getOnlyConstructor();
+    Constructor<?> constructor =
+        TestParameterInjectorUtils.getOnlyConstructor(getTestClass().getJavaClass());
 
     // Construct a test instance
     Object testInstance;
@@ -343,7 +344,9 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   @Override
   protected final void validateZeroArgConstructor(List<Throwable> errorsReturned) {
     ExecutableValidationResult validationResult =
-        getTestMethodProcessors().validateConstructor(getTestClass().getOnlyConstructor());
+        getTestMethodProcessors()
+            .validateConstructor(
+                TestParameterInjectorUtils.getOnlyConstructor(getTestClass().getJavaClass()));
 
     if (validationResult.wasValidated()) {
       errorsReturned.addAll(validationResult.validationErrors());

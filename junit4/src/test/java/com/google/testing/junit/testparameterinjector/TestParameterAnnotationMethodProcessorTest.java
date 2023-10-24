@@ -675,6 +675,14 @@ public class TestParameterAnnotationMethodProcessorTest {
     void test(@TestParameter boolean b) {}
   }
 
+  @ClassTestResult(Result.FAILURE)
+  public static class ErrorPackagePrivateConstructor {
+    ErrorPackagePrivateConstructor() {}
+
+    @Test
+    public void test1() {}
+  }
+
   public enum EnumA {
     A1,
     A2
@@ -829,7 +837,7 @@ public class TestParameterAnnotationMethodProcessorTest {
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
         assertThrows(
-            RuntimeException.class,
+            Exception.class,
             () ->
                 SharedTestUtilitiesJUnit4.runTestsAndGetFailures(
                     newTestRunnerWithParameterizedSupport(
@@ -838,7 +846,7 @@ public class TestParameterAnnotationMethodProcessorTest {
 
       case FAILURE:
         assertThrows(
-            RuntimeException.class,
+            Exception.class,
             () ->
                 SharedTestUtilitiesJUnit4.runTestsAndGetFailures(
                     newTestRunnerWithParameterizedSupport(
