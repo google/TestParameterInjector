@@ -1,3 +1,8 @@
+## 1.14
+
+- Fixed multiple constructors error when this library is used with Powermock.
+  See https://github.com/google/TestParameterInjector/issues/40.
+
 ## 1.13
 
 - Add support for setting a custom name for a `@TestParameter` value given via a provider: 
