@@ -1047,7 +1047,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
           for (TestParameterValueHolder testParameterValue :
               remainingTestParameterValuesForFieldInjection) {
             if (declaredField.isAnnotationPresent(
-                testParameterValue.annotationTypeOrigin().annotationType())) {
+                testParameterValue.annotationTypeOrigin().annotationType()) &&
+                declaredField.getName() == testParameterValue.paramName().get()) {
               declaredField.setAccessible(true);
               declaredField.set(testInstance, testParameterValue.unwrappedValue());
               remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
@@ -1275,7 +1276,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   private ImmutableList<Method> getMethodsIncludingParents(Class<?> clazz) {
     ImmutableList.Builder<Method> resultBuilder = ImmutableList.builder();
     while (clazz != null) {
-      resultBuilder.add(clazz.getDeclaredMethods());
+      Method[] declaredMethods = clazz.getDeclaredMethods();
+      Arrays.sort(declaredMethods, Comparator.comparing(Method::getName));
+      resultBuilder.add(declaredMethods);
       clazz = clazz.getSuperclass();
     }
     return resultBuilder.build();
