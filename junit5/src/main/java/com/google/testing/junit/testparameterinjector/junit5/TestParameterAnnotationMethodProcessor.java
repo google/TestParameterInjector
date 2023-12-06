@@ -34,6 +34,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.testing.junit.testparameterinjector.junit5.TestInfo.TestInfoParameter;
@@ -734,7 +735,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
               .withExtraAnnotation(
                   TestIndexHolderFactory.create(
                       /* methodIndex= */ strictIndexOf(
-                          getMethodsIncludingParents(originalTest.getTestClass()),
+                          getMethodsIncludingParentsSorted(originalTest.getTestClass()),
                           originalTest.getMethod()),
                       parametersIndex,
                       originalTest.getTestClass().getName())));
@@ -780,7 +781,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
             + " class that this runner is handling (%s)",
         testIndexHolder.testClassName(),
         testClass.getName());
-    Method testMethod = getMethodsIncludingParents(testClass).get(testIndexHolder.methodIndex());
+    Method testMethod =
+        getMethodsIncludingParentsSorted(testClass).get(testIndexHolder.methodIndex());
     return getParameterValuesForMethod(testMethod, testClass)
         .get(testIndexHolder.parametersIndex());
   }
@@ -1048,6 +1050,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
               remainingTestParameterValuesForFieldInjection) {
             if (declaredField.isAnnotationPresent(
                 testParameterValue.annotationTypeOrigin().annotationType())) {
+              if (testParameterValue.paramName().isPresent()
+                  && !declaredField.getName().equals(testParameterValue.paramName().get())) {
+                // names don't match
+                continue;
+              }
               declaredField.setAccessible(true);
               declaredField.set(testInstance, testParameterValue.unwrappedValue());
               remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
@@ -1139,7 +1146,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   @Retention(RUNTIME)
   @interface TestIndexHolder {
 
-    /** The index of the test method in {@code getMethodsIncludingParents(testClass)} */
+    /** The index of the test method in {@code getMethodsIncludingParentsSorted(testClass)} */
     int methodIndex();
 
     /**
@@ -1272,13 +1279,18 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     return index;
   }
 
-  private ImmutableList<Method> getMethodsIncludingParents(Class<?> clazz) {
+  private ImmutableList<Method> getMethodsIncludingParentsSorted(Class<?> clazz) {
     ImmutableList.Builder<Method> resultBuilder = ImmutableList.builder();
     while (clazz != null) {
       resultBuilder.add(clazz.getDeclaredMethods());
       clazz = clazz.getSuperclass();
     }
-    return resultBuilder.build();
+    // Because getDeclaredMethods()'s order is not specified, there is the theoretical possibility
+    // that the order of methods is unstable. To partly fix this, we sort the result based on method
+    // name. This is still not perfect because of method overloading, but that should be
+    // sufficiently rare for test names.
+    return ImmutableList.sortedCopyOf(
+        Ordering.natural().onResultOf(Method::getName), resultBuilder.build());
   }
 
   private static ImmutableList<Class<?>> listWithParents(Class<?> clazz) {
