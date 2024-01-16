@@ -190,7 +190,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
               valueProvider
                   .getConstructor()
                   .newInstance()
-                  .provideValues(annotation, annotationWithMetadata.paramClass()))
+                  .provideValues(
+                      annotation,
+                      annotationWithMetadata.otherAnnotations(),
+                      annotationWithMetadata.paramClass(),
+                      annotationWithMetadata.testClass()))
           .transform(
               value ->
                   (value instanceof TestParameterValue)
@@ -248,6 +252,15 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     abstract Annotation annotation();
 
     /**
+     * A list of all other annotations on the field or parameter that was annotated with {@code
+     * annotation}.
+     *
+     * <p>In case the annotation is annotating a method, constructor or class, {@code
+     * parameterClass} is an empty list.
+     */
+    abstract ImmutableList<Annotation> otherAnnotations();
+
+    /**
      * The class of the parameter or field that is being annotated. In case the annotation is
      * annotating a method, constructor or class, {@code paramClass} is an absent optional.
      */
@@ -259,20 +272,48 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
      */
     abstract Optional<String> paramName();
 
+    /** The class that contains the test that is currently being run. */
+    abstract Class<?> testClass();
+
     public static AnnotationWithMetadata withMetadata(
-        Annotation annotation, Class<?> paramClass, String paramName) {
+        Annotation annotation,
+        Annotation[] allAnnotations,
+        Class<?> paramClass,
+        String paramName,
+        Class<?> testClass) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
-          annotation, Optional.of(paramClass), Optional.of(paramName));
+          annotation,
+          /* otherAnnotations= */ FluentIterable.from(allAnnotations)
+              .filter(a -> !a.equals(annotation))
+              .toList(),
+          Optional.of(paramClass),
+          Optional.of(paramName),
+          testClass);
     }
 
-    public static AnnotationWithMetadata withMetadata(Annotation annotation, Class<?> paramClass) {
+    public static AnnotationWithMetadata withMetadata(
+        Annotation annotation,
+        Annotation[] allAnnotations,
+        Class<?> paramClass,
+        Class<?> testClass) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
-          annotation, Optional.of(paramClass), Optional.absent());
+          annotation,
+          /* otherAnnotations= */ FluentIterable.from(allAnnotations)
+              .filter(a -> !a.equals(annotation))
+              .toList(),
+          Optional.of(paramClass),
+          Optional.absent(),
+          testClass);
     }
 
-    public static AnnotationWithMetadata withoutMetadata(Annotation annotation) {
+    public static AnnotationWithMetadata withoutMetadata(
+        Annotation annotation, Class<?> testClass) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
-          annotation, Optional.absent(), Optional.absent());
+          annotation,
+          /* otherAnnotations= */ ImmutableList.of(),
+          /* paramClass= */ Optional.absent(),
+          /* paramName= */ Optional.absent(),
+          testClass);
     }
 
     // Prevent anyone relying on equals() and hashCode() so that it remains possible to add fields
@@ -907,7 +948,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     if (origin == Origin.CONSTRUCTOR_PARAMETER) {
       Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
       List<AnnotationWithMetadata> annotations =
-          getAnnotationWithMetadataListWithType(constructor, annotationType);
+          getAnnotationWithMetadataListWithType(constructor, annotationType, testClass);
 
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
@@ -918,12 +959,12 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       if (annotation != null) {
         return ImmutableList.of(
             TestParameterValueHolder.create(
-                AnnotationWithMetadata.withoutMetadata(annotation), origin));
+                AnnotationWithMetadata.withoutMetadata(annotation, testClass), origin));
       }
 
     } else if (origin == Origin.METHOD_PARAMETER) {
       List<AnnotationWithMetadata> annotations =
-          getAnnotationWithMetadataListWithType(method, annotationType);
+          getAnnotationWithMetadataListWithType(method, annotationType, testClass);
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
       }
@@ -931,7 +972,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       if (method.isAnnotationPresent(annotationType)) {
         return ImmutableList.of(
             TestParameterValueHolder.create(
-                AnnotationWithMetadata.withoutMetadata(method.getAnnotation(annotationType)),
+                AnnotationWithMetadata.withoutMetadata(
+                    method.getAnnotation(annotationType), testClass),
                 origin));
       }
     } else if (origin == Origin.FIELD) {
@@ -946,7 +988,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                               .transform(
                                   annotation ->
                                       AnnotationWithMetadata.withMetadata(
-                                          annotation, field.getType(), field.getName())))
+                                          annotation,
+                                          field.getAnnotations(),
+                                          field.getType(),
+                                          field.getName(),
+                                          testClass)))
                   .toList());
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
@@ -956,7 +1002,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       if (annotation != null) {
         return ImmutableList.of(
             TestParameterValueHolder.create(
-                AnnotationWithMetadata.withoutMetadata(annotation), origin));
+                AnnotationWithMetadata.withoutMetadata(annotation, testClass), origin));
       }
     }
     return ImmutableList.of();
@@ -974,22 +1020,30 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   }
 
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Method callable, Class<? extends Annotation> annotationType) {
+      Method callable, Class<? extends Annotation> annotationType, Class<?> testClass) {
     try {
-      return getAnnotationWithMetadataListWithType(callable.getParameters(), annotationType);
+      return getAnnotationWithMetadataListWithType(
+          callable.getParameters(), annotationType, testClass);
     } catch (NoSuchMethodError ignored) {
       return getAnnotationWithMetadataListWithType(
-          callable.getParameterTypes(), callable.getParameterAnnotations(), annotationType);
+          callable.getParameterTypes(),
+          callable.getParameterAnnotations(),
+          annotationType,
+          testClass);
     }
   }
 
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Constructor<?> callable, Class<? extends Annotation> annotationType) {
+      Constructor<?> callable, Class<? extends Annotation> annotationType, Class<?> testClass) {
     try {
-      return getAnnotationWithMetadataListWithType(callable.getParameters(), annotationType);
+      return getAnnotationWithMetadataListWithType(
+          callable.getParameters(), annotationType, testClass);
     } catch (NoSuchMethodError ignored) {
       return getAnnotationWithMetadataListWithType(
-          callable.getParameterTypes(), callable.getParameterAnnotations(), annotationType);
+          callable.getParameterTypes(),
+          callable.getParameterAnnotations(),
+          annotationType,
+          testClass);
     }
   }
 
@@ -998,7 +1052,7 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   // which are optional anyway).
   @SuppressWarnings("AndroidJdkLibsChecker")
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Parameter[] parameters, Class<? extends Annotation> annotationType) {
+      Parameter[] parameters, Class<? extends Annotation> annotationType, Class<?> testClass) {
     return FluentIterable.from(parameters)
         .transform(
             parameter -> {
@@ -1007,8 +1061,16 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                   ? null
                   : parameter.isNamePresent()
                       ? AnnotationWithMetadata.withMetadata(
-                          annotation, parameter.getType(), parameter.getName())
-                      : AnnotationWithMetadata.withMetadata(annotation, parameter.getType());
+                          annotation,
+                          /* allAnnotations= */ parameter.getAnnotations(),
+                          parameter.getType(),
+                          parameter.getName(),
+                          testClass)
+                      : AnnotationWithMetadata.withMetadata(
+                          annotation,
+                          /* allAnnotations= */ parameter.getAnnotations(),
+                          parameter.getType(),
+                          testClass);
             })
         .filter(Objects::nonNull)
         .toList();
@@ -1017,14 +1079,17 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
       Class<?>[] parameterTypes,
       Annotation[][] annotations,
-      Class<? extends Annotation> annotationType) {
+      Class<? extends Annotation> annotationType,
+      Class<?> testClass) {
     checkArgument(parameterTypes.length == annotations.length);
 
     ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
     for (int i = 0; i < annotations.length; i++) {
       for (Annotation annotation : annotations[i]) {
         if (annotation.annotationType().equals(annotationType)) {
-          resultBuilder.add(AnnotationWithMetadata.withMetadata(annotation, parameterTypes[i]));
+          resultBuilder.add(
+              AnnotationWithMetadata.withMetadata(
+                  annotation, /* allAnnotations= */ annotations[i], parameterTypes[i], testClass));
         }
       }
     }
