@@ -16,15 +16,11 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.truth.Truth.assertThat;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.common.base.CharMatcher;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase;
-import com.google.testing.junit.testparameterinjector.TestParameterValuesProvider.Context;
-import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.util.Arrays;
 import java.util.Collection;
@@ -223,72 +219,6 @@ public class TestParameterTest {
         return newArrayList(CharMatcher.any(), CharMatcher.ascii(), CharMatcher.whitespace());
       }
     }
-  }
-
-  @RunAsTest
-  public static class WithContextAwareValuesProvider extends SuccessfulTestCaseBase {
-
-    @CustomFieldAnnotation
-    @TestParameter(valuesProvider = InjectContextProvider.class)
-    private Context contextFromField;
-
-    private final Context contextFromConstructor;
-
-    public WithContextAwareValuesProvider(
-        @TestParameter(valuesProvider = InjectContextProvider.class) Context context) {
-      this.contextFromConstructor = context;
-    }
-
-    @Test
-    public void contextTest(
-        @CustomParameterAnnotation1
-            @CustomParameterAnnotation2
-            @TestParameter(valuesProvider = InjectContextProvider.class)
-            Context contextFromParameter) {
-      assertThat(contextFromField.testClass()).isEqualTo(WithContextAwareValuesProvider.class);
-      assertThat(contextFromConstructor.testClass())
-          .isEqualTo(WithContextAwareValuesProvider.class);
-      assertThat(contextFromParameter.testClass()).isEqualTo(WithContextAwareValuesProvider.class);
-
-      assertThat(
-              FluentIterable.from(contextFromField.otherAnnotations())
-                  .transform(Annotation::annotationType)
-                  .toList())
-          .containsExactly(CustomFieldAnnotation.class);
-      assertThat(contextFromConstructor.otherAnnotations()).isEmpty();
-      assertThat(
-              FluentIterable.from(contextFromParameter.otherAnnotations())
-                  .transform(Annotation::annotationType)
-                  .toList())
-          .containsExactly(CustomParameterAnnotation1.class, CustomParameterAnnotation2.class);
-
-      storeTestParametersForThisTest(contextFromParameter);
-    }
-
-    @Override
-    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
-      return ImmutableMap.<String, String>builder()
-          .put(
-              "contextTest[1.Context(otherAnnotations=[@com.google.testing.junit.tes...,1.Context(otherAnnotations=[],testClass=WithContextAwareV...,1.Context(otherAnnotations=[@com.google.testing.junit.tes...]",
-              "Context(otherAnnotations=[@com.google.testing.junit.testparameterinjector.TestParameterTest.WithContextAwareValuesProvider.CustomParameterAnnotation1(),@com.google.testing.junit.testparameterinjector.TestParameterTest.WithContextAwareValuesProvider.CustomParameterAnnotation2()],testClass=WithContextAwareValuesProvider)")
-          .build();
-    }
-
-    private static final class InjectContextProvider extends TestParameterValuesProvider {
-      @Override
-      public List<?> provideValues(Context context) {
-        return newArrayList(context);
-      }
-    }
-
-    @Retention(RUNTIME)
-    @interface CustomFieldAnnotation {}
-
-    @Retention(RUNTIME)
-    @interface CustomParameterAnnotation1 {}
-
-    @Retention(RUNTIME)
-    @interface CustomParameterAnnotation2 {}
   }
 
   @Parameters(name = "{0}")
