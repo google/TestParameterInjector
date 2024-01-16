@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.testing.junit.testparameterinjector.TestParameter.InternalImplementationOfThisParameter;
+import com.google.testing.junit.testparameterinjector.TestParameterValuesProvider.Context;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -147,7 +148,10 @@ public @interface TestParameter {
   final class InternalImplementationOfThisParameter implements TestParameterValueProvider {
     @Override
     public List<Object> provideValues(
-        Annotation uncastAnnotation, Optional<Class<?>> maybeParameterClass) {
+        Annotation uncastAnnotation,
+        ImmutableList<Annotation> otherAnnotations,
+        Optional<Class<?>> maybeParameterClass,
+        Class<?> testClass) {
       TestParameter annotation = (TestParameter) uncastAnnotation;
       Class<?> parameterClass = getValueType(annotation.annotationType(), maybeParameterClass);
 
@@ -165,7 +169,8 @@ public @interface TestParameter {
                 .transform(v -> parseStringValue(v, parameterClass))
                 .toArray(Object.class));
       } else if (valuesProviderIsSet) {
-        return getValuesFromProvider(annotation.valuesProvider());
+        return getValuesFromProvider(
+            annotation.valuesProvider(), Context.create(otherAnnotations, testClass));
       } else {
         if (Enum.class.isAssignableFrom(parameterClass)) {
           return Arrays.asList((Object[]) parameterClass.asSubclass(Enum.class).getEnumConstants());
@@ -206,12 +211,21 @@ public @interface TestParameter {
     }
 
     private static List<Object> getValuesFromProvider(
-        Class<? extends TestParameterValuesProvider> valuesProvider) {
+        Class<? extends TestParameterValuesProvider> valuesProvider, Context context) {
       try {
         Constructor<? extends TestParameterValuesProvider> constructor =
             valuesProvider.getDeclaredConstructor();
         constructor.setAccessible(true);
-        return new ArrayList<>(constructor.newInstance().provideValues());
+        TestParameterValuesProvider instance = constructor.newInstance();
+        if (instance
+            instanceof com.google.testing.junit.testparameterinjector.TestParameterValuesProvider) {
+          return new ArrayList<>(
+              ((com.google.testing.junit.testparameterinjector.TestParameterValuesProvider)
+                      instance)
+                  .provideValues(context));
+        } else {
+          return new ArrayList<>(instance.provideValues());
+        }
       } catch (NoSuchMethodException e) {
         if (!Modifier.isStatic(valuesProvider.getModifiers()) && valuesProvider.isMemberClass()) {
           throw new IllegalStateException(
