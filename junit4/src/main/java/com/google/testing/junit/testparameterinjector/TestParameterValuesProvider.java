@@ -32,7 +32,7 @@ import javax.annotation.Nullable;
 public abstract class TestParameterValuesProvider
     implements TestParameter.TestParameterValuesProvider {
 
-  abstract List<?> provideValues(Context context);
+  protected abstract List<?> provideValues(Context context);
 
   @Override
   public final List<?> provideValues() {
