@@ -29,7 +29,6 @@ import java.lang.annotation.Retention;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import javax.inject.Qualifier;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -282,15 +281,12 @@ public class TestParameterTest {
       }
     }
 
-    @Qualifier
     @Retention(RUNTIME)
     @interface CustomFieldAnnotation {}
 
-    @Qualifier
     @Retention(RUNTIME)
     @interface CustomParameterAnnotation1 {}
 
-    @Qualifier
     @Retention(RUNTIME)
     @interface CustomParameterAnnotation2 {}
   }
