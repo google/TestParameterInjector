@@ -274,6 +274,18 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
           annotation, Optional.absent(), Optional.absent());
     }
+
+    // Prevent anyone relying on equals() and hashCode() so that it remains possible to add fields
+    // to this class without breaking existing code.
+    @Override
+    public final boolean equals(Object other) {
+      throw new UnsupportedOperationException("Equality is not supported");
+    }
+
+    @Override
+    public final int hashCode() {
+      throw new UnsupportedOperationException("hashCode() is not supported");
+    }
   }
 
   private final boolean onlyForFieldsAndParameters;
