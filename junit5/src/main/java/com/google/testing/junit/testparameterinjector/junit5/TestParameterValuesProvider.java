@@ -66,13 +66,13 @@ public abstract class TestParameterValuesProvider
      *
      * <p>For example, if the test code is as follows:
      *
-     * <pre>{@code
-     * @Test
-     * public void myTest_success(
-     *     @CustomAnnotation(123) @TestParameter(valuesProvider=MyProvider.class) Foo foo) {
-     *   ...
-     * }
-     * }</pre>
+     * <pre>
+     *   {@literal @}Test
+     *   public void myTest_success(
+     *       {@literal @}CustomAnnotation(123) {@literal @}TestParameter(valuesProvider=MyProvider.class) Foo foo) {
+     *     ...
+     *   }
+     * </pre>
      *
      * then this list will contain a single element: @CustomAnnotation(123).
      */
