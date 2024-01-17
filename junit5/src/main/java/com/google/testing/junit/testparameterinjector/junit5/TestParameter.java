@@ -244,6 +244,13 @@ public @interface TestParameter {
         }
       } catch (ReflectiveOperationException e) {
         throw new IllegalStateException(e);
+      } catch (Exception e) {
+        // Catch any unchecked exception that may come from `provideValues(Context)`
+        if (e instanceof RuntimeException) {
+          throw (RuntimeException) e;
+        } else {
+          throw new IllegalStateException(e);
+        }
       }
     }
   }

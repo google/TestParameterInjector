@@ -17,13 +17,13 @@ package com.google.testing.junit.testparameterinjector;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
-import java.util.NoSuchElementException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import java.lang.annotation.Annotation;
 import java.util.List;
+import java.util.NoSuchElementException;
 import javax.annotation.Nullable;
 
 /**
@@ -36,7 +36,7 @@ import javax.annotation.Nullable;
 public abstract class TestParameterValuesProvider
     implements TestParameter.TestParameterValuesProvider {
 
-  protected abstract List<?> provideValues(Context context);
+  protected abstract List<?> provideValues(Context context) throws Exception;
 
   @Override
   public final List<?> provideValues() {
