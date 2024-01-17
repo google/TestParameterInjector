@@ -100,6 +100,8 @@ public @interface TestParameter {
    * <p><b>Example</b>
    *
    * <pre>
+   * import com.google.testing.junit.testparameterinjector.junit5.TestParameterValuesProvider;
+   *
    * {@literal @}Test
    * public void matchesAllOf_throwsOnNull(
    *     {@literal @}TestParameter(valuesProvider = CharMatcherProvider.class)
@@ -107,9 +109,9 @@ public @interface TestParameter {
    *   assertThrows(NullPointerException.class, () -&gt; charMatcher.matchesAllOf(null));
    * }
    *
-   * private static final class CharMatcherProvider implements TestParameterValuesProvider {
+   * private static final class CharMatcherProvider extends TestParameterValuesProvider {
    *   {@literal @}Override
-   *   public {@literal List<CharMatcher>} provideValues() {
+   *   public {@literal List<CharMatcher>} provideValues(Context context) {
    *     return ImmutableList.of(CharMatcher.any(), CharMatcher.ascii(), CharMatcher.whitespace());
    *   }
    * }
