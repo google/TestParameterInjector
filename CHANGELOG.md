@@ -1,3 +1,39 @@
+## 1.15
+
+- Add context aware version of [`TestParameterValuesProvider`](
+  https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameterValuesProvider.html).
+  It is the same as the old [`TestParameter.TestParameterValuesProvider`](
+  https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameter.TestParameterValuesProvider.html),
+  except that `provideValues()` was changed to `provideValues(Context)` where
+  [`Context`](
+  https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameterValuesProvider.Context.html)
+  contains the test class and the other annotations. This allows for more generic
+  providers that take into account custom annotations with extra data, or the
+  implementation of abstract methods on a base test class.
+
+  Example usage:
+
+```java
+import com.google.testing.junit.testparameterinjector.TestParameterValuesProvider;
+
+private static final class MyProvider extends TestParameterValuesProvider {
+  @Override
+  public List<?> provideValues(Context context) throws Exception {
+    var testInstance = context.testClass().getDeclaredConstructor().newInstance();
+    var fooList = ((MyBaseTestClass) testInstance).getFooList();
+    // ...
+
+    // OR
+
+    var fooList = context.getOtherAnnotation(MyCustomAnnotation.class).fooList();
+    // ...
+  }
+}
+```
+
+- Fixed some theoretical non-determinism that could arise from Java reflection
+  methods
+
 ## 1.14
 
 - Fixed multiple constructors error when this library is used with Powermock.
