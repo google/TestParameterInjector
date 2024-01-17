@@ -170,7 +170,7 @@ public @interface TestParameter {
                 .toArray(Object.class));
       } else if (valuesProviderIsSet) {
         return getValuesFromProvider(
-            annotation.valuesProvider(), Context.create(otherAnnotations, testClass));
+            annotation.valuesProvider(), new Context(otherAnnotations, testClass));
       } else {
         if (Enum.class.isAssignableFrom(parameterClass)) {
           return Arrays.asList((Object[]) parameterClass.asSubclass(Enum.class).getEnumConstants());

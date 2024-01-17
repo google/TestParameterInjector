@@ -17,7 +17,7 @@ package com.google.testing.junit.testparameterinjector;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
-import com.google.auto.value.AutoValue;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -61,40 +61,14 @@ public abstract class TestParameterValuesProvider
    * An immutable value class that contains extra information about the context of the parameter for
    * which values are being provided.
    */
-  @AutoValue
-  public abstract static class Context {
-    /**
-     * A list of all other annotations on the field or parameter that was annotated
-     * with @TestParameter.
-     *
-     * <p>For example, if the test code is as follows:
-     *
-     * <pre>
-     *   {@literal @}Test
-     *   public void myTest_success(
-     *       {@literal @}CustomAnnotation(123) {@literal @}TestParameter(valuesProvider=MyProvider.class) Foo foo) {
-     *     ...
-     *   }
-     * </pre>
-     *
-     * then this list will contain a single element: @CustomAnnotation(123).
-     */
-    abstract ImmutableList<Annotation> otherAnnotations();
+  public static final class Context {
 
-    /**
-     * The class that contains the test that is currently being run.
-     *
-     * <p>Having this can be useful when sharing providers between tests that have the same base
-     * class. In those cases, an abstract method can be called as follows:
-     *
-     * <pre>
-     *   ((MyBaseClass) context.testClass().newInstance()).myAbstractMethod()
-     * </pre>
-     */
-    public abstract Class<?> testClass();
+    private final ImmutableList<Annotation> otherAnnotations;
+    private final Class<?> testClass;
 
-    static Context create(ImmutableList<Annotation> otherAnnotations, Class<?> testClass) {
-      return new AutoValue_TestParameterValuesProvider_Context(otherAnnotations, testClass);
+    Context(ImmutableList<Annotation> otherAnnotations, Class<?> testClass) {
+      this.otherAnnotations = otherAnnotations;
+      this.testClass = testClass;
     }
 
     /**
@@ -119,7 +93,7 @@ public abstract class TestParameterValuesProvider
      *     handled by the TestParameterInjector framework.
      */
     @SuppressWarnings("unchecked") // Safe because of the filter operation
-    public final <A extends Annotation> A getOtherAnnotation(Class<A> annotationType) {
+    public <A extends Annotation> A getOtherAnnotation(Class<A> annotationType) {
       checkArgument(
           !TestParameter.class.equals(annotationType),
           "Getting the @TestParameter annotating the field or parameter is not allowed because"
@@ -133,14 +107,35 @@ public abstract class TestParameterValuesProvider
 
     // TODO: b/317524353 - Add support for repeated annotations
 
+    /**
+     * The class that contains the test that is currently being run.
+     *
+     * <p>Having this can be useful when sharing providers between tests that have the same base
+     * class. In those cases, an abstract method can be called as follows:
+     *
+     * <pre>
+     *   ((MyBaseClass) context.testClass().newInstance()).myAbstractMethod()
+     * </pre>
+     */
+    public Class<?> testClass() {
+      return testClass;
+    }
+
+    /**
+     * A list of all other annotations on the field or parameter that was annotated
+     * with @TestParameter.
+     */
+    @VisibleForTesting
+    ImmutableList<Annotation> otherAnnotations() {
+      return otherAnnotations;
+    }
+
     @Override
-    public final String toString() {
+    public String toString() {
       return String.format(
           "Context(otherAnnotations=[%s],testClass=%s)",
           FluentIterable.from(otherAnnotations()).join(Joiner.on(',')),
           testClass().getSimpleName());
     }
-
-    Context() {} // Prevent implementations outside of this package
   }
 }
