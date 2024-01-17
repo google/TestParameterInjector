@@ -17,6 +17,7 @@ package com.google.testing.junit.testparameterinjector.junit5;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
+import java.util.NoSuchElementException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.FluentIterable;
