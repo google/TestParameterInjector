@@ -331,15 +331,17 @@ Instead of providing a list of parsable strings, you can implement your own
 `TestParameterValuesProvider` as follows:
 
 ```java
+import com.google.testing.junit.testparameterinjector.TestParameterValuesProvider;
+
 @Test
 public void matchesAllOf_throwsOnNull(
     @TestParameter(valuesProvider = CharMatcherProvider.class) CharMatcher charMatcher) {
   assertThrows(NullPointerException.class, () -> charMatcher.matchesAllOf(null));
 }
 
-private static final class CharMatcherProvider implements TestParameterValuesProvider {
+private static final class CharMatcherProvider extends TestParameterValuesProvider {
   @Override
-  public List<CharMatcher> provideValues() {
+  public List<CharMatcher> provideValues(Context context) {
     return ImmutableList.of(CharMatcher.any(), CharMatcher.ascii(), CharMatcher.whitespace());
   }
 }
@@ -356,15 +358,20 @@ Notes:
     want to customize the value names, you can do that as follows:
 
     ```
-    private static final class FruitProvider implements TestParameterValuesProvider {
+    private static final class FruitProvider extends TestParameterValuesProvider {
       @Override
-      public List<?> provideValues() {
+      public List<?> provideValues(Context context) {
         return ImmutableList.of(
             value(new Apple()).withName("apple"),
             value(new Banana()).withName("banana"));
       }
     }
     ```
+
+-   The given `Context` contains the test class and other annotations on the
+    `@TestParameter`-annotated parameter/field. This allows more generic
+    providers that take into account custom annotations with extra data, or the
+    implementation of abstract methods on a base test class.
 
 ### Dynamic parameter generation for `@TestParameters`
 
