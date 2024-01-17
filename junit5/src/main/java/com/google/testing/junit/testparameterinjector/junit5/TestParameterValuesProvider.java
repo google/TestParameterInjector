@@ -14,6 +14,9 @@
 
 package com.google.testing.junit.testparameterinjector.junit5;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.Iterables.getOnlyElement;
+
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Joiner;
 import com.google.common.collect.FluentIterable;
@@ -76,7 +79,7 @@ public abstract class TestParameterValuesProvider
      *
      * then this list will contain a single element: @CustomAnnotation(123).
      */
-    public abstract ImmutableList<Annotation> otherAnnotations();
+    abstract ImmutableList<Annotation> otherAnnotations();
 
     /**
      * The class that contains the test that is currently being run.
@@ -93,6 +96,42 @@ public abstract class TestParameterValuesProvider
     static Context create(ImmutableList<Annotation> otherAnnotations, Class<?> testClass) {
       return new AutoValue_TestParameterValuesProvider_Context(otherAnnotations, testClass);
     }
+
+    /**
+     * Returns the only annotation with the given type on the field or parameter that was annotated
+     * with @TestParameter.
+     *
+     * <p>For example, if the test code is as follows:
+     *
+     * <pre>
+     *   {@literal @}Test
+     *   public void myTest_success(
+     *       {@literal @}CustomAnnotation(123) {@literal @}TestParameter(valuesProvider=MyProvider.class) Foo foo) {
+     *     ...
+     *   }
+     * </pre>
+     *
+     * then {@code context.getOtherAnnotation(CustomAnnotation.class).value()} will equal 123.
+     *
+     * @throws NoSuchElementException if this there is no annotation with the given type
+     * @throws IllegalArgumentException if there are multiple annotations with the given type
+     * @throws IllegalArgumentException if the argument it TestParameter.class because it is already
+     *     handled by the TestParameterInjector framework.
+     */
+    @SuppressWarnings("unchecked") // Safe because of the filter operation
+    public final <A extends Annotation> A getOtherAnnotation(Class<A> annotationType) {
+      checkArgument(
+          !TestParameter.class.equals(annotationType),
+          "Getting the @TestParameter annotating the field or parameter is not allowed because"
+              + " it is already handled by the TestParameterInjector framework.");
+      return (A)
+          getOnlyElement(
+              FluentIterable.from(otherAnnotations())
+                  .filter(annotation -> annotation.annotationType().equals(annotationType))
+                  .toList());
+    }
+
+    // TODO: b/317524353 - Add support for repeated annotations
 
     @Override
     public final String toString() {
