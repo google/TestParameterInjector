@@ -38,7 +38,12 @@ public abstract class TestParameterValuesProvider
 
   protected abstract List<?> provideValues(Context context) throws Exception;
 
+  /**
+   * @deprecated This method should never be called as it will simply throw an {@link
+   *     UnsupportedOperationException}.
+   */
   @Override
+  @Deprecated
   public final List<?> provideValues() {
     throw new UnsupportedOperationException(
         "The TestParameterInjector framework should never call this method, and instead call"
