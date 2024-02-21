@@ -34,7 +34,6 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import javax.annotation.Nullable;
 
 /**
  * Test parameter annotation that defines the values that a single parameter can have.
@@ -140,7 +139,7 @@ public @interface TestParameter {
      *
      * <p>Do not override this method.
      */
-    default TestParameterValue value(@Nullable Object wrappedValue) {
+    default TestParameterValue value(@javax.annotation.Nullable Object wrappedValue) {
       return TestParameterValue.wrap(wrappedValue);
     }
   }

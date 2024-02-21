@@ -17,7 +17,6 @@ package com.google.testing.junit.testparameterinjector
 import com.google.common.collect.ImmutableList
 import com.google.common.collect.ImmutableMap
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase
-import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider
 import java.util.Arrays
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -148,8 +147,8 @@ class TestParameterInjectorKotlinTest {
         .buildOrThrow()
     }
 
-    private class DoubleValueClassProvider : TestParameterValuesProvider {
-      override fun provideValues(): List<DoubleValueClass> {
+    private class DoubleValueClassProvider : TestParameterValuesProvider() {
+      override fun provideValues(context: Context): List<DoubleValueClass> {
         return ImmutableList.of(DoubleValueClass(1.0), DoubleValueClass(2.5))
       }
     }
@@ -262,6 +261,7 @@ class TestParameterInjectorKotlinTest {
         .collect(ImmutableList.toImmutableList())
     }
   }
+
   annotation class RunAsTest
 
   enum class Color {
@@ -269,7 +269,10 @@ class TestParameterInjectorKotlinTest {
     BLUE,
     GREEN
   }
+
   @JvmInline value class ColorValueClass(val onlyValue: Color)
+
   @JvmInline value class StringValueClass(val onlyValue: String)
+
   @JvmInline value class DoubleValueClass(val onlyValue: Double)
 }

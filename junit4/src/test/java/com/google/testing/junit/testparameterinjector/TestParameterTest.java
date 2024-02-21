@@ -21,6 +21,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableMap;
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase;
+import com.google.testing.junit.testparameterinjector.TestParameterValuesProvider.Context;
 import java.lang.annotation.Retention;
 import java.util.Arrays;
 import java.util.Collection;
@@ -195,27 +196,24 @@ public class TestParameterTest {
           .build();
     }
 
-    private static final class TestNumberProvider
-        implements TestParameter.TestParameterValuesProvider {
+    private static final class TestNumberProvider extends TestParameterValuesProvider {
       @Override
-      public List<?> provideValues() {
+      public List<?> provideValues(Context context) {
         return newArrayList(value(1).withName("one"), 2);
       }
     }
 
-    private static final class TestStringProvider
-        implements TestParameter.TestParameterValuesProvider {
+    private static final class TestStringProvider extends TestParameterValuesProvider {
       @Override
-      public List<?> provideValues() {
+      public List<?> provideValues(Context context) {
         return newArrayList(
             "A", "B", null, value(null).withName("nothing"), value("harry").withName("wizard"));
       }
     }
 
-    private static final class CharMatcherProvider
-        implements TestParameter.TestParameterValuesProvider {
+    private static final class CharMatcherProvider extends TestParameterValuesProvider {
       @Override
-      public List<CharMatcher> provideValues() {
+      public List<CharMatcher> provideValues(Context context) {
         return newArrayList(CharMatcher.any(), CharMatcher.ascii(), CharMatcher.whitespace());
       }
     }

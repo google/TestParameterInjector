@@ -60,7 +60,7 @@ public abstract class TestParameterValuesProvider
   @Override
   public final TestParameterValue value(@Nullable Object wrappedValue) {
     // Overriding this method as final because it is not supposed to be overwritten
-    return TestParameter.TestParameterValuesProvider.super.value(wrappedValue);
+    return TestParameterValue.wrap(wrappedValue);
   }
 
   /**

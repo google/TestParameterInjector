@@ -22,7 +22,6 @@ import static org.junit.Assert.assertThrows;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase;
-import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.util.Arrays;
@@ -272,9 +271,9 @@ public class TestParameterAnnotationMethodProcessorTest {
       storeTestParametersForThisTest(testString);
     }
 
-    private static final class Test2Provider implements TestParameterValuesProvider {
+    private static final class Test2Provider extends TestParameterValuesProvider {
       @Override
-      public List<Object> provideValues() {
+      public List<Object> provideValues(TestParameterValuesProvider.Context context) {
         return newArrayList(123, "123", "null", null);
       }
     }
@@ -660,9 +659,9 @@ public class TestParameterAnnotationMethodProcessorTest {
     public void test(@TestParameter(valuesProvider = NonStaticProvider.class) int i) {}
 
     @SuppressWarnings("ClassCanBeStatic")
-    class NonStaticProvider implements TestParameterValuesProvider {
+    class NonStaticProvider extends TestParameterValuesProvider {
       @Override
-      public List<?> provideValues() {
+      public List<?> provideValues(TestParameterValuesProvider.Context context) {
         return ImmutableList.of();
       }
     }
