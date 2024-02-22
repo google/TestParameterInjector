@@ -15,11 +15,8 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.collect.Iterables.getOnlyElement;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import java.lang.annotation.Annotation;
 import java.util.List;
@@ -69,12 +66,10 @@ public abstract class TestParameterValuesProvider
    */
   public static final class Context {
 
-    private final ImmutableList<Annotation> otherAnnotations;
-    private final Class<?> testClass;
+    private final GenericParameterContext delegate;
 
-    Context(ImmutableList<Annotation> otherAnnotations, Class<?> testClass) {
-      this.otherAnnotations = otherAnnotations;
-      this.testClass = testClass;
+    Context(GenericParameterContext delegate) {
+      this.delegate = delegate;
     }
 
     /**
@@ -98,17 +93,12 @@ public abstract class TestParameterValuesProvider
      * @throws IllegalArgumentException if the argument it TestParameter.class because it is already
      *     handled by the TestParameterInjector framework.
      */
-    @SuppressWarnings("unchecked") // Safe because of the filter operation
     public <A extends Annotation> A getOtherAnnotation(Class<A> annotationType) {
       checkArgument(
           !TestParameter.class.equals(annotationType),
           "Getting the @TestParameter annotating the field or parameter is not allowed because"
               + " it is already handled by the TestParameterInjector framework.");
-      return (A)
-          getOnlyElement(
-              FluentIterable.from(otherAnnotations())
-                  .filter(annotation -> annotation.annotationType().equals(annotationType))
-                  .toList());
+      return delegate.getAnnotation(annotationType);
     }
 
     // TODO: b/317524353 - Add support for repeated annotations
@@ -124,24 +114,18 @@ public abstract class TestParameterValuesProvider
      * </pre>
      */
     public Class<?> testClass() {
-      return testClass;
+      return delegate.testClass();
     }
 
-    /**
-     * A list of all other annotations on the field or parameter that was annotated
-     * with @TestParameter.
-     */
+    /** A list of all annotations on the field or parameter. */
     @VisibleForTesting
-    ImmutableList<Annotation> otherAnnotations() {
-      return otherAnnotations;
+    ImmutableList<Annotation> annotationsOnParameter() {
+      return delegate.annotationsOnParameter();
     }
 
     @Override
     public String toString() {
-      return String.format(
-          "Context(otherAnnotations=[%s],testClass=%s)",
-          FluentIterable.from(otherAnnotations()).join(Joiner.on(',')),
-          testClass().getSimpleName());
+      return delegate.toString();
     }
   }
 }

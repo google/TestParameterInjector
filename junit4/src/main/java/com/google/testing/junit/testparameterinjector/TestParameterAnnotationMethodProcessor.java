@@ -192,9 +192,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                   .newInstance()
                   .provideValues(
                       annotation,
-                      annotationWithMetadata.otherAnnotations(),
                       annotationWithMetadata.paramClass(),
-                      annotationWithMetadata.testClass()))
+                      annotationWithMetadata.context()))
           .transform(
               value ->
                   (value instanceof TestParameterValue)
@@ -252,15 +251,6 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     abstract Annotation annotation();
 
     /**
-     * A list of all other annotations on the field or parameter that was annotated with {@code
-     * annotation}.
-     *
-     * <p>In case the annotation is annotating a method, constructor or class, {@code
-     * parameterClass} is an empty list.
-     */
-    abstract ImmutableList<Annotation> otherAnnotations();
-
-    /**
      * The class of the parameter or field that is being annotated. In case the annotation is
      * annotating a method, constructor or class, {@code paramClass} is an absent optional.
      */
@@ -272,8 +262,13 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
      */
     abstract Optional<String> paramName();
 
-    /** The class that contains the test that is currently being run. */
-    abstract Class<?> testClass();
+    /**
+     * A value class that contains extra information about the context of this parameter.
+     *
+     * <p>In case the annotation is annotating a method, constructor or class (deprecated
+     * functionality), the annotations in the context will be empty.
+     */
+    abstract GenericParameterContext context();
 
     public static AnnotationWithMetadata withMetadata(
         Annotation annotation,
@@ -283,12 +278,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         Class<?> testClass) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
           annotation,
-          /* otherAnnotations= */ FluentIterable.from(allAnnotations)
-              .filter(a -> !a.equals(annotation))
-              .toList(),
           Optional.of(paramClass),
           Optional.of(paramName),
-          testClass);
+          new GenericParameterContext(ImmutableList.copyOf(allAnnotations), testClass));
     }
 
     public static AnnotationWithMetadata withMetadata(
@@ -298,22 +290,18 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         Class<?> testClass) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
           annotation,
-          /* otherAnnotations= */ FluentIterable.from(allAnnotations)
-              .filter(a -> !a.equals(annotation))
-              .toList(),
           Optional.of(paramClass),
           Optional.absent(),
-          testClass);
+          new GenericParameterContext(ImmutableList.copyOf(allAnnotations), testClass));
     }
 
     public static AnnotationWithMetadata withoutMetadata(
         Annotation annotation, Class<?> testClass) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
           annotation,
-          /* otherAnnotations= */ ImmutableList.of(),
           /* paramClass= */ Optional.absent(),
           /* paramName= */ Optional.absent(),
-          testClass);
+          new GenericParameterContext(/* annotationsOnParameter= */ ImmutableList.of(), testClass));
     }
 
     // Prevent anyone relying on equals() and hashCode() so that it remains possible to add fields

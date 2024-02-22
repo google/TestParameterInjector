@@ -21,7 +21,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameter.InternalImplementationOfThisParameter;
@@ -148,7 +147,7 @@ public @interface TestParameter {
   class DefaultTestParameterValuesProvider implements TestParameterValuesProvider {
     @Override
     public List<Object> provideValues() {
-      return ImmutableList.of();
+      return com.google.common.collect.ImmutableList.of();
     }
   }
 
@@ -157,9 +156,8 @@ public @interface TestParameter {
     @Override
     public List<Object> provideValues(
         Annotation uncastAnnotation,
-        ImmutableList<Annotation> otherAnnotations,
         Optional<Class<?>> maybeParameterClass,
-        Class<?> testClass) {
+        GenericParameterContext context) {
       TestParameter annotation = (TestParameter) uncastAnnotation;
       Class<?> parameterClass = getValueType(annotation.annotationType(), maybeParameterClass);
 
@@ -177,8 +175,7 @@ public @interface TestParameter {
                 .transform(v -> parseStringValue(v, parameterClass))
                 .toArray(Object.class));
       } else if (valuesProviderIsSet) {
-        return getValuesFromProvider(
-            annotation.valuesProvider(), new Context(otherAnnotations, testClass));
+        return getValuesFromProvider(annotation.valuesProvider(), new Context(context));
       } else {
         if (Enum.class.isAssignableFrom(parameterClass)) {
           return Arrays.asList((Object[]) parameterClass.asSubclass(Enum.class).getEnumConstants());

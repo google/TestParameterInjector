@@ -15,7 +15,6 @@
 package com.google.testing.junit.testparameterinjector.junit5;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import java.lang.annotation.Annotation;
 import java.util.List;
 
@@ -75,10 +74,7 @@ interface TestParameterValueProvider {
    */
   @Deprecated
   default List<Object> provideValues(
-      Annotation annotation,
-      ImmutableList<Annotation> otherAnnotations,
-      Optional<Class<?>> parameterClass,
-      Class<?> testClass) {
+      Annotation annotation, Optional<Class<?>> parameterClass, GenericParameterContext context) {
     return provideValues(annotation, parameterClass);
   }
 

@@ -19,9 +19,12 @@ import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.common.base.CharMatcher;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase;
 import com.google.testing.junit.testparameterinjector.TestParameterValuesProvider.Context;
+import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.util.Arrays;
 import java.util.Collection;
@@ -242,5 +245,10 @@ public class TestParameterTest {
             return TestMethodProcessorList.createNewParameterizedProcessors();
           }
         });
+  }
+
+  private static ImmutableList<Class<? extends Annotation>> annotationTypes(
+      Iterable<Annotation> annotations) {
+    return FluentIterable.from(annotations).transform(Annotation::annotationType).toList();
   }
 }
