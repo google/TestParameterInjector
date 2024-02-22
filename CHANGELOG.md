@@ -1,3 +1,10 @@
+## 1.16
+
+- Deprecated [`TestParameter.TestParameterValuesProvider`](
+  https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameter.TestParameterValuesProvider.html)
+  in favor of its newer version [`TestParameterValuesProvider`](
+  https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameterValuesProvider.html).
+
 ## 1.15
 
 - Add context aware version of [`TestParameterValuesProvider`](
