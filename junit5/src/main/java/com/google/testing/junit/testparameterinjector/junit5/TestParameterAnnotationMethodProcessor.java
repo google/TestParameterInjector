@@ -272,36 +272,26 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
     public static AnnotationWithMetadata withMetadata(
         Annotation annotation,
-        Annotation[] allAnnotations,
         Class<?> paramClass,
         String paramName,
-        Class<?> testClass) {
+        GenericParameterContext context) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
-          annotation,
-          Optional.of(paramClass),
-          Optional.of(paramName),
-          new GenericParameterContext(ImmutableList.copyOf(allAnnotations), testClass));
+          annotation, Optional.of(paramClass), Optional.of(paramName), context);
     }
 
     public static AnnotationWithMetadata withMetadata(
-        Annotation annotation,
-        Annotation[] allAnnotations,
-        Class<?> paramClass,
-        Class<?> testClass) {
+        Annotation annotation, Class<?> paramClass, GenericParameterContext context) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
-          annotation,
-          Optional.of(paramClass),
-          Optional.absent(),
-          new GenericParameterContext(ImmutableList.copyOf(allAnnotations), testClass));
+          annotation, Optional.of(paramClass), Optional.absent(), context);
     }
 
     public static AnnotationWithMetadata withoutMetadata(
-        Annotation annotation, Class<?> testClass) {
+        Annotation annotation, GenericParameterContext context) {
       return new AutoValue_TestParameterAnnotationMethodProcessor_AnnotationWithMetadata(
           annotation,
           /* paramClass= */ Optional.absent(),
           /* paramName= */ Optional.absent(),
-          new GenericParameterContext(/* annotationsOnParameter= */ ImmutableList.of(), testClass));
+          context);
     }
 
     // Prevent anyone relying on equals() and hashCode() so that it remains possible to add fields
@@ -947,7 +937,10 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       if (annotation != null) {
         return ImmutableList.of(
             TestParameterValueHolder.create(
-                AnnotationWithMetadata.withoutMetadata(annotation, testClass), origin));
+                AnnotationWithMetadata.withoutMetadata(
+                    annotation,
+                    GenericParameterContext.createWithoutParameterAnnotations(testClass)),
+                origin));
       }
 
     } else if (origin == Origin.METHOD_PARAMETER) {
@@ -961,7 +954,8 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         return ImmutableList.of(
             TestParameterValueHolder.create(
                 AnnotationWithMetadata.withoutMetadata(
-                    method.getAnnotation(annotationType), testClass),
+                    method.getAnnotation(annotationType),
+                    GenericParameterContext.createWithoutParameterAnnotations(testClass)),
                 origin));
       }
     } else if (origin == Origin.FIELD) {
@@ -977,10 +971,9 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                                   annotation ->
                                       AnnotationWithMetadata.withMetadata(
                                           annotation,
-                                          field.getAnnotations(),
                                           field.getType(),
                                           field.getName(),
-                                          testClass)))
+                                          GenericParameterContext.create(field, testClass))))
                   .toList());
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
@@ -990,7 +983,10 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       if (annotation != null) {
         return ImmutableList.of(
             TestParameterValueHolder.create(
-                AnnotationWithMetadata.withoutMetadata(annotation, testClass), origin));
+                AnnotationWithMetadata.withoutMetadata(
+                    annotation,
+                    GenericParameterContext.createWithoutParameterAnnotations(testClass)),
+                origin));
       }
     }
     return ImmutableList.of();
@@ -1050,15 +1046,13 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                   : parameter.isNamePresent()
                       ? AnnotationWithMetadata.withMetadata(
                           annotation,
-                          /* allAnnotations= */ parameter.getAnnotations(),
                           parameter.getType(),
                           parameter.getName(),
-                          testClass)
+                          GenericParameterContext.create(parameter, testClass))
                       : AnnotationWithMetadata.withMetadata(
                           annotation,
-                          /* allAnnotations= */ parameter.getAnnotations(),
                           parameter.getType(),
-                          testClass);
+                          GenericParameterContext.create(parameter, testClass));
             })
         .filter(Objects::nonNull)
         .toList();
@@ -1077,7 +1071,10 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         if (annotation.annotationType().equals(annotationType)) {
           resultBuilder.add(
               AnnotationWithMetadata.withMetadata(
-                  annotation, /* allAnnotations= */ annotations[i], parameterTypes[i], testClass));
+                  annotation,
+                  parameterTypes[i],
+                  GenericParameterContext.createWithRepeatableAnnotationsFallback(
+                      annotations[i], testClass)));
         }
       }
     }

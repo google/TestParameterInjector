@@ -101,7 +101,38 @@ public abstract class TestParameterValuesProvider
       return delegate.getAnnotation(annotationType);
     }
 
-    // TODO: b/317524353 - Add support for repeated annotations
+    /**
+     * Returns the only annotation with the given type on the field or parameter that was annotated
+     * with @TestParameter.
+     *
+     * <p>For example, if the test code is as follows:
+     *
+     * <pre>
+     *   {@literal @}Test
+     *   public void myTest_success(
+     *       {@literal @}CustomAnnotation(123)
+     *       {@literal @}CustomAnnotation(456)
+     *       {@literal @}TestParameter(valuesProvider=MyProvider.class)
+     *       Foo foo) {
+     *     ...
+     *   }
+     * </pre>
+     *
+     * then {@code context.getOtherAnnotations(CustomAnnotation.class)} will return the annotation
+     * with 123 and 456.
+     *
+     * <p>Returns an empty list if this there is no annotation with the given type.
+     *
+     * @throws IllegalArgumentException if the argument it TestParameter.class because it is already
+     *     handled by the TestParameterInjector framework.
+     */
+    public <A extends Annotation> ImmutableList<A> getOtherAnnotations(Class<A> annotationType) {
+      checkArgument(
+          !TestParameter.class.equals(annotationType),
+          "Getting the @TestParameter annotating the field or parameter is not allowed because"
+              + " it is already handled by the TestParameterInjector framework.");
+      return delegate.getAnnotations(annotationType);
+    }
 
     /**
      * The class that contains the test that is currently being run.
