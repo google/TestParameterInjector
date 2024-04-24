@@ -26,8 +26,8 @@ import javax.annotation.Nullable;
 /**
  * Abstract class for custom providers of @TestParameter values.
  *
- * <p>This is a replacement for {@link TestParameter.TestParameterValuesProvider}, which will soon
- * be deprecated. The difference with the former interface is that this class provides a {@code
+ * <p>This is a replacement for {@link TestParameter.TestParameterValuesProvider}, which is
+ * deprecated. The difference with the former interface is that this class provides a {@code
  * Context} instance when invoking {@link #provideValues}.
  */
 public abstract class TestParameterValuesProvider
