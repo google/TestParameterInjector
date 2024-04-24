@@ -20,21 +20,18 @@ import static com.google.common.base.Verify.verify;
 import com.google.auto.value.AutoAnnotation;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
-import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import com.google.testing.junit.testparameterinjector.TestParameters.DefaultTestParametersValuesProvider;
 import com.google.testing.junit.testparameterinjector.TestParameters.RepeatedTestParameters;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
-import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
@@ -45,23 +42,22 @@ import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 /** {@code TestMethodProcessor} implementation for supporting {@link TestParameters}. */
 @SuppressWarnings("AndroidJdkLibsChecker") // Parameter is not available on old Android SDKs.
 final class TestParametersMethodProcessor implements TestMethodProcessor {
 
-  private final LoadingCache<Executable, ImmutableList<TestParametersValues>>
+  private final Cache<Executable, ImmutableList<TestParametersValues>>
       parameterValuesByConstructorOrMethodCache =
-          CacheBuilder.newBuilder()
-              .maximumSize(1000)
-              .build(CacheLoader.from(TestParametersMethodProcessor::toParameterValuesList));
+          CacheBuilder.newBuilder().maximumSize(1000).build();
 
   @Override
   public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
     if (hasRelevantAnnotation(constructor)) {
       try {
         // This method throws an exception if there is a validation error
-        getConstructorParameters(constructor);
+        ImmutableList<TestParametersValues> unused = getConstructorParameters(constructor);
       } catch (Throwable t) {
         return ExecutableValidationResult.validated(t);
       }
@@ -76,7 +72,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
     if (hasRelevantAnnotation(testMethod)) {
       try {
         // This method throws an exception if there is a validation error
-        getMethodParameters(testMethod);
+        ImmutableList<TestParametersValues> unused = getMethodParameters(testMethod, testClass);
       } catch (Throwable t) {
         return ExecutableValidationResult.validated(t);
       }
@@ -102,7 +98,8 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
     ImmutableList<Optional<TestParametersValues>> constructorParametersList =
         getConstructorParametersOrSingleAbsentElement(originalTest.getTestClass());
     ImmutableList<Optional<TestParametersValues>> methodParametersList =
-        getMethodParametersOrSingleAbsentElement(originalTest.getMethod());
+        getMethodParametersOrSingleAbsentElement(
+            originalTest.getMethod(), originalTest.getTestClass());
     for (int constructorParametersIndex = 0;
         constructorParametersIndex < constructorParametersList.size();
         ++constructorParametersIndex) {
@@ -157,9 +154,11 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   private ImmutableList<Optional<TestParametersValues>> getMethodParametersOrSingleAbsentElement(
-      Method method) {
+      Method method, Class<?> testClass) {
     return hasRelevantAnnotation(method)
-        ? FluentIterable.from(getMethodParameters(method)).transform(Optional::of).toList()
+        ? FluentIterable.from(getMethodParameters(method, testClass))
+            .transform(Optional::of)
+            .toList()
         : ImmutableList.of(Optional.absent());
   }
 
@@ -183,7 +182,8 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
     Method testMethod = testInfo.getMethod();
     if (hasRelevantAnnotation(testMethod)) {
-      ImmutableList<TestParametersValues> parameterValuesList = getMethodParameters(testMethod);
+      ImmutableList<TestParametersValues> parameterValuesList =
+          getMethodParameters(testMethod, testInfo.getTestClass());
       TestParametersValues parametersValues =
           parameterValuesList.get(
               testInfo.getAnnotation(TestIndexHolder.class).methodParametersIndex());
@@ -199,27 +199,31 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private ImmutableList<TestParametersValues> getConstructorParameters(Constructor<?> constructor) {
     try {
-      return parameterValuesByConstructorOrMethodCache.getUnchecked(constructor);
-    } catch (UncheckedExecutionException e) {
+      return parameterValuesByConstructorOrMethodCache.get(
+          constructor, () -> toParameterValuesList(constructor, constructor.getDeclaringClass()));
+    } catch (ExecutionException e) {
       // Rethrow IllegalStateException because they can be caused by user mistakes and the user
       // doesn't need to know that the caching layer is in between.
       Throwables.throwIfInstanceOf(e.getCause(), IllegalStateException.class);
-      throw e;
+      throw new RuntimeException(e);
     }
   }
 
-  private ImmutableList<TestParametersValues> getMethodParameters(Method method) {
+  private ImmutableList<TestParametersValues> getMethodParameters(
+      Method method, Class<?> testClass) {
     try {
-      return parameterValuesByConstructorOrMethodCache.getUnchecked(method);
-    } catch (UncheckedExecutionException e) {
+      return parameterValuesByConstructorOrMethodCache.get(
+          method, () -> toParameterValuesList(method, testClass));
+    } catch (ExecutionException e) {
       // Rethrow IllegalStateException because they can be caused by user mistakes and the user
       // doesn't need to know that the caching layer is in between.
       Throwables.throwIfInstanceOf(e.getCause(), IllegalStateException.class);
-      throw e;
+      throw new RuntimeException(e);
     }
   }
 
-  private static ImmutableList<TestParametersValues> toParameterValuesList(Executable executable) {
+  private static ImmutableList<TestParametersValues> toParameterValuesList(
+      Executable executable, Class<?> testClass) {
     checkParameterNamesArePresent(executable);
     ImmutableList<Parameter> parametersList = ImmutableList.copyOf(executable.getParameters());
 
@@ -258,7 +262,10 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
                 yamlMap -> toParameterValues(yamlMap, parametersList, annotation.customName()))
             .toList();
       } else {
-        return toParameterValuesList(annotation.valuesProvider(), parametersList);
+        return toParameterValuesList(
+            annotation.valuesProvider(),
+            parametersList,
+            GenericParameterContext.create(executable, testClass));
       }
     } else { // Not annotated with @TestParameters
       verify(
@@ -278,12 +285,19 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   private static ImmutableList<TestParametersValues> toParameterValuesList(
-      Class<? extends TestParametersValuesProvider> valuesProvider, List<Parameter> parameters) {
+      Class<? extends TestParameters.TestParametersValuesProvider> valuesProvider,
+      List<Parameter> parameters,
+      GenericParameterContext context) {
     try {
-      Constructor<? extends TestParametersValuesProvider> constructor =
+      Constructor<? extends TestParameters.TestParametersValuesProvider> constructor =
           valuesProvider.getDeclaredConstructor();
       constructor.setAccessible(true);
-      List<TestParametersValues> testParametersValues = constructor.newInstance().provideValues();
+      TestParameters.TestParametersValuesProvider provider = constructor.newInstance();
+      List<TestParametersValues> testParametersValues =
+          provider instanceof TestParametersValuesProvider
+              ? ((TestParametersValuesProvider) provider)
+                  .provideValues(new TestParametersValuesProvider.Context(context))
+              : provider.provideValues();
       for (TestParametersValues testParametersValue : testParametersValues) {
         validateThatValuesMatchParameters(testParametersValue, parameters);
       }
@@ -302,7 +316,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
                 "Could not find a no-arg constructor for %s.", valuesProvider.getSimpleName()),
             e);
       }
-    } catch (ReflectiveOperationException e) {
+    } catch (Exception e) {
       throw new IllegalStateException(e);
     }
   }

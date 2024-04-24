@@ -4,6 +4,8 @@
   https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameter.TestParameterValuesProvider.html)
   in favor of its newer version [`TestParameterValuesProvider`](
   https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameterValuesProvider.html).
+- Added support for repeated annotations to [`TestParameterValuesProvider.Context`](
+  https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameterValuesProvider.Context.html)
 
 ## 1.15
 

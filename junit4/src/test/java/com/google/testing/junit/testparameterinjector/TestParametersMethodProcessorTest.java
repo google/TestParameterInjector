@@ -15,16 +15,21 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Iterables.getOnlyElement;
+import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.TruthJUnit.assume;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.junit.Assert.assertThrows;
 
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
-import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
+import com.google.testing.junit.testparameterinjector.TestParametersValuesProvider.Context;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.util.Arrays;
 import java.util.Collection;
@@ -49,7 +54,8 @@ public class TestParametersMethodProcessorTest {
     THREE;
   }
 
-  private static final class TestEnumValuesProvider implements TestParametersValuesProvider {
+  private static final class TestEnumValuesProvider
+      implements TestParameters.TestParametersValuesProvider {
     @Override
     public List<TestParametersValues> provideValues() {
       return ImmutableList.of(
@@ -264,7 +270,8 @@ public class TestParametersMethodProcessorTest {
           .build();
     }
 
-    private static final class CustomProvider implements TestParametersValuesProvider {
+    private static final class CustomProvider
+        implements TestParameters.TestParametersValuesProvider {
       @Override
       public List<TestParametersValues> provideValues() {
         return ImmutableList.of(
@@ -276,6 +283,109 @@ public class TestParametersMethodProcessorTest {
                 .addParameter("testInt", 10)
                 .addParameter("testEnum", TestEnum.TWO)
                 .build());
+      }
+    }
+  }
+
+  @RunAsTest
+  public static class ProviderWithContext extends SuccessfulTestCaseBase {
+
+    @CustomAnnotation('A')
+    @CustomRepeatableAnnotation('B')
+    @TestParameters(valuesProvider = InjectContextProvider.class)
+    public ProviderWithContext(Context context) {
+      assertThat(context.testClass()).isEqualTo(ProviderWithContext.class);
+
+      assertThat(annotationTypes(context.annotationsOnParameter()))
+          .containsExactly(
+              TestParameters.class, CustomAnnotation.class, CustomRepeatableAnnotation.class);
+
+      assertThat(context.getOtherAnnotation(CustomAnnotation.class).value()).isEqualTo('A');
+
+      assertThat(getOnlyElement(context.getOtherAnnotations(CustomAnnotation.class)).value())
+          .isEqualTo('A');
+      assertThat(
+              getOnlyElement(context.getOtherAnnotations(CustomRepeatableAnnotation.class)).value())
+          .isEqualTo('B');
+    }
+
+    @TestParameters(valuesProvider = InjectContextProvider.class)
+    @Test
+    public void testWithoutOtherAnnotations(Context context) {
+      assertThat(context.testClass()).isEqualTo(ProviderWithContext.class);
+
+      assertThat(annotationTypes(context.annotationsOnParameter()))
+          .containsExactly(TestParameters.class, Test.class);
+
+      assertThat(context.getOtherAnnotations(CustomAnnotation.class)).isEmpty();
+      assertThat(context.getOtherAnnotations(CustomRepeatableAnnotation.class)).isEmpty();
+
+      storeTestParametersForThisTest(context);
+    }
+
+    @TestParameters(valuesProvider = InjectContextProvider.class)
+    @CustomAnnotation('C')
+    @CustomRepeatableAnnotation('D')
+    @CustomRepeatableAnnotation('E')
+    @Test
+    public void testWithOtherAnnotations(Context context) {
+      assertThat(context.testClass()).isEqualTo(ProviderWithContext.class);
+
+      assertThat(annotationTypes(context.annotationsOnParameter()))
+          .containsExactly(
+              TestParameters.class,
+              Test.class,
+              CustomAnnotation.class,
+              CustomRepeatableAnnotation.CustomRepeatableAnnotationHolder.class);
+
+      assertThat(context.getOtherAnnotation(CustomAnnotation.class).value()).isEqualTo('C');
+
+      assertThat(getOnlyElement(context.getOtherAnnotations(CustomAnnotation.class)).value())
+          .isEqualTo('C');
+      assertThat(
+              FluentIterable.from(context.getOtherAnnotations(CustomRepeatableAnnotation.class))
+                  .transform(a -> a.value())
+                  .toList())
+          .containsExactly('D', 'E');
+
+      storeTestParametersForThisTest(context);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put(
+              "testWithoutOtherAnnotations[1.{context(annotationsOnParameter=[@TestParameters,@CustomAnnotation,@CustomRepe...,1.{context(annotationsOnParameter=[@TestParameters,@Test],testClass=ProviderWith...]",
+              "context(annotationsOnParameter=[@TestParameters,@Test],testClass=ProviderWithContext)")
+          .put(
+              "testWithOtherAnnotations[1.{context(annotationsOnParameter=[@TestParameters,@CustomAnnotation,@CustomRepeat...,1.{context(annotationsOnParameter=[@TestParameters,@CustomAnnotation,@CustomRepeat...]",
+              "context(annotationsOnParameter=[@TestParameters,@CustomAnnotation,@CustomRepeatableAnnotationHolder,@Test],testClass=ProviderWithContext)")
+          .build();
+    }
+
+    private static final class InjectContextProvider extends TestParametersValuesProvider {
+      @Override
+      protected List<TestParametersValues> provideValues(Context context) {
+        return newArrayList(
+            TestParametersValues.builder().addParameter("context", context).build());
+      }
+    }
+
+    @Retention(RUNTIME)
+    @interface CustomAnnotation {
+      char value();
+    }
+
+    @Retention(RUNTIME)
+    @Repeatable(CustomRepeatableAnnotation.CustomRepeatableAnnotationHolder.class)
+    @interface CustomRepeatableAnnotation {
+      char value();
+
+      @Retention(RUNTIME)
+      @interface CustomRepeatableAnnotationHolder {
+        CustomRepeatableAnnotation[] value();
+
+        String test() default "TEST";
       }
     }
   }
@@ -550,5 +660,10 @@ public class TestParametersMethodProcessorTest {
         return TestMethodProcessorList.createNewParameterizedProcessors();
       }
     };
+  }
+
+  private static ImmutableList<Class<? extends Annotation>> annotationTypes(
+      Iterable<Annotation> annotations) {
+    return FluentIterable.from(annotations).transform(Annotation::annotationType).toList();
   }
 }

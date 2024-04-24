@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -76,6 +77,17 @@ final class GenericParameterContext {
         ImmutableList.copyOf(parameter.getAnnotations()),
         /* getAnnotationsFunction= */ annotationType ->
             ImmutableList.copyOf(parameter.getAnnotationsByType(annotationType)),
+        testClass);
+  }
+
+  // Executable is not available on old Android SDKs, and isn't desugared. This method is only
+  // called via @TestParameters, wich only supports newer SDKs anyway.
+  @SuppressWarnings("AndroidJdkLibsChecker")
+  static GenericParameterContext create(Executable executable, Class<?> testClass) {
+    return new GenericParameterContext(
+        ImmutableList.copyOf(executable.getAnnotations()),
+        /* getAnnotationsFunction= */ annotationType ->
+            ImmutableList.copyOf(executable.getAnnotationsByType(annotationType)),
         testClass);
   }
 
