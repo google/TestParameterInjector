@@ -118,7 +118,7 @@ public abstract class TestParameterValuesProvider
      *   }
      * </pre>
      *
-     * then {@code context.getOtherAnnotations(CustomAnnotation.class)} will return the annotation
+     * then {@code context.getOtherAnnotations(CustomAnnotation.class)} will return the annotations
      * with 123 and 456.
      *
      * <p>Returns an empty list if this there is no annotation with the given type.
