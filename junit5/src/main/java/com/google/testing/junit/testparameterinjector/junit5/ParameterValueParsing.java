@@ -17,6 +17,7 @@ package com.google.testing.junit.testparameterinjector.junit5;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
 import com.google.common.base.CharMatcher;
@@ -29,6 +30,7 @@ import com.google.common.primitives.UnsignedLong;
 import com.google.common.reflect.TypeToken;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
@@ -49,7 +51,34 @@ final class ParameterValueParsing {
 
   @SuppressWarnings("unchecked")
   static <E extends Enum<E>> Enum<?> parseEnum(String str, Class<?> enumType) {
-    return Enum.valueOf((Class<E>) enumType, str);
+    try {
+      return Enum.valueOf((Class<E>) enumType, str);
+    } catch (IllegalArgumentException e) {
+      Optional<Enum<?>> enumValue = maybeGetStaticConstant(enumType, str);
+      if (enumValue.isPresent()) {
+        return enumValue.get();
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Optional<Enum<?>> maybeGetStaticConstant(Class<?> enumType, String fieldName) {
+    verify(enumType.isEnum(), "Given type %s is not a enum.", enumType.getSimpleName());
+    try {
+      Field field = enumType.getField(fieldName);
+      Object valueCandidate = field.get(null);
+      checkArgument(
+          enumType.isInstance(valueCandidate),
+          "The field %s.%s exists, but is not of expected type %s.",
+          enumType.getSimpleName(),
+          fieldName,
+          enumType.getSimpleName());
+      return Optional.of((Enum<?>) valueCandidate);
+    } catch (SecurityException | ReflectiveOperationException e) {
+      return Optional.absent();
+    }
   }
 
   static boolean isValidYamlString(String yamlString) {
