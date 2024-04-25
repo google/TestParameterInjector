@@ -371,6 +371,11 @@ final class ParameterValueParsing {
       return resultBuider.toString();
     } else if (ByteStringReflection.isInstanceOfByteString(value)) {
       return Arrays.toString(ByteStringReflection.byteStringToByteArray(value));
+    } else if (value instanceof Enum<?>) {
+      // Sometimes, enums have custom toString() methods. They are probably adding extra information
+      // (such as with protobuf enums on Android), but for a test name, the string should be as
+      // short as possible
+      return ((Enum<?>) value).name();
     } else {
       return String.valueOf(value);
     }
