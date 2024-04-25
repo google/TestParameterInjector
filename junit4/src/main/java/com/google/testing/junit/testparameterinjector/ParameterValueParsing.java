@@ -54,6 +54,9 @@ final class ParameterValueParsing {
     try {
       return Enum.valueOf((Class<E>) enumType, str);
     } catch (IllegalArgumentException e) {
+      // The given name was not a valid enum value. However, the enum might have an alias to one of
+      // its values defined as static field. This happens for example (via code generation) in the
+      // case of Protocol Buffer aliases (see the allow_alias option).
       Optional<Enum<?>> enumValue = maybeGetStaticConstant(enumType, str);
       if (enumValue.isPresent()) {
         return enumValue.get();

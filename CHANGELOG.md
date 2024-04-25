@@ -7,6 +7,8 @@
 - Added support for repeated annotations to [`TestParameterValuesProvider.Context`](
   https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameterValuesProvider.Context.html)
 - Converting incorrectly YAML-parsed booleans back to their enum values when possible
+- Support enum aliases (defined as static fields on the enum), and in particular
+  Protocol Buffer enum aliases
 
 ## 1.15
 
