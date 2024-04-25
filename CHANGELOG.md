@@ -6,6 +6,7 @@
   https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameterValuesProvider.html).
 - Added support for repeated annotations to [`TestParameterValuesProvider.Context`](
   https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameterValuesProvider.Context.html)
+- Converting incorrectly YAML-parsed booleans back to their enum values when possible
 
 ## 1.15
 

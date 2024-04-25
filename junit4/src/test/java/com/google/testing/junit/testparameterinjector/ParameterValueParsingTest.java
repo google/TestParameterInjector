@@ -15,6 +15,7 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
@@ -127,6 +128,19 @@ public class ParameterValueParsingTest {
         /* yamlString= */ "AAA",
         /* javaClass= */ TestEnum.class,
         /* expectedResult= */ TestEnum.AAA),
+    BOOLEAN_TO_ENUM_FALSE(
+        /* yamlString= */ "NO", /* javaClass= */ TestEnum.class, /* expectedResult= */ TestEnum.NO),
+    BOOLEAN_TO_ENUM_TRUE(
+        /* yamlString= */ "TRUE",
+        /* javaClass= */ TestEnum.class,
+        /* expectedResult= */ TestEnum.TRUE),
+    // This works because the YAML parser in between makes it impossible to differentiate. This test
+    // case is not testing desired behavior, but rather double-checking that the YAML parsing step
+    // actually happens and we are testing this edge case.
+    BOOLEAN_TO_ENUM_TRUE_DIFFERENT_ALIAS(
+        /* yamlString= */ "ON",
+        /* javaClass= */ TestEnum.class,
+        /* expectedResult= */ TestEnum.TRUE),
 
     STRING_TO_BYTES(
         /* yamlString= */ "data",
@@ -169,6 +183,24 @@ public class ParameterValueParsingTest {
     assertThat(result).isEqualTo(parseYamlValueToJavaTypeCases.expectedResult);
   }
 
+  @Test
+  public void parseYamlStringToJavaType_booleanToEnum_ambiguousValues_fails(
+      @TestParameter({"OFF", "YES", "false", "True"}) String yamlString) throws Exception {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ParameterValueParsing.parseYamlStringToJavaType(
+                    yamlString, TestEnumWithAmbiguousValues.class));
+
+    assertThat(exception)
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains(
+            "It is likely that the YAML parser is 'wrongly' parsing one of these values as"
+                + " boolean");
+  }
+
   enum FormatTestNameStringTestCases {
     NULL_REFERENCE(/* value= */ null, /* expectedResult= */ "param=null"),
     BOOLEAN(/* value= */ false, /* expectedResult= */ "param=false"),
@@ -201,6 +233,17 @@ public class ParameterValueParsingTest {
 
   private enum TestEnum {
     AAA,
-    BBB;
+    BBB,
+    NO,
+    TRUE;
+  }
+
+  private enum TestEnumWithAmbiguousValues {
+    AAA,
+    BBB,
+    NO,
+    OFF,
+    YES,
+    TRUE;
   }
 }
