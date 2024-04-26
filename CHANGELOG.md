@@ -9,6 +9,8 @@
 - Converting incorrectly YAML-parsed booleans back to their enum values when possible
 - Support enum aliases (defined as static fields on the enum), and in particular
   Protocol Buffer enum aliases
+- When generating test names for enum values, the enum name is used instead of
+  its `toString()` method.
 
 ## 1.15
 
