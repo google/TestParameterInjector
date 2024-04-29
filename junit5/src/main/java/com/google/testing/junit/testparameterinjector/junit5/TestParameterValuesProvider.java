@@ -102,7 +102,7 @@ public abstract class TestParameterValuesProvider
     }
 
     /**
-     * Returns the only annotation with the given type on the field or parameter that was annotated
+     * Returns all annotations with the given type on the field or parameter that was annotated
      * with @TestParameter.
      *
      * <p>For example, if the test code is as follows:

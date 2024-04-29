@@ -91,8 +91,8 @@ public abstract class TestParametersValuesProvider
     }
 
     /**
-     * Returns the only annotation with the given type on the method or constructor that was
-     * annotated with @TestParameter.
+     * Returns all annotations with the given type on the method or constructor that was annotated
+     * with @TestParameter.
      *
      * <pre>
      *   {@literal @}Test
