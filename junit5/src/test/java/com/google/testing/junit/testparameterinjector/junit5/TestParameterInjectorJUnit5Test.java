@@ -32,7 +32,7 @@ import com.google.testing.junit.testparameterinjector.junit5.TestParameterInject
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterValuesProvider;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameters;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameters.TestParametersValues;
-import com.google.testing.junit.testparameterinjector.junit5.TestParameters.TestParametersValuesProvider;
+import com.google.testing.junit.testparameterinjector.junit5.TestParametersValuesProvider;
 import java.lang.annotation.Retention;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -596,9 +596,9 @@ class TestParameterInjectorJUnit5Test {
     THREE;
   }
 
-  private static final class TestEnumValuesProvider implements TestParametersValuesProvider {
+  private static final class TestEnumValuesProvider extends TestParametersValuesProvider {
     @Override
-    public List<TestParametersValues> provideValues() {
+    public List<TestParametersValues> provideValues(Context context) {
       return ImmutableList.of(
           TestParametersValues.builder().name("one").addParameter("testEnum", TestEnum.ONE).build(),
           TestParametersValues.builder().name("two").addParameter("testEnum", TestEnum.TWO).build(),
