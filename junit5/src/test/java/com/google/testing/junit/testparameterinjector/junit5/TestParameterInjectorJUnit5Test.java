@@ -28,8 +28,8 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameter;
-import com.google.testing.junit.testparameterinjector.junit5.TestParameter.TestParameterValuesProvider;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorTest;
+import com.google.testing.junit.testparameterinjector.junit5.TestParameterValuesProvider;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameters;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameters.TestParametersValues;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameters.TestParametersValuesProvider;
@@ -310,16 +310,16 @@ class TestParameterInjectorJUnit5Test {
           .build();
     }
 
-    private static final class TestStringProvider implements TestParameterValuesProvider {
+    private static final class TestStringProvider extends TestParameterValuesProvider {
       @Override
-      public List<?> provideValues() {
+      public List<?> provideValues(Context context) {
         return newArrayList("A", "B", null, value("harry").withName("wizard"));
       }
     }
 
-    private static final class CharMatcherProvider implements TestParameterValuesProvider {
+    private static final class CharMatcherProvider extends TestParameterValuesProvider {
       @Override
-      public List<CharMatcher> provideValues() {
+      public List<CharMatcher> provideValues(Context context) {
         return newArrayList(CharMatcher.any(), CharMatcher.ascii(), CharMatcher.whitespace());
       }
     }
@@ -487,9 +487,9 @@ class TestParameterInjectorJUnit5Test {
     void test(@TestParameter(valuesProvider = NonStaticProvider.class) int i) {}
 
     @SuppressWarnings("ClassCanBeStatic")
-    class NonStaticProvider implements TestParameterValuesProvider {
+    class NonStaticProvider extends TestParameterValuesProvider {
       @Override
-      public List<?> provideValues() {
+      public List<?> provideValues(Context context) {
         return ImmutableList.of();
       }
     }
