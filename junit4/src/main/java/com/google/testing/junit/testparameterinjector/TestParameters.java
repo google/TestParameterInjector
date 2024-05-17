@@ -172,7 +172,14 @@ public @interface TestParameters {
   Class<? extends TestParametersValuesProvider> valuesProvider() default
       DefaultTestParametersValuesProvider.class;
 
-  /** Interface for custom providers of test parameter values. */
+  /**
+   * Interface for custom providers of test parameter values.
+   *
+   * @deprecated Use {@link
+   *     com.google.testing.junit.testparameterinjector.TestParametersValuesProvider} instead. The
+   *     replacement implements this same interface, but with an additional Context parameter.
+   */
+  @Deprecated
   interface TestParametersValuesProvider {
     List<TestParametersValues> provideValues();
   }
