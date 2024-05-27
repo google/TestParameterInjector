@@ -21,13 +21,10 @@ import static java.util.Collections.unmodifiableMap;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
-import com.google.testing.junit.testparameterinjector.junit5.TestParameters.TestParametersValuesProvider;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -181,7 +178,15 @@ public @interface TestParameters {
    */
   @Deprecated
   interface TestParametersValuesProvider {
-    List<TestParametersValues> provideValues();
+    java.util.List<TestParametersValues> provideValues();
+  }
+
+  /** Default {@link TestParametersValuesProvider} implementation that does nothing. */
+  class DefaultTestParametersValuesProvider implements TestParametersValuesProvider {
+    @Override
+    public java.util.List<TestParametersValues> provideValues() {
+      return com.google.common.collect.ImmutableList.of();
+    }
   }
 
   /** A set of parameters for a single method invocation. */
@@ -261,14 +266,6 @@ public @interface TestParameters {
         return new AutoValue_TestParameters_TestParametersValues(
             name, unmodifiableMap(new LinkedHashMap<>(parametersMap)));
       }
-    }
-  }
-
-  /** Default {@link TestParametersValuesProvider} implementation that does nothing. */
-  class DefaultTestParametersValuesProvider implements TestParametersValuesProvider {
-    @Override
-    public List<TestParametersValues> provideValues() {
-      return ImmutableList.of();
     }
   }
 

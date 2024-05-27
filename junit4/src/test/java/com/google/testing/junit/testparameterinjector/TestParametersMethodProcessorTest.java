@@ -54,10 +54,9 @@ public class TestParametersMethodProcessorTest {
     THREE;
   }
 
-  private static final class TestEnumValuesProvider
-      implements TestParameters.TestParametersValuesProvider {
+  private static final class TestEnumValuesProvider extends TestParametersValuesProvider {
     @Override
-    public List<TestParametersValues> provideValues() {
+    public List<TestParametersValues> provideValues(Context context) {
       return ImmutableList.of(
           TestParametersValues.builder().name("one").addParameter("testEnum", TestEnum.ONE).build(),
           TestParametersValues.builder().addParameter("testEnum", TestEnum.TWO).build(),
@@ -270,10 +269,9 @@ public class TestParametersMethodProcessorTest {
           .build();
     }
 
-    private static final class CustomProvider
-        implements TestParameters.TestParametersValuesProvider {
+    private static final class CustomProvider extends TestParametersValuesProvider {
       @Override
-      public List<TestParametersValues> provideValues() {
+      public List<TestParametersValues> provideValues(Context context) {
         return ImmutableList.of(
             TestParametersValues.builder()
                 .addParameter("testInt", 5)

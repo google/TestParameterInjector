@@ -29,9 +29,11 @@ import com.google.common.collect.Maps;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
-import com.google.testing.junit.testparameterinjector.TestParameters.DefaultTestParametersValuesProvider;
 import com.google.testing.junit.testparameterinjector.TestParameters.RepeatedTestParameters;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
+import com.google.testing.junit.testparameterinjector.TestParametersValuesProvider.Context;
+import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValuesProvider;
+import com.google.testing.junit.testparameterinjector.TestParameters.DefaultTestParametersValuesProvider;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
@@ -285,18 +287,21 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   }
 
   private static ImmutableList<TestParametersValues> toParameterValuesList(
-      Class<? extends TestParameters.TestParametersValuesProvider> valuesProvider,
+      Class<? extends TestParametersValuesProvider> valuesProvider,
       List<Parameter> parameters,
       GenericParameterContext context) {
     try {
-      Constructor<? extends TestParameters.TestParametersValuesProvider> constructor =
+      Constructor<? extends TestParametersValuesProvider> constructor =
           valuesProvider.getDeclaredConstructor();
       constructor.setAccessible(true);
-      TestParameters.TestParametersValuesProvider provider = constructor.newInstance();
+      TestParametersValuesProvider provider = constructor.newInstance();
       List<TestParametersValues> testParametersValues =
-          provider instanceof TestParametersValuesProvider
-              ? ((TestParametersValuesProvider) provider)
-                  .provideValues(new TestParametersValuesProvider.Context(context))
+          provider
+                  instanceof
+                  com.google.testing.junit.testparameterinjector.TestParametersValuesProvider
+              ? ((com.google.testing.junit.testparameterinjector.TestParametersValuesProvider)
+                      provider)
+                  .provideValues(new Context(context))
               : provider.provideValues();
       for (TestParametersValues testParametersValue : testParametersValues) {
         validateThatValuesMatchParameters(testParametersValue, parameters);
