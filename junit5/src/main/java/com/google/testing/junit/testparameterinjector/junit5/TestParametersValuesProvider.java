@@ -26,8 +26,8 @@ import java.util.NoSuchElementException;
 /**
  * Abstract class for custom providers of @TestParameters values.
  *
- * <p>This is a replacement for {@link TestParameters.TestParametersValuesProvider}, which will soon
- * be deprecated. The difference with the former interface is that this class provides a {@code
+ * <p>This is a replacement for {@link TestParameters.TestParametersValuesProvider}, which is
+ * deprecated. The difference with the former interface is that this class provides a {@code
  * Context} instance when invoking {@link #provideValues}.
  */
 public abstract class TestParametersValuesProvider
