@@ -379,12 +379,15 @@ Instead of providing a YAML mapping of parameters, you can implement your own
 `TestParametersValuesProvider` as follows:
 
 ```java
+import com.google.testing.junit.testparameterinjector.TestParametersValuesProvider;
+import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
+
 @Test
 @TestParameters(valuesProvider = IsAdultValueProvider.class)
 public void personIsAdult(int age, boolean expectIsAdult) { ... }
 
-static final class IsAdultValueProvider implements TestParametersValuesProvider {
-  @Override public ImmutableList<TestParametersValues> provideValues() {
+static final class IsAdultValueProvider extends TestParametersValuesProvider {
+  @Override public ImmutableList<TestParametersValues> provideValues(Context context) {
     return ImmutableList.of(
       TestParametersValues.builder()
         .name("teenager")
