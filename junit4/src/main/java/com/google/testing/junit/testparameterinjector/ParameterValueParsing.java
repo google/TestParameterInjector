@@ -14,6 +14,7 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -23,6 +24,7 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
@@ -34,13 +36,17 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -188,6 +194,12 @@ final class ParameterValueParsing {
           .supportParsedType(String.class, ByteStringReflection::copyFromUtf8)
           .supportParsedType(byte[].class, ByteStringReflection::copyFrom);
     }
+
+    yamlValueTransformer
+        .ifJavaType(Duration.class)
+        .supportParsedType(String.class, ParameterValueParsing::parseDuration)
+        // Support the special case where the YAML string is "0"
+        .supportParsedType(Integer.class, i -> parseDuration(String.valueOf(i)));
 
     // Added mainly for protocol buffer parsing
     yamlValueTransformer
@@ -379,6 +391,69 @@ final class ParameterValueParsing {
     } else {
       return String.valueOf(value);
     }
+  }
+
+  // ********** Duration parsing ********** //
+
+  private static final ImmutableMap<String, Duration> ABBREVIATION_TO_DURATION =
+      new ImmutableMap.Builder<String, Duration>()
+          .put("d", Duration.ofDays(1))
+          .put("h", Duration.ofHours(1))
+          .put("m", Duration.ofMinutes(1))
+          .put("min", Duration.ofMinutes(1))
+          .put("s", Duration.ofSeconds(1))
+          .put("ms", Duration.ofMillis(1))
+          .put("us", Duration.ofNanos(1000))
+          .put("ns", Duration.ofNanos(1))
+          .buildOrThrow();
+  private static final Pattern UNIT_PATTERN =
+      Pattern.compile("(?x) ([0-9]+)? (\\.[0-9]*)? (d|h|min|ms?|s|us|ns)");
+  private static final CharMatcher ASCII_DIGIT = CharMatcher.inRange('0', '9');
+
+  private static Duration parseDuration(String value) {
+    checkArgument(value != null, "input value cannot be null");
+    checkArgument(!value.isEmpty(), "input value cannot be empty");
+    checkArgument(!value.equals("-"), "input value cannot be '-'");
+    checkArgument(!value.equals("+"), "input value cannot be '+'");
+
+    value = CharMatcher.whitespace().trimFrom(value);
+
+    if (Objects.equals(value, "0")) {
+      return Duration.ZERO;
+    }
+
+    Duration duration = Duration.ZERO;
+    boolean negative = value.startsWith("-");
+    boolean explicitlyPositive = value.startsWith("+");
+    int index = negative || explicitlyPositive ? 1 : 0;
+    Matcher matcher = UNIT_PATTERN.matcher(value);
+    while (matcher.find(index) && matcher.start() == index) {
+      // Prevent strings like ".s" or "d" by requiring at least one digit.
+      checkArgument(ASCII_DIGIT.matchesAnyOf(matcher.group(0)));
+      try {
+        String unit = matcher.group(3);
+
+        long whole = Long.parseLong(firstNonNull(matcher.group(1), "0"));
+        Duration singleUnit = ABBREVIATION_TO_DURATION.get(unit);
+        checkArgument(singleUnit != null, "invalid unit (%s)", unit);
+        // TODO(b/142748138): Consider using saturated duration math here
+        duration = duration.plus(singleUnit.multipliedBy(whole));
+
+        long nanosPerUnit = singleUnit.toNanos();
+        double frac = Double.parseDouble("0" + firstNonNull(matcher.group(2), ""));
+        duration = duration.plus(Duration.ofNanos((long) (nanosPerUnit * frac)));
+      } catch (ArithmeticException e) {
+        throw new IllegalArgumentException(e);
+      }
+      index = matcher.end();
+    }
+    if (index < value.length()) {
+      throw new IllegalArgumentException("Could not parse entire duration: " + value);
+    }
+    if (negative) {
+      duration = duration.negated();
+    }
+    return duration;
   }
 
   private ParameterValueParsing() {}

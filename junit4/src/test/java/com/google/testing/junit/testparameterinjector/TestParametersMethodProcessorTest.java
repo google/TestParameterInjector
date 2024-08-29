@@ -31,6 +31,7 @@ import com.google.testing.junit.testparameterinjector.TestParametersValuesProvid
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -120,6 +121,14 @@ public class TestParametersMethodProcessorTest {
       storeTestParametersForThisTest(testEnum);
     }
 
+    @Test
+    @TestParameters("{testDuration: 0}")
+    @TestParameters("{testDuration: 1d}")
+    @TestParameters("{testDuration: -2h}")
+    public void test5_withDuration(Duration testDuration) {
+      storeTestParametersForThisTest(testDuration);
+    }
+
     @Override
     ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
       return ImmutableMap.<String, String>builder()
@@ -167,6 +176,9 @@ public class TestParametersMethodProcessorTest {
           .put("test4_withCustomName[custom1]", "ONE")
           .put("test4_withCustomName[{testEnum: TWO}]", "TWO")
           .put("test4_withCustomName[custom3]", "THREE")
+          .put("test5_withDuration[{testDuration: 0}]", "PT0S")
+          .put("test5_withDuration[{testDuration: 1d}]", "PT24H")
+          .put("test5_withDuration[{testDuration: -2h}]", "PT-2H")
           .build();
     }
   }

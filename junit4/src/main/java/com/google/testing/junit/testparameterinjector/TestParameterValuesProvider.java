@@ -90,7 +90,7 @@ public abstract class TestParameterValuesProvider
      *
      * @throws NoSuchElementException if this there is no annotation with the given type
      * @throws IllegalArgumentException if there are multiple annotations with the given type
-     * @throws IllegalArgumentException if the argument it TestParameter.class because it is already
+     * @throws IllegalArgumentException if the argument is TestParameter.class because it is already
      *     handled by the TestParameterInjector framework.
      */
     public <A extends Annotation> A getOtherAnnotation(Class<A> annotationType) {
@@ -123,7 +123,7 @@ public abstract class TestParameterValuesProvider
      *
      * <p>Returns an empty list if this there is no annotation with the given type.
      *
-     * @throws IllegalArgumentException if the argument it TestParameter.class because it is already
+     * @throws IllegalArgumentException if the argument is TestParameter.class because it is already
      *     handled by the TestParameterInjector framework.
      */
     public <A extends Annotation> ImmutableList<A> getOtherAnnotations(Class<A> annotationType) {

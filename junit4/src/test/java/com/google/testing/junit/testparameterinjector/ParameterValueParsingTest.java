@@ -19,9 +19,12 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.UnsignedLong;
 import com.google.protobuf.ByteString;
+import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
 import java.math.BigInteger;
+import java.time.Duration;
 import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -181,6 +184,136 @@ public class ParameterValueParsingTest {
             parseYamlValueToJavaTypeCases.yamlString, parseYamlValueToJavaTypeCases.javaClass);
 
     assertThat(result).isEqualTo(parseYamlValueToJavaTypeCases.expectedResult);
+  }
+
+  private static final class DurationSuccessTestCasesProvider extends TestParametersValuesProvider {
+    @Override
+    protected ImmutableList<TestParametersValues> provideValues(Context context) {
+      return ImmutableList.of(
+          // Simple
+          testCase("7d", Duration.ofDays(7)),
+          testCase("6h", Duration.ofHours(6)),
+          testCase("5m", Duration.ofMinutes(5)),
+          testCase("5min", Duration.ofMinutes(5)),
+          testCase("4s", Duration.ofSeconds(4)),
+          testCase("3.2s", Duration.ofMillis(3200)),
+          testCase("0.2s", Duration.ofMillis(200)),
+          testCase(".15s", Duration.ofMillis(150)),
+          testCase("5.0s", Duration.ofSeconds(5)),
+          testCase("1.0s", Duration.ofSeconds(1)),
+          testCase("1.00s", Duration.ofSeconds(1)),
+          testCase("1.004s", Duration.ofSeconds(1).plusMillis(4)),
+          testCase("1.0040s", Duration.ofSeconds(1).plusMillis(4)),
+          testCase("100.00100s", Duration.ofSeconds(100).plusMillis(1)),
+          testCase("0.3333333333333333333h", Duration.ofMinutes(20)),
+          testCase("1s3ms", Duration.ofSeconds(1).plusMillis(3)),
+          testCase("1s34ms", Duration.ofSeconds(1).plusMillis(34)),
+          testCase("1s345ms", Duration.ofSeconds(1).plusMillis(345)),
+          testCase("345ms", Duration.ofMillis(345)),
+          testCase(".9ms", Duration.ofNanos(900000)),
+          testCase("5.s", Duration.ofSeconds(5)),
+          testCase("+24h", Duration.ofHours(24)),
+          testCase("0d", Duration.ZERO),
+          testCase("-0d", Duration.ZERO),
+          testCase("-1d", Duration.ofDays(-1)),
+          testCase("1d", Duration.ofDays(1)),
+
+          // Zero
+          testCase("0", Duration.ZERO),
+          testCase("-0", Duration.ZERO),
+          testCase("+0", Duration.ZERO),
+
+          // Multiple fields
+          testCase("1h30m", Duration.ofMinutes(90)),
+          testCase("1h30min", Duration.ofMinutes(90)),
+          testCase("1d7m", Duration.ofDays(1).plusMinutes(7)),
+          testCase("1m3.5s", Duration.ofMinutes(1).plusMillis(3500)),
+          testCase("1m3s500ms", Duration.ofMinutes(1).plusMillis(3500)),
+          testCase("5d4h3m2.1s", Duration.ofDays(5).plusHours(4).plusMinutes(3).plusMillis(2100)),
+          testCase("3.5s250ms", Duration.ofMillis(3500 + 250)),
+          testCase("1m2m3m", Duration.ofMinutes(6)),
+          testCase("1m2h", Duration.ofHours(2).plusMinutes(1)),
+
+          // Negative duration
+          testCase("-.5h", Duration.ofMinutes(-30)),
+
+          // Overflow
+          testCase("106751d23h47m16s854ms775us807ns", Duration.ofNanos(Long.MAX_VALUE)),
+          testCase("106751991167d7h12m55s807ms", Duration.ofMillis(Long.MAX_VALUE)),
+          testCase("106751991167300d15h30m7s", Duration.ofSeconds(Long.MAX_VALUE)),
+          testCase("106945d", Duration.ofDays(293 * 365)),
+
+          // Underflow
+          testCase("-106751d23h47m16s854ms775us808ns", Duration.ofNanos(Long.MIN_VALUE)),
+          testCase("-106751991167d7h12m55s808ms", Duration.ofMillis(Long.MIN_VALUE)),
+          testCase("-106751991167300d15h30m7s", Duration.ofSeconds(Long.MIN_VALUE + 1)),
+          testCase("-106945d", Duration.ofDays(-293 * 365)),
+
+          // Very large values
+          testCase("9223372036854775807ns", Duration.ofNanos(Long.MAX_VALUE)),
+          testCase("9223372036854775806ns", Duration.ofNanos(Long.MAX_VALUE - 1)),
+          testCase("106751991167d7h12m55s807ms", Duration.ofMillis(Long.MAX_VALUE)),
+          testCase("900000000000d", Duration.ofDays(900000000000L)),
+          testCase("100000000000d100000000000d", Duration.ofDays(200000000000L)));
+    }
+
+    private static TestParametersValues testCase(String yamlString, Duration expectedResult) {
+      return TestParametersValues.builder()
+          .name(yamlString)
+          .addParameter("yamlString", yamlString)
+          .addParameter("expectedResult", expectedResult)
+          .build();
+    }
+  }
+
+  @Test
+  @TestParameters(valuesProvider = DurationSuccessTestCasesProvider.class)
+  public void parseYamlStringToJavaType_duration_success(String yamlString, Duration expectedResult)
+      throws Exception {
+    Object result = ParameterValueParsing.parseYamlStringToJavaType(yamlString, Duration.class);
+
+    assertThat(result).isEqualTo(expectedResult);
+  }
+
+  @Test
+  public void parseYamlStringToJavaType_duration_fails(
+      @TestParameter({
+            // Wrong format
+            "1m 3s", // spaces not allowed
+            "0x123abc",
+            "123x456",
+            ".s",
+            "d",
+            "5dh",
+            "1s500",
+            "unparseable",
+            "-",
+            "+",
+            "2",
+            "-2",
+            "+2",
+
+            // Uppercase
+            "1D",
+            "1H",
+            "1M",
+            "1S",
+            "1MS",
+            "1Ms",
+            "1mS",
+            "1NS",
+            "1Ns",
+            "1nS",
+
+            // Very large values
+            Long.MAX_VALUE + "d",
+            "10000000000000000000000000d"
+          })
+          String yamlString)
+      throws Exception {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ParameterValueParsing.parseYamlStringToJavaType(yamlString, Duration.class));
   }
 
   @Test

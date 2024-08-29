@@ -1,3 +1,11 @@
+## 1.17
+- Added support for parsing `java.time.Duration` from a string. Example:
+
+```
+@Test
+public void myTest(@TestParameter({"1d", "2h20min", "10.5ms"}) Duration duration){...}
+```
+
 ## 1.16
 
 - Deprecated [`TestParameter.TestParameterValuesProvider`](
