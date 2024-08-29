@@ -34,7 +34,7 @@ jobs:
       - run: mvn javadoc:javadoc
 
       - name: Deploy docs to website
-        uses: JamesIves/github-pages-deploy-action@releases/v3
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: site
