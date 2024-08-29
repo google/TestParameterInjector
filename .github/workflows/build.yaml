@@ -43,6 +43,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: site
-          folder: junit4/target/site/apidocs
+          folder: junit4/target/reports/apidocs
           target-folder: docs/latest/
           clean: true

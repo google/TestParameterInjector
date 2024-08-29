@@ -36,8 +36,8 @@ jobs:
       - name: Deploy docs to website
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: site
-          FOLDER: junit4/target/site/apidocs
-          TARGET_FOLDER: docs/1.x/
-          CLEAN: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: site
+          folder: junit4/target/reports/apidocs
+          target-folder: docs/1.x/
+          clean: true
