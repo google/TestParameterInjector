@@ -54,7 +54,7 @@ And add the following dependency to your `.pom` file:
 <dependency>
   <groupId>com.google.testparameterinjector</groupId>
   <artifactId>test-parameter-injector</artifactId>
-  <version>1.16</version>
+  <version>1.17</version>
   <scope>test</scope>
 </dependency>
 ```
@@ -97,7 +97,7 @@ And add the following dependency to your `.pom` file:
 <dependency>
   <groupId>com.google.testparameterinjector</groupId>
   <artifactId>test-parameter-injector-junit5</artifactId>
-  <version>1.16</version>
+  <version>1.17</version>
   <scope>test</scope>
 </dependency>
 ```
