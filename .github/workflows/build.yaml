@@ -41,8 +41,8 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' }}
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: site
-          FOLDER: junit4/target/site/apidocs
-          TARGET_FOLDER: docs/latest/
-          CLEAN: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: site
+          folder: junit4/target/site/apidocs
+          target-folder: docs/latest/
+          clean: true
