@@ -25,9 +25,4 @@ public final class TestParameterInjector extends PluggableTestRunner {
   public TestParameterInjector(Class<?> testClass) throws InitializationError {
     super(testClass);
   }
-
-  @Override
-  protected TestMethodProcessorList createTestMethodProcessorList() {
-    return TestMethodProcessorList.createNewParameterizedProcessors();
-  }
 }

@@ -16,7 +16,6 @@ package com.google.testing.junit.testparameterinjector;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedListMultimap;
@@ -66,8 +65,13 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
     super(klass);
   }
 
-  /** Returns the TestMethodProcessorList to use. This is meant to be overridden by subclasses. */
-  protected abstract TestMethodProcessorList createTestMethodProcessorList();
+  /**
+   * Returns the TestMethodProcessorList to use.
+   */
+  @Deprecated
+  protected TestMethodProcessorList createTestMethodProcessorList() {
+    return TestMethodProcessorList.createNewParameterizedProcessors();
+  }
 
   /**
    * This method is run to perform optional additional operations on the test instance, right after
@@ -78,36 +82,13 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   /**
-   * If true, all test methods (across different TestMethodProcessors) will be sorted in a
-   * deterministic way.
-   *
-   * <p>Deterministic means that the order will not change, even when tests are added/removed or
-   * between releases.
-   *
-   * @deprecated Override {@link #sortTestMethods} with preferred sorting strategy.
-   */
-  @Deprecated
-  protected boolean shouldSortTestMethodsDeterministically() {
-    return false; // Don't sort methods by default
-  }
-
-  /**
    * Sort test methods (across different TestMethodProcessors).
    *
    * <p>This should be deterministic. The order should not change, even when tests are added/removed
    * or between releases.
    */
   protected ImmutableList<FrameworkMethod> sortTestMethods(ImmutableList<FrameworkMethod> methods) {
-    if (!shouldSortTestMethodsDeterministically()) {
-      return methods;
-    }
-    return FluentIterable.from(methods)
-        .toSortedList(
-            (o1, o2) ->
-                ComparisonChain.start()
-                    .compare(o1.getName().hashCode(), o2.getName().hashCode())
-                    .compare(o1.getName(), o2.getName())
-                    .result());
+    return methods;
   }
 
   /**
@@ -128,7 +109,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   @Override
-  protected final ImmutableList<FrameworkMethod> computeTestMethods() {
+  public final ImmutableList<FrameworkMethod> computeTestMethods() {
     return sortTestMethods(
         FluentIterable.from(getSupportedTestAnnotations())
             .transformAndConcat(annotation -> getTestClass().getAnnotatedMethods(annotation))
@@ -195,7 +176,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   // Note: This is a copy of the parent implementation, except that instead of calling
   // #createTest(), this method calls #createTestForMethod(method).
   @Override
-  protected final Statement methodBlock(final FrameworkMethod method) {
+  public final Statement methodBlock(final FrameworkMethod method) {
     Object testObject;
     try {
       testObject =
@@ -236,7 +217,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   @Override
-  protected final Statement methodInvoker(FrameworkMethod frameworkMethod, Object testObject) {
+  public final Statement methodInvoker(FrameworkMethod frameworkMethod, Object testObject) {
     TestInfo testInfo = ((OverriddenFrameworkMethod) frameworkMethod).getTestInfo();
 
     if (testInfo.getMethod().getParameterTypes().length == 0) {
