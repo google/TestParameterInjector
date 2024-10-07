@@ -1,4 +1,17 @@
+## 1.18
+
+- Made some internal JUnit4 methods of `TestParameterInjector` public:
+
+  - `computeTestMethods()`
+  - `methodBlock()`
+  - `methodInvoker()`
+
+  These allow any client to combine `TestParameterInjector` with another JUnit4
+  runner by manually creating a `TestParameterInjector` instance and calling
+  these methods from the combined JUnit4 runner.
+
 ## 1.17
+
 - Added support for parsing `java.time.Duration` from a string. Example:
 
 ```
