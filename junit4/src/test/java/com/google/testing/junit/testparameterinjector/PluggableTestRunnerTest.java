@@ -85,7 +85,6 @@ public class PluggableTestRunnerTest {
     }
   }
 
-  @RunWith(PluggableTestRunner.class)
   public static class TestAndMethodRuleTestClass {
 
     @Rule public TestAndMethodRule rule = new TestAndMethodRule();
@@ -99,17 +98,11 @@ public class PluggableTestRunnerTest {
   @Test
   public void ruleThatIsBothTestRuleAndMethodRuleIsInvokedOnceOnly() throws Exception {
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
-        new PluggableTestRunner(TestAndMethodRuleTestClass.class) {
-          @Override
-          protected TestMethodProcessorList createTestMethodProcessorList() {
-            return TestMethodProcessorList.empty();
-          }
-        });
+        new PluggableTestRunner(TestAndMethodRuleTestClass.class) {});
 
     assertThat(ruleInvocations).hasSize(1);
   }
 
-  @RunWith(PluggableTestRunner.class)
   public static class RuleOrderingTestClassWithExplicitOrder {
 
     @Rule(order = 3)
@@ -130,17 +123,11 @@ public class PluggableTestRunnerTest {
   @Test
   public void rulesAreSortedCorrectly_withExplicitOrder() throws Exception {
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
-        new PluggableTestRunner(RuleOrderingTestClassWithExplicitOrder.class) {
-          @Override
-          protected TestMethodProcessorList createTestMethodProcessorList() {
-            return TestMethodProcessorList.empty();
-          }
-        });
+        new PluggableTestRunner(RuleOrderingTestClassWithExplicitOrder.class) {});
 
     assertThat(ruleInvocations).containsExactly("B", "C", "A").inOrder();
   }
 
-  @RunWith(PluggableTestRunner.class)
   public static class CustomTestAnnotationTestClass {
     @SuppressWarnings("JUnit4TestNotRun")
     @CustomTest
@@ -159,10 +146,6 @@ public class PluggableTestRunnerTest {
     testMethodInvocationCount = 0;
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
         new PluggableTestRunner(CustomTestAnnotationTestClass.class) {
-          @Override
-          protected TestMethodProcessorList createTestMethodProcessorList() {
-            return TestMethodProcessorList.empty();
-          }
 
           @Override
           protected ImmutableList<Class<? extends Annotation>> getSupportedTestAnnotations() {
@@ -173,7 +156,6 @@ public class PluggableTestRunnerTest {
     assertThat(testMethodInvocationCount).isEqualTo(2);
   }
 
-  @RunWith(PluggableTestRunner.class)
   public static class SortedPluggableTestRunnerTestClass {
     @Test
     public void a() {
@@ -196,10 +178,6 @@ public class PluggableTestRunnerTest {
     testOrder.clear();
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
         new PluggableTestRunner(SortedPluggableTestRunnerTestClass.class) {
-          @Override
-          protected TestMethodProcessorList createTestMethodProcessorList() {
-            return TestMethodProcessorList.empty();
-          }
 
           @Override
           protected ImmutableList<FrameworkMethod> sortTestMethods(

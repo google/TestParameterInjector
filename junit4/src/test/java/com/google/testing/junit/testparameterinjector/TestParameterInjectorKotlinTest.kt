@@ -243,11 +243,7 @@ class TestParameterInjectorKotlinTest {
   @Test
   fun test_success() {
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
-      object : PluggableTestRunner(testClass) {
-        override fun createTestMethodProcessorList(): TestMethodProcessorList {
-          return TestMethodProcessorList.createNewParameterizedProcessors()
-        }
-      }
+      object : PluggableTestRunner(testClass) {}
     )
   }
 
@@ -267,7 +263,7 @@ class TestParameterInjectorKotlinTest {
   enum class Color {
     RED,
     BLUE,
-    GREEN
+    GREEN,
   }
 
   @JvmInline value class ColorValueClass(val onlyValue: Color)

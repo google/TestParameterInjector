@@ -238,13 +238,7 @@ public class TestParameterTest {
 
   @Test
   public void test() throws Exception {
-    SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
-        new PluggableTestRunner(testClass) {
-          @Override
-          protected TestMethodProcessorList createTestMethodProcessorList() {
-            return TestMethodProcessorList.createNewParameterizedProcessors();
-          }
-        });
+    SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(new PluggableTestRunner(testClass) {});
   }
 
   private static ImmutableList<Class<? extends Annotation>> annotationTypes(

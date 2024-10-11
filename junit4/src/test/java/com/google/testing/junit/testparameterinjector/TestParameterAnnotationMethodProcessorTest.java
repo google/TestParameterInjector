@@ -27,12 +27,10 @@ import java.lang.annotation.Retention;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Function;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.junit.runners.model.TestClass;
 
 /**
  * Test class to test the PluggableTestRunner test harness works with {@link
@@ -830,8 +828,7 @@ public class TestParameterAnnotationMethodProcessorTest {
     switch (result) {
       case SUCCESS_ALWAYS:
         SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
-            newTestRunnerWithParameterizedSupport(
-                testClass -> TestMethodProcessorList.createNewParameterizedProcessors()));
+            newTestRunner(/* supportLegacyFeatures= */ false));
         break;
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
@@ -839,8 +836,7 @@ public class TestParameterAnnotationMethodProcessorTest {
             Exception.class,
             () ->
                 SharedTestUtilitiesJUnit4.runTestsAndGetFailures(
-                    newTestRunnerWithParameterizedSupport(
-                        testClass -> TestMethodProcessorList.createNewParameterizedProcessors())));
+                    newTestRunner(/* supportLegacyFeatures= */ false)));
         break;
 
       case FAILURE:
@@ -848,19 +844,12 @@ public class TestParameterAnnotationMethodProcessorTest {
             Exception.class,
             () ->
                 SharedTestUtilitiesJUnit4.runTestsAndGetFailures(
-                    newTestRunnerWithParameterizedSupport(
-                        testClass -> TestMethodProcessorList.createNewParameterizedProcessors())));
+                    newTestRunner(/* supportLegacyFeatures= */ false)));
         break;
     }
   }
 
-  private PluggableTestRunner newTestRunnerWithParameterizedSupport(
-      Function<TestClass, TestMethodProcessorList> processorListGenerator) throws Exception {
-    return new PluggableTestRunner(testClass) {
-      @Override
-      protected TestMethodProcessorList createTestMethodProcessorList() {
-        return processorListGenerator.apply(getTestClass());
-      }
-    };
+  private PluggableTestRunner newTestRunner(boolean supportLegacyFeatures) throws Exception {
+    return new PluggableTestRunner(testClass) {};
   }
 }

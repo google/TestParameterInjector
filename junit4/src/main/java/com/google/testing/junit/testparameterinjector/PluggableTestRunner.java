@@ -66,14 +66,6 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   /**
-   * Returns the TestMethodProcessorList to use.
-   */
-  @Deprecated
-  protected TestMethodProcessorList createTestMethodProcessorList() {
-    return TestMethodProcessorList.createNewParameterizedProcessors();
-  }
-
-  /**
    * This method is run to perform optional additional operations on the test instance, right after
    * it was created.
    */
@@ -397,7 +389,7 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   private synchronized TestMethodProcessorList getTestMethodProcessors() {
     if (testMethodProcessors == null) {
-      testMethodProcessors = createTestMethodProcessorList();
+      testMethodProcessors = TestMethodProcessorList.createNewParameterizedProcessors();
     }
     return testMethodProcessors;
   }

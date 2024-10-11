@@ -664,12 +664,7 @@ public class TestParametersMethodProcessorTest {
   }
 
   private PluggableTestRunner newTestRunner() throws Exception {
-    return new PluggableTestRunner(testClass) {
-      @Override
-      protected TestMethodProcessorList createTestMethodProcessorList() {
-        return TestMethodProcessorList.createNewParameterizedProcessors();
-      }
-    };
+    return new PluggableTestRunner(testClass) {};
   }
 
   private static ImmutableList<Class<? extends Annotation>> annotationTypes(
