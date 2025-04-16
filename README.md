@@ -361,7 +361,7 @@ Notes:
 -   The returned objects' `toString()` will be used for the test names. If you
     want to customize the value names, you can do that as follows:
 
-    ```
+    ```java
     private static final class FruitProvider extends TestParameterValuesProvider {
       @Override
       public List<?> provideValues(Context context) {
