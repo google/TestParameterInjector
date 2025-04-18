@@ -148,8 +148,9 @@ public @interface TestParameters {
    * {@literal @}TestParameters(valuesProvider = IsAdultValueProvider.class)
    * public void personIsAdult(int age, boolean expectIsAdult) { ... }
    *
-   * private static final class IsAdultValueProvider implements TestParametersValuesProvider {
-   *   {@literal @}Override public {@literal List<TestParametersValues>} provideValues() {
+   * private static final class IsAdultValueProvider extends TestParametersValuesProvider {
+   *   {@literal @}Override public {@literal List<TestParametersValues>} provideValues(
+   *       {@literal Context} context) {
    *     return ImmutableList.of(
    *       TestParametersValues.builder()
    *         .name("teenager")
@@ -241,7 +242,7 @@ public @interface TestParameters {
         return this;
       }
 
-      /** Adds parameters by thris names. */
+      /** Adds parameters by their names. */
       public Builder addParameters(Map<String, Object> parameterNameToValueMap) {
         this.parametersMap.putAll(parameterNameToValueMap);
         return this;
