@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -72,7 +73,6 @@ final class ParameterValueParsing {
     }
   }
 
-  @SuppressWarnings("unchecked")
   private static Optional<Enum<?>> maybeGetStaticConstant(Class<?> enumType, String fieldName) {
     verify(enumType.isEnum(), "Given type %s is not a enum.", enumType.getSimpleName());
     try {
@@ -287,8 +287,12 @@ final class ParameterValueParsing {
       this.javaType = javaType;
     }
 
-    <JavaT> SupportedJavaType<JavaT> ifJavaType(Class<JavaT> supportedJavaType) {
+    <JavaT> SupportedJavaType<JavaT> ifJavaType(Predicate<Class<?>> supportedJavaType) {
       return new SupportedJavaType<>(supportedJavaType);
+    }
+
+    <JavaT> SupportedJavaType<JavaT> ifJavaType(Class<JavaT> supportedJavaType) {
+      return new SupportedJavaType<>(Primitives.wrap(supportedJavaType)::isAssignableFrom);
     }
 
     Object transformedJavaValue() {
@@ -303,9 +307,9 @@ final class ParameterValueParsing {
 
     final class SupportedJavaType<JavaT> {
 
-      private final Class<JavaT> supportedJavaType;
+      private final Predicate<Class<?>> supportedJavaType;
 
-      private SupportedJavaType(Class<JavaT> supportedJavaType) {
+      private SupportedJavaType(Predicate<Class<?>> supportedJavaType) {
         this.supportedJavaType = supportedJavaType;
       }
 
@@ -313,7 +317,7 @@ final class ParameterValueParsing {
       @CanIgnoreReturnValue
       <ParsedYamlT> SupportedJavaType<JavaT> supportParsedType(
           Class<ParsedYamlT> parsedYamlType, Function<ParsedYamlT, JavaT> transformation) {
-        if (Primitives.wrap(supportedJavaType).isAssignableFrom(Primitives.wrap(javaType))) {
+        if (supportedJavaType.test(Primitives.wrap(javaType))) {
           if (Primitives.wrap(parsedYamlType).isInstance(parsedYaml)) {
             checkState(
                 transformedJavaValue == null,
