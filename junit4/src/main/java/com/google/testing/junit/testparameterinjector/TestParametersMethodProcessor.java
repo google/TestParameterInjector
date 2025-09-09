@@ -41,6 +41,7 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -456,11 +457,9 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private static List<Object> toParameterList(
       TestParametersValues parametersValues, Parameter[] parameters) {
-    return Arrays.asList(
-        FluentIterable.from(Arrays.asList(parameters))
-            .transform(Parameter::getName)
-            .transform(name -> parametersValues.parametersMap().get(name))
-            .toArray(Object.class));
+    return FluentIterable.from(parameters)
+        .transform(parameter -> parametersValues.parametersMap().get(parameter.getName()))
+        .copyInto(new ArrayList<>(parameters.length));
   }
 
   /**
