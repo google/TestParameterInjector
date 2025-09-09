@@ -176,6 +176,24 @@ class TestParameterInjectorKotlinTest {
   }
 
   @RunAsTest
+  internal class TestParameters_PrimaryConstructorParam(
+    @TestParameter private val testBoolean: Boolean
+  ) : SuccessfulTestCaseBase() {
+
+    @Test
+    fun testWithPrimaryConstructorParam() {
+      storeTestParametersForThisTest(testBoolean)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("testWithPrimaryConstructorParam[testBoolean=false]", "false")
+        .put("testWithPrimaryConstructorParam[testBoolean=true]", "true")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
   internal class TestParameters_MethodParam : SuccessfulTestCaseBase() {
     @TestParameters("{width: 3, height: 8}")
     @TestParameters("{width: 5, height: 2.5}")
