@@ -25,7 +25,7 @@ import java.util.List;
 interface TestParameterValidator {
 
   /**
-   * This interface allows to access information on the current testwhen implementing {@link
+   * This interface allows to access information on the current test when implementing {@link
    * TestParameterValidator}.
    */
   interface Context {

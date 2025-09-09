@@ -22,6 +22,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Primitives;
+import com.google.errorprone.annotations.DoNotCall;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -150,7 +151,7 @@ import java.util.List;
   Class<? extends TestParameterValueProvider> valueProvider() default DefaultValueProvider.class;
 
   /** Default {@link TestParameterValidator} implementation which skips no test. */
-  class DefaultValidator implements TestParameterValidator {
+  final class DefaultValidator implements TestParameterValidator {
 
     @Override
     public boolean shouldSkip(Context context) {
@@ -162,7 +163,7 @@ import java.util.List;
    * Default {@link TestParameterValueProvider} implementation that gets its values from the
    * annotation's `value` method.
    */
-  class DefaultValueProvider implements TestParameterValueProvider {
+  final class DefaultValueProvider implements TestParameterValueProvider {
 
     @Override
     public List<Object> provideValues(Annotation annotation, Optional<Class<?>> parameterClass) {
@@ -241,4 +242,16 @@ import java.util.List;
       return parameters;
     }
   }
+
+  /**
+   * Android API 23 had a bug where under certain circumstances a dynamic proxy class would segfault
+   * if the alphabetically first method in the proxy interface was invoked. Dynamic proxies are used
+   * when loading an annotation's value as an instance via reflection. To avoid this problem we
+   * declare a dummy function which is always first and never invoked. The character '$' is not
+   * supposed to be present in java source code, but it's the lexicographically first possible valid
+   * java identifier.
+   */
+  @Deprecated
+  @DoNotCall
+  Class<?> $() default Object.class;
 }

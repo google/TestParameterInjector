@@ -38,6 +38,8 @@ import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
+import com.google.testing.junit.testparameterinjector.TestParameter.InternalImplementationOfThisParameter;
+import com.google.testing.junit.testparameterinjector.TestParameterAnnotation.DefaultValidator;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
@@ -64,7 +66,6 @@ import javax.annotation.Nullable;
  * @see TestParameterAnnotation
  */
 final class TestParameterAnnotationMethodProcessor implements TestMethodProcessor {
-
   /**
    * Class to hold an annotation type and origin and one of the values as returned by the {@code
    * value()} method.
@@ -184,7 +185,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     Annotation annotation = annotationWithMetadata.annotation();
     TestParameterAnnotation testParameter =
         annotation.annotationType().getAnnotation(TestParameterAnnotation.class);
-    Class<? extends TestParameterValueProvider> valueProvider = testParameter.valueProvider();
+    Class<? extends TestParameterValueProvider> valueProvider =
+        annotation.annotationType() == TestParameter.class
+            // Workaround for b/287424109:
+            ? TEST_PARAMETER_VALUE_PROVIDER
+            : testParameter.valueProvider();
     try {
       return FluentIterable.from(
               valueProvider
@@ -1244,7 +1249,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       List<TestParameterValueHolder> testParameterValues) {
     TestParameterAnnotation annotation =
         annotationType.getAnnotation(TestParameterAnnotation.class);
-    Class<? extends TestParameterValidator> validator = annotation.validator();
+    Class<? extends TestParameterValidator> validator =
+        annotationType == TestParameter.class
+            // Workaround for b/287424109:
+            ? TEST_PARAMETER_VALIDATOR
+            : annotation.validator();
     try {
       return validator
           .getConstructor()
@@ -1312,7 +1321,11 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       Class<? extends Annotation> annotationType, Optional<Class<?>> paramClass) {
     TestParameterAnnotation testParameter =
         annotationType.getAnnotation(TestParameterAnnotation.class);
-    Class<? extends TestParameterValueProvider> valueProvider = testParameter.valueProvider();
+    Class<? extends TestParameterValueProvider> valueProvider =
+        annotationType == TestParameter.class
+            // Workaround for b/287424109:
+            ? TEST_PARAMETER_VALUE_PROVIDER
+            : testParameter.valueProvider();
     try {
       return valueProvider.getConstructor().newInstance().getValueType(annotationType, paramClass);
     } catch (Exception e) {
@@ -1365,5 +1378,42 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
     }
 
     return resultBuilder.build();
+  }
+
+  private static final Class<? extends TestParameterValidator> TEST_PARAMETER_VALIDATOR =
+      DefaultValidator.class;
+  private static final Class<? extends TestParameterValueProvider> TEST_PARAMETER_VALUE_PROVIDER =
+      InternalImplementationOfThisParameter.class;
+
+  static {
+    // Validate our constants.
+    // Under Android 23, we need to use the constants because normal reflection might not work.
+    // Since normal reflection might not work under Android, we don't validate the constants there.
+    if (!isAndroid()) {
+      TestParameterAnnotation annotation =
+          TestParameter.class.getAnnotation(TestParameterAnnotation.class);
+      if (!annotation.validator().equals(TEST_PARAMETER_VALIDATOR)) {
+        throw new AssertionError(
+            String.format(
+                "The value of validator() in the @TestParameterAnnotation annotation in"
+                    + " TestParameter.java has changed to %s. Update the constant in"
+                    + " TestParameterAnnotationMethodProcessor, which currently has value %s, to"
+                    + " match",
+                annotation.validator().getName(), TEST_PARAMETER_VALIDATOR.getName()));
+      }
+      if (!annotation.valueProvider().equals(TEST_PARAMETER_VALUE_PROVIDER)) {
+        throw new AssertionError(
+            String.format(
+                "The value of valueProvider() in the @TestParameterAnnotation annotation in"
+                    + " TestParameter.java has changed to %s. Update the constant in"
+                    + " TestParameterAnnotationMethodProcessor, which currently has value %s, to"
+                    + " match",
+                annotation.valueProvider().getName(), TEST_PARAMETER_VALUE_PROVIDER.getName()));
+      }
+    }
+  }
+
+  private static boolean isAndroid() {
+    return System.getProperty("java.runtime.name", "").contains("Android");
   }
 }
