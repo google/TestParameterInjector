@@ -21,7 +21,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameter.InternalImplementationOfThisParameter;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterValuesProvider.Context;
@@ -74,11 +73,12 @@ public @interface TestParameter {
    * <p>Types that are supported:
    *
    * <ul>
-   *   <li>String: No parsing happens
+   *   <li>String: No parsing happens, except that {@code "null"} parses as null
    *   <li>boolean: Specified as YAML boolean
    *   <li>long and int: Specified as YAML integer
    *   <li>float and double: Specified as YAML floating point or integer
-   *   <li>Enum value: Specified as a String that can be parsed by {@code Enum.valueOf()}
+   *   <li>Enum value: Specified as a String that can be parsed by {@code Enum.valueOf()}, or {@code
+   *       "null"} for null
    *   <li>Byte array or com.google.protobuf.ByteString: Specified as an UTF8 String or YAML bytes
    *       (example: "!!binary 'ZGF0YQ=='")
    * </ul>
@@ -170,10 +170,9 @@ public @interface TestParameter {
           annotation);
 
       if (valueIsSet) {
-        return Lists.newArrayList(
-            FluentIterable.from(annotation.value())
-                .transform(v -> parseStringValue(v, parameterClass))
-                .toArray(Object.class));
+        return FluentIterable.from(annotation.value())
+            .transform(v -> parseStringValue(v, parameterClass))
+            .copyInto(new ArrayList<>());
       } else if (valuesProviderIsSet) {
         return getValuesFromProvider(annotation.valuesProvider(), new Context(context));
       } else {
