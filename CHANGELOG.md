@@ -1,3 +1,12 @@
+## 1.19
+
+- Fix for 2025 Kotlin change  that causes the field/parameter of a primary
+  constructor to get its annotation on both the field and the constructor
+  parameter. See
+  https://github.com/google/TestParameterInjector/commit/2f831443f10686087762e55c51bc2d124ffa3bc5
+- Bugfix: Work around a flaky Android-23 crash with annotation proxies. See
+  https://github.com/google/TestParameterInjector/commit/26d981a83d6883d68f5677f3b495682fc35646fd
+
 ## 1.18
 
 - Made some internal JUnit4 methods of `TestParameterInjector` public:
