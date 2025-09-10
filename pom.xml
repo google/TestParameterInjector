@@ -179,6 +179,14 @@
         <configuration>
           <jvmTarget>17</jvmTarget>
           <javaParameters>true</javaParameters>
+          <args>
+            <!--
+              Opt in to upcoming Kotlin compiler change which is causing issues with
+              TestParameterInjector. See https://github.com/google/TestParameterInjector/issues/49
+              for more info.
+            -->
+            <arg>-Xannotation-default-target=param-property</arg>
+          </args>
         </configuration>
       </plugin>
       <plugin>
