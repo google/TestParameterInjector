@@ -176,7 +176,7 @@ class TestParameterInjectorKotlinTest {
   }
 
   @RunAsTest
-  internal class TestParameters_PrimaryConstructorParam(
+  internal class TestParameter_PrimaryConstructorParam(
     @TestParameter private val testBoolean: Boolean
   ) : SuccessfulTestCaseBase() {
 
@@ -189,6 +189,55 @@ class TestParameterInjectorKotlinTest {
       return ImmutableMap.builder<String, String>()
         .put("testWithPrimaryConstructorParam[testBoolean=false]", "false")
         .put("testWithPrimaryConstructorParam[testBoolean=true]", "true")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
+  internal class TestParameter_Mixed(@TestParameter private val testBoolean1: Boolean) :
+    SuccessfulTestCaseBase() {
+    @TestParameter private var testBoolean2: Boolean = false
+    @TestParameter private var testBoolean3: Boolean = false
+
+    @Test
+    fun testWithPrimaryConstructorParam() {
+      storeTestParametersForThisTest(testBoolean1, testBoolean2)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put(
+          "testWithPrimaryConstructorParam[testBoolean2=false,testBoolean3=false,testBoolean1=false]",
+          "false:false",
+        )
+        .put(
+          "testWithPrimaryConstructorParam[testBoolean2=false,testBoolean3=false,testBoolean1=true]",
+          "true:false",
+        )
+        .put(
+          "testWithPrimaryConstructorParam[testBoolean2=false,testBoolean3=true,testBoolean1=false]",
+          "false:false",
+        )
+        .put(
+          "testWithPrimaryConstructorParam[testBoolean2=false,testBoolean3=true,testBoolean1=true]",
+          "true:false",
+        )
+        .put(
+          "testWithPrimaryConstructorParam[testBoolean2=true,testBoolean3=false,testBoolean1=false]",
+          "false:true",
+        )
+        .put(
+          "testWithPrimaryConstructorParam[testBoolean2=true,testBoolean3=false,testBoolean1=true]",
+          "true:true",
+        )
+        .put(
+          "testWithPrimaryConstructorParam[testBoolean2=true,testBoolean3=true,testBoolean1=false]",
+          "false:true",
+        )
+        .put(
+          "testWithPrimaryConstructorParam[testBoolean2=true,testBoolean3=true,testBoolean1=true]",
+          "true:true",
+        )
         .buildOrThrow()
     }
   }

@@ -980,6 +980,12 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
                                           field.getName(),
                                           GenericParameterContext.create(field, testClass))))
                   .toList());
+
+      if (isKotlinClass(testClass)) {
+        annotations =
+            applyKotlinDuplicateAnnotationWorkaround(annotations, annotationType, testClass);
+      }
+
       if (!annotations.isEmpty()) {
         return toTestParameterValueList(annotations, origin);
       }
@@ -995,6 +1001,83 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       }
     }
     return ImmutableList.of();
+  }
+
+  /**
+   * Hack to fix a 2025 Kotlin change that causes the field/parameter of a primary constructor to
+   * get its annotation on both the field and the constructor parameter.
+   *
+   * <p>Example:
+   *
+   * {@snippet :
+   *   @RunWith(TestParameterInjector::class)
+   *   class ExampleTest(@TestParameter private val isEnabled: Boolean)
+   * }
+   *
+   * In this heuristic, we look for fields with the same name and type as a constructor parameter.
+   * If we find one, we assume it's the same parameter, and drop it.
+   *
+   * <p>For more info, see: https://github.com/google/TestParameterInjector/issues/49
+   */
+  private static List<AnnotationWithMetadata> applyKotlinDuplicateAnnotationWorkaround(
+      List<AnnotationWithMetadata> fieldAnnotations,
+      Class<? extends Annotation> annotationType,
+      Class<?> testClass) {
+    List<AnnotationWithMetadata> constructorAnnotations =
+        getAnnotationWithMetadataListWithType(
+            TestParameterInjectorUtils.getOnlyConstructor(testClass), annotationType, testClass);
+
+    ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
+    for (AnnotationWithMetadata fieldAnnotation : fieldAnnotations) {
+      List<AnnotationWithMetadata> matchingConstructorAnnotations =
+          FluentIterable.from(constructorAnnotations)
+              .filter(
+                  constructorAnnotation ->
+                      fieldAnnotation.annotation().equals(constructorAnnotation.annotation())
+                          && fieldAnnotation
+                              .paramClass()
+                              .equals(constructorAnnotation.paramClass()))
+              .toList();
+
+      if (matchingConstructorAnnotations.isEmpty()) {
+        // Most common case: No suspect fields/parameters.
+        resultBuilder.add(fieldAnnotation);
+      } else {
+        if (matchingConstructorAnnotations.get(0).paramName().isPresent()) {
+          if (FluentIterable.from(matchingConstructorAnnotations)
+              .filter(
+                  constructorAnnotation ->
+                      fieldAnnotation.paramName().equals(constructorAnnotation.paramName()))
+              .isEmpty()) {
+            // No suspect fields/parameters because their names don't match.
+            resultBuilder.add(fieldAnnotation);
+          } else {
+            // Skip this field because it has the same name + type as a constructor
+            // parameter. Therefore, it is almost certainly an artefact of the Kotlin-Java
+            // translation of a field+parameter in the primary constructor..
+          }
+        } else {
+          // This field has the same type as a constructor parameter, but this code was built
+          // without parameter names, so it may or may not be the same parameter.
+          throw new RuntimeException(
+              String.format(
+                  "%s: Found a Kotlin field (%s) and constructor parameter with the same type. This"
+                      + " may be an artefact of the Kotlin-Java translation of a field+parameter in"
+                      + " the primary constructor. However, TestParameterInjector needs to be built"
+                      + " with access to parameter names to be able to confirm.\n"
+                      + "\n"
+                      + "To fix this error, either:\n"
+                      + "  - Use `@param:TestParameter` instead of `@TestParameter` on the primary"
+                      + " constructor parameter.\n"
+                      + "  - Build this test with the `-parameters` compiler option. In  Maven, you"
+                      + " do this by adding <javaParameters>true</javaParameters> to the"
+                      + " kotlin-maven-plugin's configuration.",
+                  testClass.getSimpleName(), fieldAnnotation.paramName().get()));
+        }
+      }
+    }
+
+    return resultBuilder.build();
   }
 
   private static ImmutableList<List<TestParameterValueHolder>> toTestParameterValueList(
@@ -1415,5 +1498,10 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
 
   private static boolean isAndroid() {
     return System.getProperty("java.runtime.name", "").contains("Android");
+  }
+
+  private static boolean isKotlinClass(Class<?> clazz) {
+    return FluentIterable.from(clazz.getDeclaredAnnotations())
+        .anyMatch(annotation -> annotation.annotationType().getName().equals("kotlin.Metadata"));
   }
 }
