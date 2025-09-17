@@ -928,79 +928,83 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
       AnnotationTypeOrigin annotationTypeOrigin, Method method, Class<?> testClass) {
     Origin origin = annotationTypeOrigin.origin();
     Class<? extends Annotation> annotationType = annotationTypeOrigin.annotationType();
-    if (origin == Origin.CONSTRUCTOR_PARAMETER) {
-      Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
-      List<AnnotationWithMetadata> annotations =
-          getAnnotationWithMetadataListWithType(constructor, annotationType, testClass);
 
-      if (!annotations.isEmpty()) {
+    switch (origin) {
+      case Origin.CONSTRUCTOR_PARAMETER:
+        Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
+        List<AnnotationWithMetadata> annotations =
+            getAnnotationWithMetadataListWithType(constructor, annotationType, testClass);
+
         return toTestParameterValueList(annotations, origin);
-      }
-    } else if (origin == Origin.CONSTRUCTOR) {
-      Annotation annotation =
-          TestParameterInjectorUtils.getOnlyConstructor(testClass).getAnnotation(annotationType);
-      if (annotation != null) {
-        return ImmutableList.of(
-            TestParameterValueHolder.create(
-                AnnotationWithMetadata.withoutMetadata(
-                    annotation,
-                    GenericParameterContext.createWithoutParameterAnnotations(testClass)),
-                origin));
-      }
+      case Origin.CONSTRUCTOR:
+        Annotation annotation =
+            TestParameterInjectorUtils.getOnlyConstructor(testClass).getAnnotation(annotationType);
+        if (annotation != null) {
+          return ImmutableList.of(
+              TestParameterValueHolder.create(
+                  AnnotationWithMetadata.withoutMetadata(
+                      annotation,
+                      GenericParameterContext.createWithoutParameterAnnotations(testClass)),
+                  origin));
+        } else {
+          return ImmutableList.of();
+        }
 
-    } else if (origin == Origin.METHOD_PARAMETER) {
-      List<AnnotationWithMetadata> annotations =
-          getAnnotationWithMetadataListWithType(method, annotationType, testClass);
-      if (!annotations.isEmpty()) {
-        return toTestParameterValueList(annotations, origin);
-      }
-    } else if (origin == Origin.METHOD) {
-      if (method.isAnnotationPresent(annotationType)) {
-        return ImmutableList.of(
-            TestParameterValueHolder.create(
-                AnnotationWithMetadata.withoutMetadata(
-                    method.getAnnotation(annotationType),
-                    GenericParameterContext.createWithoutParameterAnnotations(testClass)),
-                origin));
-      }
-    } else if (origin == Origin.FIELD) {
-      List<AnnotationWithMetadata> annotations =
-          new ArrayList<>(
-              FluentIterable.from(listWithParents(testClass))
-                  .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
-                  .transformAndConcat(
-                      field ->
-                          FluentIterable.from(
-                                  getAnnotationListWithType(field.getAnnotations(), annotationType))
-                              .transform(
-                                  annotation ->
-                                      AnnotationWithMetadata.withMetadata(
-                                          annotation,
-                                          field.getType(),
-                                          field.getName(),
-                                          GenericParameterContext.create(field, testClass))))
-                  .toList());
+      case Origin.METHOD_PARAMETER:
+        List<AnnotationWithMetadata> annotations2 =
+            getAnnotationWithMetadataListWithType(method, annotationType, testClass);
+        return toTestParameterValueList(annotations2, origin);
+      case Origin.METHOD:
+        if (method.isAnnotationPresent(annotationType)) {
+          return ImmutableList.of(
+              TestParameterValueHolder.create(
+                  AnnotationWithMetadata.withoutMetadata(
+                      method.getAnnotation(annotationType),
+                      GenericParameterContext.createWithoutParameterAnnotations(testClass)),
+                  origin));
+        } else {
+          return ImmutableList.of();
+        }
+      case Origin.FIELD:
+        List<AnnotationWithMetadata> annotations3 =
+            new ArrayList<>(
+                FluentIterable.from(listWithParents(testClass))
+                    .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
+                    .transformAndConcat(
+                        field ->
+                            FluentIterable.from(
+                                    getAnnotationListWithType(
+                                        field.getAnnotations(), annotationType))
+                                .transform(
+                                    annotation2 ->
+                                        AnnotationWithMetadata.withMetadata(
+                                            annotation2,
+                                            field.getType(),
+                                            field.getName(),
+                                            GenericParameterContext.create(field, testClass))))
+                    .toList());
 
-      if (isKotlinClass(testClass)) {
-        annotations =
-            applyKotlinDuplicateAnnotationWorkaround(annotations, annotationType, testClass);
-      }
+        if (isKotlinClass(testClass)) {
+          annotations3 =
+              applyKotlinDuplicateAnnotationWorkaround(annotations3, annotationType, testClass);
+        }
 
-      if (!annotations.isEmpty()) {
-        return toTestParameterValueList(annotations, origin);
-      }
-    } else if (origin == Origin.CLASS) {
-      Annotation annotation = testClass.getAnnotation(annotationType);
-      if (annotation != null) {
-        return ImmutableList.of(
-            TestParameterValueHolder.create(
-                AnnotationWithMetadata.withoutMetadata(
-                    annotation,
-                    GenericParameterContext.createWithoutParameterAnnotations(testClass)),
-                origin));
-      }
+        return toTestParameterValueList(annotations3, origin);
+      case Origin.CLASS:
+        Annotation annotation3 = testClass.getAnnotation(annotationType);
+        if (annotation3 != null) {
+          return ImmutableList.of(
+              TestParameterValueHolder.create(
+                  AnnotationWithMetadata.withoutMetadata(
+                      annotation3,
+                      GenericParameterContext.createWithoutParameterAnnotations(testClass)),
+                  origin));
+        } else {
+          return ImmutableList.of();
+        }
+      default:
+        throw new AssertionError("Unreachable");
     }
-    return ImmutableList.of();
   }
 
   /**
