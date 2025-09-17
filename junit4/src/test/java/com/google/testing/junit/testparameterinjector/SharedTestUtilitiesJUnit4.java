@@ -45,7 +45,19 @@ class SharedTestUtilitiesJUnit4 {
    * @throws AssertionError if the test instance reports any failures
    */
   static void runTestsAndAssertNoFailures(Runner testRunner) {
-    ImmutableList<Failure> failures = runTestsAndGetFailures(testRunner);
+    final ImmutableList.Builder<Failure> failuresBuilder = ImmutableList.builder();
+    RunNotifier notifier = new RunNotifier();
+    notifier.addFirstListener(
+        new RunListener() {
+          @Override
+          public void testFailure(Failure failure) throws Exception {
+            failuresBuilder.add(failure);
+          }
+        });
+
+    testRunner.run(notifier);
+
+    ImmutableList<Failure> failures = failuresBuilder.build();
 
     if (failures.size() == 1) {
       throw new AssertionError(getOnlyElement(failures).getException());
@@ -62,27 +74,6 @@ class SharedTestUtilitiesJUnit4 {
                               Throwables.getStackTraceAsString(f.getException())))
                   .join(Joiner.on("\n------------------------------------\n"))));
     }
-  }
-
-  /**
-   * Runs the given test runner.
-   *
-   * @return all failures reported by the test instance.
-   */
-  static ImmutableList<Failure> runTestsAndGetFailures(Runner testRunner) {
-    final ImmutableList.Builder<Failure> failures = ImmutableList.builder();
-    RunNotifier notifier = new RunNotifier();
-    notifier.addFirstListener(
-        new RunListener() {
-          @Override
-          public void testFailure(Failure failure) throws Exception {
-            failures.add(failure);
-          }
-        });
-
-    testRunner.run(notifier);
-
-    return failures.build();
   }
 
   private static String toCopyPastableJavaString(Map<String, String> map) {

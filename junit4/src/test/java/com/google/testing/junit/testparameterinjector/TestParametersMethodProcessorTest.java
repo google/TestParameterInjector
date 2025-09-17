@@ -655,12 +655,12 @@ public class TestParametersMethodProcessorTest {
   public void test_failure() throws Exception {
     assume().that(maybeFailureMessage.isPresent()).isTrue();
 
-    Exception exception =
+    Throwable throwable =
         assertThrows(
-            Exception.class,
-            () -> SharedTestUtilitiesJUnit4.runTestsAndGetFailures(newTestRunner()));
+            Throwable.class,
+            () -> SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(newTestRunner()));
 
-    assertThat(exception).hasMessageThat().contains(maybeFailureMessage.get());
+    assertThat(throwable).hasMessageThat().contains(maybeFailureMessage.get());
   }
 
   private PluggableTestRunner newTestRunner() throws Exception {

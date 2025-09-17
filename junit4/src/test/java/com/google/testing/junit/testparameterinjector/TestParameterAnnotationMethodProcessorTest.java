@@ -639,6 +639,50 @@ public class TestParameterAnnotationMethodProcessorTest {
     }
   }
 
+  @ClassTestResult(Result.SUCCESS_ALWAYS)
+  public static class TestWithLegacyTestParameter extends SuccessfulTestCaseBase {
+
+    @Test
+    public void test(
+        @EnumEvaluatorParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
+            TestEnum enumFromCustomAnnotation,
+        @LegacyTestParameter boolean legacyBoolean,
+        @LegacyTestParameter({"1", "2"}) int legacyInt,
+        @LegacyTestParameter(valuesProvider = DoubleProvider.class) Double legacyDouble) {
+      storeTestParametersForThisTest(
+          enumFromCustomAnnotation, legacyBoolean, legacyInt, legacyDouble);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE,legacyBoolean=false,legacyInt=1,legacyDouble=9.9]", "ONE:false:1:9.9")
+          .put("test[ONE,legacyBoolean=false,legacyInt=1,legacyDouble=null]", "ONE:false:1:null")
+          .put("test[ONE,legacyBoolean=false,legacyInt=2,legacyDouble=9.9]", "ONE:false:2:9.9")
+          .put("test[ONE,legacyBoolean=false,legacyInt=2,legacyDouble=null]", "ONE:false:2:null")
+          .put("test[ONE,legacyBoolean=true,legacyInt=1,legacyDouble=9.9]", "ONE:true:1:9.9")
+          .put("test[ONE,legacyBoolean=true,legacyInt=1,legacyDouble=null]", "ONE:true:1:null")
+          .put("test[ONE,legacyBoolean=true,legacyInt=2,legacyDouble=9.9]", "ONE:true:2:9.9")
+          .put("test[ONE,legacyBoolean=true,legacyInt=2,legacyDouble=null]", "ONE:true:2:null")
+          .put("test[TWO,legacyBoolean=false,legacyInt=1,legacyDouble=9.9]", "TWO:false:1:9.9")
+          .put("test[TWO,legacyBoolean=false,legacyInt=1,legacyDouble=null]", "TWO:false:1:null")
+          .put("test[TWO,legacyBoolean=false,legacyInt=2,legacyDouble=9.9]", "TWO:false:2:9.9")
+          .put("test[TWO,legacyBoolean=false,legacyInt=2,legacyDouble=null]", "TWO:false:2:null")
+          .put("test[TWO,legacyBoolean=true,legacyInt=1,legacyDouble=9.9]", "TWO:true:1:9.9")
+          .put("test[TWO,legacyBoolean=true,legacyInt=1,legacyDouble=null]", "TWO:true:1:null")
+          .put("test[TWO,legacyBoolean=true,legacyInt=2,legacyDouble=9.9]", "TWO:true:2:9.9")
+          .put("test[TWO,legacyBoolean=true,legacyInt=2,legacyDouble=null]", "TWO:true:2:null")
+          .build();
+    }
+
+    private static final class DoubleProvider extends TestParameterValuesProvider {
+      @Override
+      public List<Object> provideValues(Context context) {
+        return newArrayList(9.9, null);
+      }
+    }
+  }
+
   @ClassTestResult(Result.FAILURE)
   @EnumParameter({TestEnum.ONE, TestEnum.TWO, TestEnum.THREE})
   public static class ErrorDuplicatedClassFieldAnnotation {
@@ -833,17 +877,17 @@ public class TestParameterAnnotationMethodProcessorTest {
 
       case SUCCESS_FOR_ALL_PLACEMENTS_ONLY:
         assertThrows(
-            Exception.class,
+            Throwable.class,
             () ->
-                SharedTestUtilitiesJUnit4.runTestsAndGetFailures(
+                SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
                     newTestRunner(/* supportLegacyFeatures= */ false)));
         break;
 
       case FAILURE:
         assertThrows(
-            Exception.class,
+            Throwable.class,
             () ->
-                SharedTestUtilitiesJUnit4.runTestsAndGetFailures(
+                SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
                     newTestRunner(/* supportLegacyFeatures= */ false)));
         break;
     }
