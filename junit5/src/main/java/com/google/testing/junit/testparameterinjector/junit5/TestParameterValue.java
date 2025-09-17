@@ -54,4 +54,11 @@ public class TestParameterValue {
   Optional<String> getCustomName() {
     return customName;
   }
+
+  @Override
+  public String toString() {
+    return customName.isPresent()
+        ? String.format("%s (name = %s)", wrappedValue, customName.get())
+        : String.valueOf(wrappedValue);
+  }
 }
