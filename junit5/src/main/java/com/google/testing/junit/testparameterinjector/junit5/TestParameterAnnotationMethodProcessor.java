@@ -845,7 +845,6 @@ final class TestParameterAnnotationMethodProcessor implements TestMethodProcesso
         .transform(
             annotationTypeOrigin ->
                 getAnnotationFromParametersOrTestOrClass(annotationTypeOrigin, method, testClass))
-        .filter(l -> !l.isEmpty())
         .transformAndConcat(i -> i)
         .toList();
   }
