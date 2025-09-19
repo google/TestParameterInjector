@@ -438,8 +438,34 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       List<AnnotationWithMetadata> annotationWithMetadatas, Origin origin) {
     return FluentIterable.from(annotationWithMetadatas)
         .transform(
-            annotationWithMetadata ->
-                TestParameterValueHolder.create(annotationWithMetadata, origin))
+            annotationWithMetadata -> {
+              List<TestParameterValue> specifiedValues =
+                  FluentIterable.from(getValuesFromTestParameter(annotationWithMetadata))
+                      .transform(
+                          value ->
+                              (value instanceof TestParameterValue)
+                                  ? (TestParameterValue) value
+                                  : TestParameterValue.wrap(value))
+                      .toList();
+              checkState(
+                  !specifiedValues.isEmpty(),
+                  "The number of parameter values should not be 0"
+                      + ", otherwise the parameter would cause the test to be skipped.");
+              return FluentIterable.from(
+                      ContiguousSet.create(
+                          Range.closedOpen(0, specifiedValues.size()), DiscreteDomain.integers()))
+                  .transform(
+                      valueIndex ->
+                          TestParameterValueHolder.create(
+                              origin,
+                              specifiedValues.get(valueIndex),
+                              valueIndex,
+                              newArrayList(
+                                  FluentIterable.from(specifiedValues)
+                                      .transform(TestParameterValue::getWrappedValue)),
+                              annotationWithMetadata.paramName()))
+                  .toList();
+            })
         .toList();
   }
 
@@ -605,35 +631,14 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       return ParameterValueParsing.formatTestNameString(paramName(), wrappedValue());
     }
 
-    public static ImmutableList<TestParameterValueHolder> create(
-        AnnotationWithMetadata annotationWithMetadata, Origin origin) {
-      List<TestParameterValue> specifiedValues =
-          FluentIterable.from(getValuesFromTestParameter(annotationWithMetadata))
-              .transform(
-                  value ->
-                      (value instanceof TestParameterValue)
-                          ? (TestParameterValue) value
-                          : TestParameterValue.wrap(value))
-              .toList();
-      checkState(
-          !specifiedValues.isEmpty(),
-          "The number of parameter values should not be 0"
-              + ", otherwise the parameter would cause the test to be skipped.");
-      return FluentIterable.from(
-              ContiguousSet.create(
-                  Range.closedOpen(0, specifiedValues.size()), DiscreteDomain.integers()))
-          .transform(
-              valueIndex ->
-                  (TestParameterValueHolder)
-                      new AutoValue_TestParameterMethodProcessor_TestParameterValueHolder(
-                          origin,
-                          specifiedValues.get(valueIndex),
-                          valueIndex,
-                          newArrayList(
-                              FluentIterable.from(specifiedValues)
-                                  .transform(TestParameterValue::getWrappedValue)),
-                          annotationWithMetadata.paramName()))
-          .toList();
+    public static TestParameterValueHolder create(
+        Origin origin,
+        TestParameterValue wrappedValue,
+        int valueIndex,
+        List<Object> specifiedValues,
+        Optional<String> paramName) {
+      return new AutoValue_TestParameterMethodProcessor_TestParameterValueHolder(
+          origin, wrappedValue, valueIndex, specifiedValues, paramName);
     }
   }
 
