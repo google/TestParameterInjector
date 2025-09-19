@@ -17,7 +17,6 @@ package com.google.testing.junit.testparameterinjector;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
-import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.auto.value.AutoAnnotation;
@@ -460,9 +459,6 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                               origin,
                               specifiedValues.get(valueIndex),
                               valueIndex,
-                              newArrayList(
-                                  FluentIterable.from(specifiedValues)
-                                      .transform(TestParameterValue::getWrappedValue)),
                               annotationWithMetadata.paramName()))
                   .toList();
             })
@@ -599,15 +595,8 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     /** The value used for the test as defined by the @TestParameter annotation. */
     abstract TestParameterValue wrappedValue();
 
-    /** The index of this value in {@link #specifiedValues()}. */
+    /** The index of this value in the list of all possible values for this parameter. */
     abstract int valueIndex();
-
-    /**
-     * The list of values specified by the @TestParameter annotation (e.g. {true, false} in the case
-     * of a boolean parameter).
-     */
-    @SuppressWarnings("AutoValueImmutableFields") // intentional to allow null values
-    abstract List<Object> specifiedValues();
 
     /**
      * The name of the parameter or field that is being annotated. Can be absent if the annotation
@@ -635,10 +624,9 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         Origin origin,
         TestParameterValue wrappedValue,
         int valueIndex,
-        List<Object> specifiedValues,
         Optional<String> paramName) {
       return new AutoValue_TestParameterMethodProcessor_TestParameterValueHolder(
-          origin, wrappedValue, valueIndex, specifiedValues, paramName);
+          origin, wrappedValue, valueIndex, paramName);
     }
   }
 
