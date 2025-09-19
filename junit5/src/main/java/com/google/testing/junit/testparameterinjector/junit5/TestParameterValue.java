@@ -17,6 +17,8 @@ package com.google.testing.junit.testparameterinjector.junit5;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import javax.annotation.Nullable;
 
 /**
@@ -35,6 +37,18 @@ public class TestParameterValue {
   /** Wraps the given value. */
   public static TestParameterValue wrap(@Nullable Object wrappedValue) {
     return new TestParameterValue(wrappedValue, /* customName= */ Optional.absent());
+  }
+
+  /** Wraps the given value unless it is already of this type. */
+  static TestParameterValue maybeWrap(@Nullable Object value) {
+    return (value instanceof TestParameterValue)
+        ? (TestParameterValue) value
+        : TestParameterValue.wrap(value);
+  }
+
+  /** Applies maybeWrap() to the given elements. */
+  static ImmutableList<TestParameterValue> maybeWrapList(Iterable<Object> values) {
+    return FluentIterable.from(values).transform(TestParameterValue::maybeWrap).toList();
   }
 
   /**

@@ -201,7 +201,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     }
   }
 
-  private static List<Object> getValuesFromTestParameter(
+  private static ImmutableList<TestParameterValue> getValuesFromTestParameter(
       AnnotationWithMetadata annotationWithMetadata) {
     TestParameter annotation = annotationWithMetadata.annotation();
     Class<?> parameterClass = annotationWithMetadata.paramClass();
@@ -216,15 +216,17 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
     if (valueIsSet) {
       return FluentIterable.from(annotation.value())
-          .transform(v -> parseStringValue(v, parameterClass))
-          .copyInto(new ArrayList<>());
+          .transform(v -> TestParameterValue.maybeWrap(parseStringValue(v, parameterClass)))
+          .toList();
     } else if (valuesProviderIsSet) {
-      return getValuesFromProvider(annotation.valuesProvider(), annotationWithMetadata.context());
+      return TestParameterValue.maybeWrapList(
+          getValuesFromProvider(annotation.valuesProvider(), annotationWithMetadata.context()));
     } else {
       if (Enum.class.isAssignableFrom(parameterClass)) {
-        return Arrays.asList((Object[]) parameterClass.asSubclass(Enum.class).getEnumConstants());
+        return TestParameterValue.maybeWrapList(
+            Arrays.asList((Object[]) parameterClass.asSubclass(Enum.class).getEnumConstants()));
       } else if (Primitives.wrap(parameterClass).equals(Boolean.class)) {
-        return Arrays.asList(false, true);
+        return TestParameterValue.maybeWrapList(Arrays.asList(false, true));
       } else {
         throw new IllegalStateException(
             String.format(
@@ -438,26 +440,21 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     return FluentIterable.from(annotationWithMetadatas)
         .transform(
             annotationWithMetadata -> {
-              List<TestParameterValue> specifiedValues =
-                  FluentIterable.from(getValuesFromTestParameter(annotationWithMetadata))
-                      .transform(
-                          value ->
-                              (value instanceof TestParameterValue)
-                                  ? (TestParameterValue) value
-                                  : TestParameterValue.wrap(value))
-                      .toList();
+              List<TestParameterValue> allParameterValues =
+                  getValuesFromTestParameter(annotationWithMetadata);
               checkState(
-                  !specifiedValues.isEmpty(),
+                  !allParameterValues.isEmpty(),
                   "The number of parameter values should not be 0"
                       + ", otherwise the parameter would cause the test to be skipped.");
               return FluentIterable.from(
                       ContiguousSet.create(
-                          Range.closedOpen(0, specifiedValues.size()), DiscreteDomain.integers()))
+                          Range.closedOpen(0, allParameterValues.size()),
+                          DiscreteDomain.integers()))
                   .transform(
                       valueIndex ->
                           TestParameterValueHolder.create(
                               origin,
-                              specifiedValues.get(valueIndex),
+                              allParameterValues.get(valueIndex),
                               valueIndex,
                               annotationWithMetadata.paramName()))
                   .toList();
