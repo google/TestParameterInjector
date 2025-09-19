@@ -59,79 +59,146 @@ import javax.annotation.Nullable;
  */
 class TestParameterMethodProcessor implements TestMethodProcessor {
 
-  /** Class to hold a single parameter value and its metadata. */
-  @AutoValue
-  abstract static class TestParameterValueHolder implements Serializable {
+  private final Cache<Method, List<List<TestParameterValueHolder>>> parameterValuesCache =
+      CacheBuilder.newBuilder().maximumSize(1000).build();
 
-    private static final long serialVersionUID = -2694196563712540762L;
+  /** Calculates the cartesian product of all relevant @TestParameter values. */
+  @Override
+  public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
+    List<List<TestParameterValueHolder>> parameterValuesForMethod =
+        getParameterValuesForMethod(originalTest.getMethod(), originalTest.getTestClass());
 
-    /** Origin of the {@link TestParameter} annotation. */
-    abstract Origin origin();
-
-    /** The value used for the test as defined by the @TestParameter annotation. */
-    abstract TestParameterValue wrappedValue();
-
-    /** The index of this value in {@link #specifiedValues()}. */
-    abstract int valueIndex();
-
-    /**
-     * The list of values specified by the @TestParameter annotation (e.g. {true, false} in the case
-     * of a boolean parameter).
-     */
-    @SuppressWarnings("AutoValueImmutableFields") // intentional to allow null values
-    abstract List<Object> specifiedValues();
-
-    /**
-     * The name of the parameter or field that is being annotated. Can be absent if the annotation
-     * is on a parameter and Java was not compiled with the -parameters flag.
-     */
-    abstract Optional<String> paramName();
-
-    /**
-     * Returns {@link #wrappedValue()} without the {@link TestParameterValue} wrapper if it exists.
-     */
-    @Nullable
-    Object unwrappedValue() {
-      return wrappedValue().getWrappedValue();
+    if (parameterValuesForMethod.isEmpty()) {
+      // This test is not parameterized
+      return ImmutableList.of(originalTest);
     }
 
-    /**
-     * Returns a String that represents this value and is fit for use in a test name (between
-     * brackets).
-     */
-    String toTestNameString() {
-      return ParameterValueParsing.formatTestNameString(paramName(), wrappedValue());
+    ImmutableList.Builder<TestInfo> testInfos = ImmutableList.builder();
+    for (int parametersIndex = 0;
+        parametersIndex < parameterValuesForMethod.size();
+        ++parametersIndex) {
+      List<TestParameterValueHolder> testParameterValues =
+          parameterValuesForMethod.get(parametersIndex);
+      testInfos.add(
+          originalTest
+              .withExtraParameters(
+                  FluentIterable.from(testParameterValues)
+                      .transform(
+                          param ->
+                              TestInfoParameter.create(
+                                  param.toTestNameString(),
+                                  param.unwrappedValue(),
+                                  param.valueIndex()))
+                      .toList())
+              .withExtraAnnotation(
+                  TestIndexHolderFactory.create(
+                      /* methodIndex= */ strictIndexOf(
+                          getMethodsIncludingParentsSorted(originalTest.getTestClass()),
+                          originalTest.getMethod()),
+                      parametersIndex,
+                      originalTest.getTestClass().getName())));
     }
 
-    public static ImmutableList<TestParameterValueHolder> create(
-        AnnotationWithMetadata annotationWithMetadata, Origin origin) {
-      List<TestParameterValue> specifiedValues =
-          FluentIterable.from(getValuesFromTestParameter(annotationWithMetadata))
-              .transform(
-                  value ->
-                      (value instanceof TestParameterValue)
-                          ? (TestParameterValue) value
-                          : TestParameterValue.wrap(value))
-              .toList();
-      checkState(
-          !specifiedValues.isEmpty(),
-          "The number of parameter values should not be 0"
-              + ", otherwise the parameter would cause the test to be skipped.");
-      return FluentIterable.from(
-              ContiguousSet.create(
-                  Range.closedOpen(0, specifiedValues.size()), DiscreteDomain.integers()))
-          .transform(
-              valueIndex ->
-                  (TestParameterValueHolder)
-                      new AutoValue_TestParameterMethodProcessor_TestParameterValueHolder(
-                          origin,
-                          specifiedValues.get(valueIndex),
-                          valueIndex,
-                          newArrayList(
-                              FluentIterable.from(specifiedValues)
-                                  .transform(TestParameterValue::getWrappedValue)),
-                          annotationWithMetadata.paramName()))
-          .toList();
+    return testInfos.build();
+  }
+
+  @Override
+  public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
+    return validateAnnotations(constructor.getParameterAnnotations(), "constructor");
+  }
+
+  @Override
+  public ExecutableValidationResult validateTestMethod(Method testMethod, Class<?> testClass) {
+    return validateAnnotations(testMethod.getParameterAnnotations(), testMethod.getName());
+  }
+
+  @Override
+  public Optional<List<Object>> maybeGetConstructorParameters(
+      Constructor<?> constructor, TestInfo testInfo) {
+    if (containsRelevantAnnotation(constructor.getParameterAnnotations())) {
+      TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
+      return Optional.of(
+          FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
+              .filter(p -> p.origin() == Origin.CONSTRUCTOR_PARAMETER)
+              .transform(TestParameterValueHolder::unwrappedValue)
+              .copyInto(new ArrayList<>()));
+    } else {
+      return Optional.absent();
+    }
+  }
+
+  @Override
+  public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
+    Method testMethod = testInfo.getMethod();
+    if (containsRelevantAnnotation(testMethod.getParameterAnnotations())) {
+      TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
+      return Optional.of(
+          FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
+              .filter(p -> p.origin() == Origin.METHOD_PARAMETER)
+              .transform(TestParameterValueHolder::unwrappedValue)
+              .copyInto(new ArrayList<>()));
+    } else {
+      return Optional.absent();
+    }
+  }
+
+  @Override
+  public void postProcessTestInstance(Object testInstance, TestInfo testInfo) {
+    TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
+    try {
+      if (testIndexHolder != null) {
+        List<TestParameterValueHolder> remainingTestParameterValuesForFieldInjection =
+            FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
+                .filter(p -> p.origin() == Origin.FIELD)
+                .copyInto(new ArrayList<>());
+
+        for (Field declaredField :
+            FluentIterable.from(listWithParents(testInstance.getClass()))
+                .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
+                .toList()) {
+          for (TestParameterValueHolder testParameterValue :
+              remainingTestParameterValuesForFieldInjection) {
+            if (declaredField.isAnnotationPresent(TestParameter.class)) {
+              if (!declaredField.getName().equals(testParameterValue.paramName().get())) {
+                // names don't match
+                continue;
+              }
+              declaredField.setAccessible(true);
+              declaredField.set(testInstance, testParameterValue.unwrappedValue());
+              remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
+              break;
+            }
+          }
+        }
+      }
+    } catch (IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static ExecutableValidationResult validateAnnotations(
+      Annotation[][] annotations, String executableName) {
+    if (containsRelevantAnnotation(annotations)) {
+      int parameterIndex = 0;
+      for (Annotation[] annotationsOnParameter : annotations) {
+        boolean hasTestParameter =
+            FluentIterable.from(annotationsOnParameter)
+                .anyMatch(annotation -> annotation instanceof TestParameter);
+        if (!hasTestParameter) {
+          return ExecutableValidationResult.validated(
+              new IllegalArgumentException(
+                  String.format(
+                      "%s has at least one parameter annotated with @TestParameter, but"
+                          + " parameter number %d is not annotated with @TestParameter.",
+                      executableName, parameterIndex + 1)));
+        }
+        parameterIndex++;
+      }
+      return ExecutableValidationResult.valid();
+    } else {
+      // This method has no relevant @TestParameter annotations, and therefore its parameters are
+      // not handled by this processor.
+      return ExecutableValidationResult.notValidated();
     }
   }
 
@@ -219,171 +286,6 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         throw new IllegalStateException(e);
       }
     }
-  }
-
-  /** The origin of an annotation type. */
-  enum Origin {
-    FIELD,
-    METHOD_PARAMETER,
-    CONSTRUCTOR_PARAMETER,
-  }
-
-  /** Class to hold an annotation type and metadata about the annotated parameter. */
-  @AutoValue
-  abstract static class AnnotationWithMetadata implements Serializable {
-
-    /** The @TestParameter annotation instance. */
-    abstract TestParameter annotation();
-
-    /** The class of the parameter or field that is being annotated. */
-    abstract Class<?> paramClass();
-
-    /**
-     * The name of the parameter or field that is being annotated. Can be absent if the annotation
-     * is on a parameter and Java was not compiled with the -parameters flag.
-     */
-    abstract Optional<String> paramName();
-
-    /** A value class that contains extra information about the context of this parameter. */
-    abstract GenericParameterContext context();
-
-    public static AnnotationWithMetadata withMetadata(
-        TestParameter annotation,
-        Class<?> paramClass,
-        String paramName,
-        GenericParameterContext context) {
-      return new AutoValue_TestParameterMethodProcessor_AnnotationWithMetadata(
-          annotation, paramClass, Optional.of(paramName), context);
-    }
-
-    public static AnnotationWithMetadata withMetadata(
-        TestParameter annotation, Class<?> paramClass, GenericParameterContext context) {
-      return new AutoValue_TestParameterMethodProcessor_AnnotationWithMetadata(
-          annotation, paramClass, /* paramName= */ Optional.absent(), context);
-    }
-
-    // Prevent anyone relying on equals() and hashCode() so that it remains possible to add fields
-    // to this class without breaking existing code.
-    @Override
-    public final boolean equals(Object other) {
-      throw new UnsupportedOperationException("Equality is not supported");
-    }
-
-    @Override
-    public final int hashCode() {
-      throw new UnsupportedOperationException("hashCode() is not supported");
-    }
-  }
-
-  private final Cache<Method, List<List<TestParameterValueHolder>>> parameterValuesCache =
-      CacheBuilder.newBuilder().maximumSize(1000).build();
-
-  TestParameterMethodProcessor() {}
-
-  @Override
-  public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
-    return validateAnnotations(constructor.getParameterAnnotations(), "constructor");
-  }
-
-  @Override
-  public ExecutableValidationResult validateTestMethod(Method testMethod, Class<?> testClass) {
-    return validateAnnotations(testMethod.getParameterAnnotations(), testMethod.getName());
-  }
-
-  private static ExecutableValidationResult validateAnnotations(
-      Annotation[][] annotations, String executableName) {
-    if (containsRelevantAnnotation(annotations)) {
-      int parameterIndex = 0;
-      for (Annotation[] annotationsOnParameter : annotations) {
-        boolean hasTestParameter =
-            FluentIterable.from(annotationsOnParameter)
-                .anyMatch(annotation -> annotation instanceof TestParameter);
-        if (!hasTestParameter) {
-          return ExecutableValidationResult.validated(
-              new IllegalArgumentException(
-                  String.format(
-                      "%s has at least one parameter annotated with @TestParameter, but"
-                          + " parameter number %d is not annotated with @TestParameter.",
-                      executableName, parameterIndex + 1)));
-        }
-        parameterIndex++;
-      }
-      return ExecutableValidationResult.valid();
-    } else {
-      // This method has no relevant @TestParameter annotations, and therefore its parameters are
-      // not handled by this processor.
-      return ExecutableValidationResult.notValidated();
-    }
-  }
-
-  @Override
-  public Optional<List<Object>> maybeGetConstructorParameters(
-      Constructor<?> constructor, TestInfo testInfo) {
-    if (containsRelevantAnnotation(constructor.getParameterAnnotations())) {
-      TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
-      return Optional.of(
-          FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
-              .filter(p -> p.origin() == Origin.CONSTRUCTOR_PARAMETER)
-              .transform(TestParameterValueHolder::unwrappedValue)
-              .copyInto(new ArrayList<>()));
-    } else {
-      return Optional.absent();
-    }
-  }
-
-  @Override
-  public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
-    Method testMethod = testInfo.getMethod();
-    if (containsRelevantAnnotation(testMethod.getParameterAnnotations())) {
-      TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
-      return Optional.of(
-          FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
-              .filter(p -> p.origin() == Origin.METHOD_PARAMETER)
-              .transform(TestParameterValueHolder::unwrappedValue)
-              .copyInto(new ArrayList<>()));
-    } else {
-      return Optional.absent();
-    }
-  }
-
-  /** Calculates the cartesian product of all relevant @TestParameter values. */
-  @Override
-  public List<TestInfo> calculateTestInfos(TestInfo originalTest) {
-    List<List<TestParameterValueHolder>> parameterValuesForMethod =
-        getParameterValuesForMethod(originalTest.getMethod(), originalTest.getTestClass());
-
-    if (parameterValuesForMethod.isEmpty()) {
-      // This test is not parameterized
-      return ImmutableList.of(originalTest);
-    }
-
-    ImmutableList.Builder<TestInfo> testInfos = ImmutableList.builder();
-    for (int parametersIndex = 0;
-        parametersIndex < parameterValuesForMethod.size();
-        ++parametersIndex) {
-      List<TestParameterValueHolder> testParameterValues =
-          parameterValuesForMethod.get(parametersIndex);
-      testInfos.add(
-          originalTest
-              .withExtraParameters(
-                  FluentIterable.from(testParameterValues)
-                      .transform(
-                          param ->
-                              TestInfoParameter.create(
-                                  param.toTestNameString(),
-                                  param.unwrappedValue(),
-                                  param.valueIndex()))
-                      .toList())
-              .withExtraAnnotation(
-                  TestIndexHolderFactory.create(
-                      /* methodIndex= */ strictIndexOf(
-                          getMethodsIncludingParentsSorted(originalTest.getTestClass()),
-                          originalTest.getMethod()),
-                      parametersIndex,
-                      originalTest.getTestClass().getName())));
-    }
-
-    return testInfos.build();
   }
 
   private static boolean containsRelevantAnnotation(Annotation[][] annotations) {
@@ -615,74 +517,6 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         .first();
   }
 
-  @Override
-  public void postProcessTestInstance(Object testInstance, TestInfo testInfo) {
-    TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
-    try {
-      if (testIndexHolder != null) {
-        List<TestParameterValueHolder> remainingTestParameterValuesForFieldInjection =
-            FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
-                .filter(p -> p.origin() == Origin.FIELD)
-                .copyInto(new ArrayList<>());
-
-        for (Field declaredField :
-            FluentIterable.from(listWithParents(testInstance.getClass()))
-                .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
-                .toList()) {
-          for (TestParameterValueHolder testParameterValue :
-              remainingTestParameterValuesForFieldInjection) {
-            if (declaredField.isAnnotationPresent(TestParameter.class)) {
-              if (!declaredField.getName().equals(testParameterValue.paramName().get())) {
-                // names don't match
-                continue;
-              }
-              declaredField.setAccessible(true);
-              declaredField.set(testInstance, testParameterValue.unwrappedValue());
-              remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
-              break;
-            }
-          }
-        }
-      }
-    } catch (IllegalAccessException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  /**
-   * This mechanism is a workaround to be able to store the annotation values in the annotation list
-   * of the {@link TestInfo}, since we cannot carry other information through the test runner.
-   */
-  @Retention(RUNTIME)
-  @interface TestIndexHolder {
-
-    /** The index of the test method in {@code getMethodsIncludingParentsSorted(testClass)} */
-    int methodIndex();
-
-    /**
-     * The index of the set of parameters to run the test method with in the list produced by {@link
-     * #getParameterValuesForMethod}.
-     */
-    int parametersIndex();
-
-    /**
-     * The full name of the test class. Only used for verifying that assumptions about the above
-     * indices are valid.
-     */
-    String testClassName();
-  }
-
-  /** Factory for {@link TestIndexHolder}. */
-  static class TestIndexHolderFactory {
-    @AutoAnnotation
-    static TestIndexHolder create(int methodIndex, int parametersIndex, String testClassName) {
-      return new AutoAnnotation_TestParameterMethodProcessor_TestIndexHolderFactory_create(
-          methodIndex, parametersIndex, testClassName);
-    }
-
-    private TestIndexHolderFactory() {}
-  }
-
   private <T> int strictIndexOf(List<T> haystack, T needle) {
     int index = haystack.indexOf(needle);
     checkArgument(index >= 0, "Could not find '%s' in %s", needle, haystack);
@@ -718,5 +552,169 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   private static boolean isKotlinClass(Class<?> clazz) {
     return FluentIterable.from(clazz.getDeclaredAnnotations())
         .anyMatch(annotation -> annotation.annotationType().getName().equals("kotlin.Metadata"));
+  }
+
+  /** The origin of an annotation type. */
+  enum Origin {
+    FIELD,
+    METHOD_PARAMETER,
+    CONSTRUCTOR_PARAMETER,
+  }
+
+  /** Class to hold a single parameter value and its metadata. */
+  @AutoValue
+  abstract static class TestParameterValueHolder implements Serializable {
+
+    private static final long serialVersionUID = -2694196563712540762L;
+
+    /** Origin of the {@link TestParameter} annotation. */
+    abstract Origin origin();
+
+    /** The value used for the test as defined by the @TestParameter annotation. */
+    abstract TestParameterValue wrappedValue();
+
+    /** The index of this value in {@link #specifiedValues()}. */
+    abstract int valueIndex();
+
+    /**
+     * The list of values specified by the @TestParameter annotation (e.g. {true, false} in the case
+     * of a boolean parameter).
+     */
+    @SuppressWarnings("AutoValueImmutableFields") // intentional to allow null values
+    abstract List<Object> specifiedValues();
+
+    /**
+     * The name of the parameter or field that is being annotated. Can be absent if the annotation
+     * is on a parameter and Java was not compiled with the -parameters flag.
+     */
+    abstract Optional<String> paramName();
+
+    /**
+     * Returns {@link #wrappedValue()} without the {@link TestParameterValue} wrapper if it exists.
+     */
+    @Nullable
+    Object unwrappedValue() {
+      return wrappedValue().getWrappedValue();
+    }
+
+    /**
+     * Returns a String that represents this value and is fit for use in a test name (between
+     * brackets).
+     */
+    String toTestNameString() {
+      return ParameterValueParsing.formatTestNameString(paramName(), wrappedValue());
+    }
+
+    public static ImmutableList<TestParameterValueHolder> create(
+        AnnotationWithMetadata annotationWithMetadata, Origin origin) {
+      List<TestParameterValue> specifiedValues =
+          FluentIterable.from(getValuesFromTestParameter(annotationWithMetadata))
+              .transform(
+                  value ->
+                      (value instanceof TestParameterValue)
+                          ? (TestParameterValue) value
+                          : TestParameterValue.wrap(value))
+              .toList();
+      checkState(
+          !specifiedValues.isEmpty(),
+          "The number of parameter values should not be 0"
+              + ", otherwise the parameter would cause the test to be skipped.");
+      return FluentIterable.from(
+              ContiguousSet.create(
+                  Range.closedOpen(0, specifiedValues.size()), DiscreteDomain.integers()))
+          .transform(
+              valueIndex ->
+                  (TestParameterValueHolder)
+                      new AutoValue_TestParameterMethodProcessor_TestParameterValueHolder(
+                          origin,
+                          specifiedValues.get(valueIndex),
+                          valueIndex,
+                          newArrayList(
+                              FluentIterable.from(specifiedValues)
+                                  .transform(TestParameterValue::getWrappedValue)),
+                          annotationWithMetadata.paramName()))
+          .toList();
+    }
+  }
+
+  /** Class to hold an annotation type and metadata about the annotated parameter. */
+  @AutoValue
+  abstract static class AnnotationWithMetadata implements Serializable {
+
+    /** The @TestParameter annotation instance. */
+    abstract TestParameter annotation();
+
+    /** The class of the parameter or field that is being annotated. */
+    abstract Class<?> paramClass();
+
+    /**
+     * The name of the parameter or field that is being annotated. Can be absent if the annotation
+     * is on a parameter and Java was not compiled with the -parameters flag.
+     */
+    abstract Optional<String> paramName();
+
+    /** A value class that contains extra information about the context of this parameter. */
+    abstract GenericParameterContext context();
+
+    public static AnnotationWithMetadata withMetadata(
+        TestParameter annotation,
+        Class<?> paramClass,
+        String paramName,
+        GenericParameterContext context) {
+      return new AutoValue_TestParameterMethodProcessor_AnnotationWithMetadata(
+          annotation, paramClass, Optional.of(paramName), context);
+    }
+
+    public static AnnotationWithMetadata withMetadata(
+        TestParameter annotation, Class<?> paramClass, GenericParameterContext context) {
+      return new AutoValue_TestParameterMethodProcessor_AnnotationWithMetadata(
+          annotation, paramClass, /* paramName= */ Optional.absent(), context);
+    }
+
+    // Prevent anyone relying on equals() and hashCode() so that it remains possible to add fields
+    // to this class without breaking existing code.
+    @Override
+    public final boolean equals(Object other) {
+      throw new UnsupportedOperationException("Equality is not supported");
+    }
+
+    @Override
+    public final int hashCode() {
+      throw new UnsupportedOperationException("hashCode() is not supported");
+    }
+  }
+
+  /**
+   * This mechanism is a workaround to be able to store the annotation values in the annotation list
+   * of the {@link TestInfo}, since we cannot carry other information through the test runner.
+   */
+  @Retention(RUNTIME)
+  @interface TestIndexHolder {
+
+    /** The index of the test method in {@code getMethodsIncludingParentsSorted(testClass)} */
+    int methodIndex();
+
+    /**
+     * The index of the set of parameters to run the test method with in the list produced by {@link
+     * #getParameterValuesForMethod}.
+     */
+    int parametersIndex();
+
+    /**
+     * The full name of the test class. Only used for verifying that assumptions about the above
+     * indices are valid.
+     */
+    String testClassName();
+  }
+
+  /** Factory for {@link TestIndexHolder}. */
+  static class TestIndexHolderFactory {
+    @AutoAnnotation
+    static TestIndexHolder create(int methodIndex, int parametersIndex, String testClassName) {
+      return new AutoAnnotation_TestParameterMethodProcessor_TestIndexHolderFactory_create(
+          methodIndex, parametersIndex, testClassName);
+    }
+
+    private TestIndexHolderFactory() {}
   }
 }
