@@ -15,6 +15,7 @@
 package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -49,7 +50,6 @@ import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import javax.annotation.Nullable;
 
@@ -114,7 +114,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   @Override
   public Optional<List<Object>> maybeGetConstructorParameters(
       Constructor<?> constructor, TestInfo testInfo) {
-    if (containsRelevantAnnotation(constructor.getParameterAnnotations())) {
+    if (isValidAndContainsRelevantAnnotations(constructor.getParameterAnnotations())) {
       TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
       return Optional.of(
           FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
@@ -129,7 +129,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   @Override
   public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
     Method testMethod = testInfo.getMethod();
-    if (containsRelevantAnnotation(testMethod.getParameterAnnotations())) {
+    if (isValidAndContainsRelevantAnnotations(testMethod.getParameterAnnotations())) {
       TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
       return Optional.of(
           FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
@@ -309,6 +309,15 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         .anyMatch(annotation -> annotation instanceof TestParameter);
   }
 
+  private static boolean isValidAndContainsRelevantAnnotations(Annotation[][] annotationsList) {
+    return annotationsList.length > 0
+        && FluentIterable.from(annotationsList)
+            .allMatch(
+                annotations ->
+                    FluentIterable.from(annotations)
+                        .anyMatch(annotation -> annotation instanceof TestParameter));
+  }
+
   private List<TestParameterValueHolder> getParameterValuesForTest(
       TestIndexHolder testIndexHolder, Class<?> testClass) {
     verify(
@@ -392,9 +401,16 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
    */
   private static List<AnnotationWithMetadata> applyKotlinDuplicateAnnotationWorkaround(
       List<AnnotationWithMetadata> fieldAnnotations, Class<?> testClass) {
+    Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
+
+    if (!isValidAndContainsRelevantAnnotations(constructor.getParameterAnnotations())) {
+      // Return early if there are no @TestParameter annotations on the constructor parameters. The
+      // remainder of this method can assume there are only @TestParameter-annotated parameters.
+      return fieldAnnotations;
+    }
+
     List<AnnotationWithMetadata> constructorAnnotations =
-        getAnnotationWithMetadataListWithType(
-            TestParameterInjectorUtils.getOnlyConstructor(testClass), testClass);
+        getAnnotationWithMetadataListWithType(constructor, testClass);
 
     ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
     for (AnnotationWithMetadata fieldAnnotation : fieldAnnotations) {
@@ -480,51 +496,44 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         .toList();
   }
 
-  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Method callable, Class<?> testClass) {
-    try {
-      return getAnnotationWithMetadataListWithType(callable.getParameters(), testClass);
-    } catch (NoSuchMethodError ignored) {
-      return getAnnotationWithMetadataListWithType(
-          callable.getParameterTypes(), callable.getParameterAnnotations(), testClass);
-    }
-  }
-
-  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Constructor<?> callable, Class<?> testClass) {
-    try {
-      return getAnnotationWithMetadataListWithType(callable.getParameters(), testClass);
-    } catch (NoSuchMethodError ignored) {
-      return getAnnotationWithMetadataListWithType(
-          callable.getParameterTypes(), callable.getParameterAnnotations(), testClass);
-    }
-  }
-
-  // Parameter is not available on old Android SDKs, and isn't desugared. That's why this method
-  // has a fallback that takes the parameter types and annotations (without the parameter names,
-  // which are optional anyway).
   @SuppressWarnings("AndroidJdkLibsChecker")
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Parameter[] parameters, Class<?> testClass) {
-    return FluentIterable.from(parameters)
-        .transform(
-            parameter -> {
-              TestParameter annotation = parameter.getAnnotation(TestParameter.class);
-              return annotation == null
-                  ? null
-                  : parameter.isNamePresent()
-                      ? AnnotationWithMetadata.withMetadata(
-                          annotation,
-                          parameter.getType(),
-                          parameter.getName(),
-                          GenericParameterContext.create(parameter, testClass))
-                      : AnnotationWithMetadata.withMetadata(
-                          annotation,
-                          parameter.getType(),
-                          GenericParameterContext.create(parameter, testClass));
-            })
-        .filter(Objects::nonNull)
-        .toList();
+      Method callable, Class<?> testClass) {
+    if (!isValidAndContainsRelevantAnnotations(callable.getParameterAnnotations())) {
+      return ImmutableList.of();
+    }
+    try {
+      // Parameter is not available on old Android SDKs, and isn't desugared. That's why this path
+      // has a fallback that takes the parameter types and annotations (without the parameter names,
+      // which are optional anyway).
+      return FluentIterable.from(callable.getParameters())
+          .transform(
+              parameter -> AnnotationWithMetadata.fromAnnotatedParameter(parameter, testClass))
+          .toList();
+    } catch (NoSuchMethodError ignored) {
+      return getAnnotationWithMetadataListWithType(
+          callable.getParameterTypes(), callable.getParameterAnnotations(), testClass);
+    }
+  }
+
+  @SuppressWarnings("AndroidJdkLibsChecker")
+  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
+      Constructor<?> callable, Class<?> testClass) {
+    if (!isValidAndContainsRelevantAnnotations(callable.getParameterAnnotations())) {
+      return ImmutableList.of();
+    }
+    try {
+      // Parameter is not available on old Android SDKs, and isn't desugared. That's why this path
+      // has a fallback that takes the parameter types and annotations (without the parameter names,
+      // which are optional anyway).
+      return FluentIterable.from(callable.getParameters())
+          .transform(
+              parameter -> AnnotationWithMetadata.fromAnnotatedParameter(parameter, testClass))
+          .toList();
+    } catch (NoSuchMethodError ignored) {
+      return getAnnotationWithMetadataListWithType(
+          callable.getParameterTypes(), callable.getParameterAnnotations(), testClass);
+    }
   }
 
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
@@ -533,16 +542,12 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
     ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
     for (int parameterIndex = 0; parameterIndex < annotations.length; parameterIndex++) {
-      Optional<TestParameter> maybeTestParameter =
-          maybeGetTestParameter(annotations[parameterIndex]);
-      if (maybeTestParameter.isPresent()) {
-        resultBuilder.add(
-            AnnotationWithMetadata.withMetadata(
-                maybeTestParameter.get(),
-                parameterTypes[parameterIndex],
-                GenericParameterContext.createWithRepeatableAnnotationsFallback(
-                    annotations[parameterIndex], testClass)));
-      }
+      resultBuilder.add(
+          AnnotationWithMetadata.withMetadata(
+              maybeGetTestParameter(annotations[parameterIndex]).get(),
+              parameterTypes[parameterIndex],
+              GenericParameterContext.createWithRepeatableAnnotationsFallback(
+                  annotations[parameterIndex], testClass)));
     }
     return resultBuilder.build();
   }
@@ -677,6 +682,23 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         TestParameter annotation, Class<?> paramClass, GenericParameterContext context) {
       return new AutoValue_TestParameterMethodProcessor_AnnotationWithMetadata(
           annotation, paramClass, /* paramName= */ Optional.absent(), context);
+    }
+
+    @SuppressWarnings("AndroidJdkLibsChecker")
+    public static AnnotationWithMetadata fromAnnotatedParameter(
+        Parameter parameter, Class<?> testClass) {
+      TestParameter annotation = parameter.getAnnotation(TestParameter.class);
+      checkNotNull(annotation, "Parameter %s is not annotated with @TestParameter", parameter);
+      return parameter.isNamePresent()
+          ? AnnotationWithMetadata.withMetadata(
+              annotation,
+              parameter.getType(),
+              parameter.getName(),
+              GenericParameterContext.create(parameter, testClass))
+          : AnnotationWithMetadata.withMetadata(
+              annotation,
+              parameter.getType(),
+              GenericParameterContext.create(parameter, testClass));
     }
 
     // Prevent anyone relying on equals() and hashCode() so that it remains possible to add fields
