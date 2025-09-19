@@ -54,6 +54,20 @@ public class TestParameterTest {
   }
 
   @RunAsTest
+  public static class StandardNonParameterizedTest extends SuccessfulTestCaseBase {
+
+    @Test
+    public void test() {
+      storeTestParametersForThisTest("nothing");
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder().put("test", "nothing").build();
+    }
+  }
+
+  @RunAsTest
   public static class AnnotatedField extends SuccessfulTestCaseBase {
 
     @TestParameter TestEnum enumParameter;
