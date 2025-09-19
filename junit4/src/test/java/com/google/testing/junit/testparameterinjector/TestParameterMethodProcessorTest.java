@@ -150,6 +150,194 @@ public class TestParameterMethodProcessorTest {
   }
 
   @RunAsTest
+  public static class MultipleAnnotatedFieldsAndParameters extends SuccessfulTestCaseBase {
+
+    @TestParameter({"ONE"})
+    TestEnum a;
+
+    @TestParameter boolean b;
+    private final TestEnum c;
+    private final boolean d;
+
+    public MultipleAnnotatedFieldsAndParameters(
+        @TestParameter({"TWO"}) TestEnum c, @TestParameter boolean d) {
+      this.c = c;
+      this.d = d;
+    }
+
+    @Test
+    public void test(@TestParameter({"THREE"}) TestEnum e, @TestParameter boolean f) {
+      storeTestParametersForThisTest(a, b, c, d, e, f);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test[ONE,b=false,TWO,d=false,THREE,f=false]", "ONE:false:TWO:false:THREE:false")
+          .put("test[ONE,b=false,TWO,d=false,THREE,f=true]", "ONE:false:TWO:false:THREE:true")
+          .put("test[ONE,b=false,TWO,d=true,THREE,f=false]", "ONE:false:TWO:true:THREE:false")
+          .put("test[ONE,b=false,TWO,d=true,THREE,f=true]", "ONE:false:TWO:true:THREE:true")
+          .put("test[ONE,b=true,TWO,d=false,THREE,f=false]", "ONE:true:TWO:false:THREE:false")
+          .put("test[ONE,b=true,TWO,d=false,THREE,f=true]", "ONE:true:TWO:false:THREE:true")
+          .put("test[ONE,b=true,TWO,d=true,THREE,f=false]", "ONE:true:TWO:true:THREE:false")
+          .put("test[ONE,b=true,TWO,d=true,THREE,f=true]", "ONE:true:TWO:true:THREE:true")
+          .build();
+    }
+  }
+
+  @RunAsTest
+  public static class TooLongTestNamesShortened extends SuccessfulTestCaseBase {
+
+    @Test
+    public void test1(
+        @TestParameter({
+              "ABC",
+              "This is a very long string (240 characters) that would normally cause Sponge+Tin to"
+                  + " exceed the filename limit of 255 characters."
+                  + " ==========================================================================="
+                  + "==================================="
+            })
+            String testString) {
+      storeTestParametersForThisTest(testString);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test1[1.ABC]", "ABC")
+          .put(
+              "test1[2.This is a very long string (240 characters) that would normally cause"
+                  + " Sponge+Tin to exceed the filename limit of 255 characters."
+                  + " =========================================================...]",
+              "This is a very long string (240 characters) that would normally cause Sponge+Tin to"
+                  + " exceed the filename limit of 255 characters."
+                  + " ============================================================================"
+                  + "==================================")
+          .build();
+    }
+  }
+
+  @RunAsTest
+  public static class DuplicateTestNames extends SuccessfulTestCaseBase {
+
+    @Test
+    public void test1(@TestParameter({"ABC", "ABC"}) String testString) {
+      storeTestParametersForThisTest(testString);
+    }
+
+    private static final class Test2Provider extends TestParameterValuesProvider {
+      @Override
+      public List<Object> provideValues(TestParameterValuesProvider.Context context) {
+        return newArrayList(123, "123", "null", null);
+      }
+    }
+
+    @Test
+    public void test2(@TestParameter(valuesProvider = Test2Provider.class) Object testObject) {
+      storeTestParametersForThisTest(testObject);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("test1[1.ABC]", "ABC")
+          .put("test1[2.ABC]", "ABC")
+          .put("test2[testObject=123 (Integer)]", "123")
+          .put("test2[testObject=123 (String)]", "123")
+          .put("test2[testObject=null (String)]", "null")
+          .put("test2[testObject=null (null reference)]", "null")
+          .build();
+    }
+  }
+
+  public abstract static class BaseClassWithSingleTest extends SuccessfulTestCaseBase {
+    @Test
+    public void testInBase(@TestParameter boolean b) {
+      storeTestParametersForThisTest(b);
+    }
+  }
+
+  @RunAsTest
+  public static class SimpleTestInheritedFromBaseClass extends BaseClassWithSingleTest {
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("testInBase[b=false]", "false")
+          .put("testInBase[b=true]", "true")
+          .build();
+    }
+  }
+
+  public abstract static class BaseClassWithAnnotations extends SuccessfulTestCaseBase {
+
+    @TestParameter boolean boolInBase;
+
+    @Test
+    public void testInBase(@TestParameter({"ONE", "TWO"}) TestEnum enumInBase) {
+      storeTestParametersForThisTest(boolInBase, enumInBase);
+    }
+
+    @Test
+    public abstract void abstractTestInBase();
+
+    @Test
+    public void overridableTestInBase() {
+      throw new UnsupportedOperationException("Expected the base class to override this");
+    }
+  }
+
+  @RunAsTest
+  public static class AnnotationInheritedFromBaseClass extends BaseClassWithAnnotations {
+
+    @TestParameter boolean boolInChild;
+
+    @Test
+    public void testInChild(@TestParameter({"TWO", "THREE"}) TestEnum enumInChild) {
+      storeTestParametersForThisTest(boolInBase, boolInChild, enumInChild);
+    }
+
+    @Override
+    public void abstractTestInBase() {
+      storeTestParametersForThisTest(boolInBase, boolInChild);
+    }
+
+    @Override
+    public void overridableTestInBase() {
+      storeTestParametersForThisTest(boolInBase, boolInChild);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("testInChild[boolInChild=false,boolInBase=false,TWO]", "false:false:TWO")
+          .put("testInChild[boolInChild=false,boolInBase=false,THREE]", "false:false:THREE")
+          .put("testInChild[boolInChild=false,boolInBase=true,TWO]", "true:false:TWO")
+          .put("testInChild[boolInChild=false,boolInBase=true,THREE]", "true:false:THREE")
+          .put("testInChild[boolInChild=true,boolInBase=false,TWO]", "false:true:TWO")
+          .put("testInChild[boolInChild=true,boolInBase=false,THREE]", "false:true:THREE")
+          .put("testInChild[boolInChild=true,boolInBase=true,TWO]", "true:true:TWO")
+          .put("testInChild[boolInChild=true,boolInBase=true,THREE]", "true:true:THREE")
+          .put("abstractTestInBase[boolInChild=false,boolInBase=false]", "false:false")
+          .put("abstractTestInBase[boolInChild=false,boolInBase=true]", "true:false")
+          .put("abstractTestInBase[boolInChild=true,boolInBase=false]", "false:true")
+          .put("abstractTestInBase[boolInChild=true,boolInBase=true]", "true:true")
+          .put("overridableTestInBase[boolInChild=false,boolInBase=false]", "false:false")
+          .put("overridableTestInBase[boolInChild=false,boolInBase=true]", "true:false")
+          .put("overridableTestInBase[boolInChild=true,boolInBase=false]", "false:true")
+          .put("overridableTestInBase[boolInChild=true,boolInBase=true]", "true:true")
+          .put("testInBase[boolInChild=false,boolInBase=false,ONE]", "false:ONE")
+          .put("testInBase[boolInChild=false,boolInBase=false,TWO]", "false:TWO")
+          .put("testInBase[boolInChild=false,boolInBase=true,ONE]", "true:ONE")
+          .put("testInBase[boolInChild=false,boolInBase=true,TWO]", "true:TWO")
+          .put("testInBase[boolInChild=true,boolInBase=false,ONE]", "false:ONE")
+          .put("testInBase[boolInChild=true,boolInBase=false,TWO]", "false:TWO")
+          .put("testInBase[boolInChild=true,boolInBase=true,ONE]", "true:ONE")
+          .put("testInBase[boolInChild=true,boolInBase=true,TWO]", "true:TWO")
+          .build();
+    }
+  }
+
+  @RunAsTest
   public static class WithValuesProvider extends SuccessfulTestCaseBase {
 
     private final int number1;
@@ -242,10 +430,75 @@ public class TestParameterMethodProcessorTest {
     }
   }
 
+  @RunAsTest
+  public static class TestNamesTest extends SuccessfulTestCaseBase {
+
+    @TestParameter("8")
+    long fieldParam;
+
+    @Test
+    public void withPrimitives(
+        @TestParameter("true") boolean param1, @TestParameter("2") int param2) {
+      storeTestParametersForThisTest(fieldParam, param1, param2);
+    }
+
+    @Test
+    public void withString(@TestParameter("AAA") String param1) {
+      storeTestParametersForThisTest(fieldParam, param1);
+    }
+
+    @Test
+    public void withEnum(@TestParameter("TWO") TestEnum param1) {
+      storeTestParametersForThisTest(fieldParam, param1);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.<String, String>builder()
+          .put("withString[fieldParam=8,AAA]", "8:AAA")
+          .put("withEnum[fieldParam=8,TWO]", "8:TWO")
+          .put("withPrimitives[fieldParam=8,param1=true,param2=2]", "8:true:2")
+          .build();
+    }
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "Could not find a no-arg constructor for NonStaticProvider, probably because it is a"
+              + " not-static inner class. You can fix this by making NonStaticProvider static")
+  public static class ErrorNonStaticProviderClass {
+
+    @Test
+    public void test(@TestParameter(valuesProvider = NonStaticProvider.class) int i) {}
+
+    @SuppressWarnings("ClassCanBeStatic")
+    class NonStaticProvider extends TestParameterValuesProvider {
+      @Override
+      public List<?> provideValues(TestParameterValuesProvider.Context context) {
+        return ImmutableList.of();
+      }
+    }
+  }
+
   @RunAsTest(failsWithMessage = "parameter number 2 is not annotated with @TestParameter")
   public static class NotAllParametersAnnotated {
     @Test
     public void test1(@TestParameter boolean bool, boolean bool2) {}
+  }
+
+  @RunAsTest(failsWithMessage = "Method test() should be public")
+  public static class ErrorNonPublicTestMethod {
+
+    @Test
+    void test(@TestParameter boolean b) {}
+  }
+
+  @RunAsTest(failsWithMessage = "Test class should have exactly one public constructor")
+  public static class ErrorPackagePrivateConstructor {
+    ErrorPackagePrivateConstructor() {}
+
+    @Test
+    public void test1() {}
   }
 
   @Parameters(name = "{0}")
