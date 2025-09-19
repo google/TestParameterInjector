@@ -201,10 +201,9 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     }
   }
 
-  private static ImmutableList<TestParameterValue> getValuesFromTestParameter(
+  private static Optional<ImmutableList<TestParameterValue>> getExplicitValuesFromAnnotation(
       AnnotationWithMetadata annotationWithMetadata) {
     TestParameter annotation = annotationWithMetadata.annotation();
-    Class<?> parameterClass = annotationWithMetadata.paramClass();
 
     boolean valueIsSet = annotation.value().length > 0;
     boolean valuesProviderIsSet =
@@ -215,25 +214,40 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         annotation);
 
     if (valueIsSet) {
-      return FluentIterable.from(annotation.value())
-          .transform(v -> TestParameterValue.maybeWrap(parseStringValue(v, parameterClass)))
-          .toList();
+      return Optional.of(
+          FluentIterable.from(annotation.value())
+              .transform(
+                  v ->
+                      TestParameterValue.maybeWrap(
+                          parseStringValue(v, annotationWithMetadata.paramClass())))
+              .toList());
     } else if (valuesProviderIsSet) {
-      return TestParameterValue.maybeWrapList(
-          getValuesFromProvider(annotation.valuesProvider(), annotationWithMetadata.context()));
+      return Optional.of(
+          TestParameterValue.maybeWrapList(
+              getValuesFromProvider(
+                  annotation.valuesProvider(), annotationWithMetadata.context())));
     } else {
-      if (Enum.class.isAssignableFrom(parameterClass)) {
-        return TestParameterValue.maybeWrapList(
-            Arrays.asList((Object[]) parameterClass.asSubclass(Enum.class).getEnumConstants()));
-      } else if (Primitives.wrap(parameterClass).equals(Boolean.class)) {
-        return TestParameterValue.maybeWrapList(Arrays.asList(false, true));
-      } else {
-        throw new IllegalStateException(
-            String.format(
-                "A @TestParameter without values can only be placed at an enum or a boolean, but"
-                    + " was placed by a %s",
-                parameterClass));
-      }
+      return Optional.absent();
+    }
+  }
+
+  /**
+   * Returns the obvious values for the given parameter type (e.g. true and false for a boolean), or
+   * throws an exception if the given type has no obvious values.
+   */
+  private static ImmutableList<TestParameterValue> getObviousValuesForParameterClass(
+      Class<?> parameterClass) {
+    if (Enum.class.isAssignableFrom(parameterClass)) {
+      return TestParameterValue.maybeWrapList(
+          Arrays.asList((Object[]) parameterClass.asSubclass(Enum.class).getEnumConstants()));
+    } else if (Primitives.wrap(parameterClass).equals(Boolean.class)) {
+      return TestParameterValue.maybeWrapList(Arrays.asList(false, true));
+    } else {
+      throw new IllegalStateException(
+          String.format(
+              "A @TestParameter without values can only be placed at an enum or a boolean, but"
+                  + " was placed by a %s",
+              parameterClass));
     }
   }
 
@@ -441,7 +455,11 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         .transform(
             annotationWithMetadata -> {
               List<TestParameterValue> allParameterValues =
-                  getValuesFromTestParameter(annotationWithMetadata);
+                  getExplicitValuesFromAnnotation(annotationWithMetadata)
+                      .or(
+                          () ->
+                              getObviousValuesForParameterClass(
+                                  annotationWithMetadata.paramClass()));
               checkState(
                   !allParameterValues.isEmpty(),
                   "The number of parameter values should not be 0"
