@@ -22,6 +22,7 @@ import static com.google.common.truth.TruthJUnit.assume;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.junit.Assert.assertThrows;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -35,7 +36,6 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -641,7 +641,7 @@ public class TestParametersMethodProcessorTest {
       String name, Class<?> testClass, String failsWithMessage) {
     this.testClass = testClass;
     this.maybeFailureMessage =
-        failsWithMessage.isEmpty() ? Optional.empty() : Optional.of(failsWithMessage);
+        failsWithMessage.isEmpty() ? Optional.absent() : Optional.of(failsWithMessage);
   }
 
   @Test

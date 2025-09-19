@@ -16,9 +16,13 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.TruthJUnit.assume;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static org.junit.Assert.assertThrows;
 
 import com.google.common.base.CharMatcher;
+import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -39,7 +43,9 @@ import org.junit.runners.Parameterized.Parameters;
 public class TestParameterTest {
 
   @Retention(RUNTIME)
-  @interface RunAsTest {}
+  @interface RunAsTest {
+    String failsWithMessage() default "";
+  }
 
   public enum TestEnum {
     ONE,
@@ -222,23 +228,52 @@ public class TestParameterTest {
     }
   }
 
+  @RunAsTest(failsWithMessage = "parameter number 2 is not annotated with @TestParameter")
+  public static class NotAllParametersAnnotated {
+    @Test
+    public void test1(@TestParameter boolean bool, boolean bool2) {}
+  }
+
   @Parameters(name = "{0}")
   public static Collection<Object[]> parameters() {
     return Arrays.stream(TestParameterTest.class.getClasses())
         .filter(cls -> cls.isAnnotationPresent(RunAsTest.class))
-        .map(cls -> new Object[] {cls.getSimpleName(), cls})
+        .map(
+            cls ->
+                new Object[] {
+                  cls.getSimpleName(), cls, cls.getAnnotation(RunAsTest.class).failsWithMessage()
+                })
         .collect(toImmutableList());
   }
 
   private final Class<?> testClass;
+  private final Optional<String> maybeFailureMessage;
 
-  public TestParameterTest(String name, Class<?> testClass) {
+  public TestParameterTest(String name, Class<?> testClass, String failsWithMessage) {
     this.testClass = testClass;
+    this.maybeFailureMessage =
+        failsWithMessage.isEmpty() ? Optional.absent() : Optional.of(failsWithMessage);
   }
 
   @Test
-  public void test() throws Exception {
+  public void test_success() throws Exception {
+    assume().that(maybeFailureMessage.isPresent()).isFalse();
+
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(new PluggableTestRunner(testClass) {});
+  }
+
+  @Test
+  public void test_failure() throws Exception {
+    assume().that(maybeFailureMessage.isPresent()).isTrue();
+
+    Throwable throwable =
+        assertThrows(
+            Throwable.class,
+            () ->
+                SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
+                    new PluggableTestRunner(testClass) {}));
+
+    assertThat(throwable).hasMessageThat().contains(maybeFailureMessage.get());
   }
 
   private static ImmutableList<Class<? extends Annotation>> annotationTypes(
