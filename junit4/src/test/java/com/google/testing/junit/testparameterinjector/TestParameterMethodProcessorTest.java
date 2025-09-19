@@ -40,7 +40,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 /** Test class to test the @TestParameter's value provider. */
 @RunWith(Parameterized.class)
-public class TestParameterTest {
+public class TestParameterMethodProcessorTest {
 
   @Retention(RUNTIME)
   @interface RunAsTest {
@@ -250,7 +250,7 @@ public class TestParameterTest {
 
   @Parameters(name = "{0}")
   public static Collection<Object[]> parameters() {
-    return Arrays.stream(TestParameterTest.class.getClasses())
+    return Arrays.stream(TestParameterMethodProcessorTest.class.getClasses())
         .filter(cls -> cls.isAnnotationPresent(RunAsTest.class))
         .map(
             cls ->
@@ -263,7 +263,8 @@ public class TestParameterTest {
   private final Class<?> testClass;
   private final Optional<String> maybeFailureMessage;
 
-  public TestParameterTest(String name, Class<?> testClass, String failsWithMessage) {
+  public TestParameterMethodProcessorTest(
+      String name, Class<?> testClass, String failsWithMessage) {
     this.testClass = testClass;
     this.maybeFailureMessage =
         failsWithMessage.isEmpty() ? Optional.absent() : Optional.of(failsWithMessage);
