@@ -192,7 +192,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
       TestParametersValues parametersValues = parameterValuesList.get(parametersIndex.get());
 
       ImmutableList<JavaCompatibilityParameter> parameters =
-          getParametersWithKotlinFallback(executable, testClass);
+          getParametersWithKotlinFallback(executable);
       return Optional.of(
           FluentIterable.from(parameters)
               .transform(
@@ -222,7 +222,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   private static ImmutableList<TestParametersValues> toParameterValuesList(
       JavaCompatibilityExecutable executable, Class<?> testClass) {
     ImmutableList<JavaCompatibilityParameter> parametersList =
-        getParametersWithKotlinFallback(executable, testClass);
+        getParametersWithKotlinFallback(executable);
     checkParameterNamesArePresent(parametersList, executable);
 
     if (executable.isAnnotationPresent(TestParameters.class)) {
@@ -445,9 +445,9 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   @SuppressWarnings("KotlinInternal")
   private static ImmutableList<JavaCompatibilityParameter> getParametersWithKotlinFallback(
-      JavaCompatibilityExecutable executable, Class<?> testClass) {
+      JavaCompatibilityExecutable executable) {
     return executable.getParametersWithFallback(
-        TestParameterInjectorUtils.isKotlinClass(testClass)
+        TestParameterInjectorUtils.isKotlinClass(executable.getDeclaringClass())
             ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
             : Optional.absent());
   }

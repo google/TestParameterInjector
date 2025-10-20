@@ -685,7 +685,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       return ImmutableList.of();
     }
     Optional<ImmutableList<String>> maybeNamesFromKotlin =
-        TestParameterInjectorUtils.isKotlinClass(testClass)
+        TestParameterInjectorUtils.isKotlinClass(executable.getDeclaringClass())
             ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
             : Optional.absent();
 
