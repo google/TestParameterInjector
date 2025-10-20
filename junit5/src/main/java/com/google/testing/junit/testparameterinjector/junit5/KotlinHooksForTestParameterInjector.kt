@@ -14,7 +14,6 @@
 
 package com.google.testing.junit.testparameterinjector.junit5
 
-import com.google.common.annotations.GoogleInternal
 import com.google.common.base.Optional
 import com.google.common.collect.ImmutableList
 import java.lang.reflect.InvocationTargetException
@@ -28,7 +27,6 @@ import kotlin.reflect.jvm.javaMethod
  * Helper functions for the TestParameterInjector implementation, providing functionality that can
  * only be implemented using Kotlin.
  */
-@GoogleInternal // TODO: jnyman - Expose this to the open source version.
 object KotlinHooksForTestParameterInjector {
 
   @JvmStatic

@@ -14,8 +14,6 @@
 
 package com.google.testing.junit.testparameterinjector.junit5
 
-import com.google.common.annotations.GoogleInternal
-
 /**
  * Functions for producing test parameter values using Kotlin's default parameter values.
  *
@@ -32,7 +30,8 @@ import com.google.common.annotations.GoogleInternal
  * ) { ... }
  * ```
  */
-@GoogleInternal // TODO: jnyman - Expose this to the open source version.
+// TODO: jnyman - Expose this to the open source version.
+// copybara:insert internal
 object KotlinTestParameters {
 
   /** Specifies the values to be used for a parameter. */
