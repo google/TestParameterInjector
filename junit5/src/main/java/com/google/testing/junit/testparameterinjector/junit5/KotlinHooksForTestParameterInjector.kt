@@ -16,6 +16,7 @@ package com.google.testing.junit.testparameterinjector.junit5
 
 import com.google.common.base.Optional
 import com.google.common.collect.ImmutableList
+import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorUtils.JavaCompatibilityExecutable
 import java.lang.reflect.InvocationTargetException
 import kotlin.jvm.kotlin
 import kotlin.reflect.KFunction
@@ -32,23 +33,10 @@ import kotlin.reflect.jvm.javaMethod
 internal object KotlinHooksForTestParameterInjector {
 
   @JvmStatic
-  fun getParameterNames(method: java.lang.reflect.Method): Optional<ImmutableList<String>> {
-    return try {
-      Optional.of(ImmutableList.copyOf(methodToFunction(method).parameters.mapNotNull { it.name }))
-    } catch (_: GetJavaExecutableFailureException) {
-      // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
-      // consistency check. This is a workaround to avoid breaking these tests.
-      Optional.absent()
-    }
-  }
-
-  @JvmStatic
-  fun getParameterNames(
-    constructor: java.lang.reflect.Constructor<*>
-  ): Optional<ImmutableList<String>> {
+  fun getParameterNames(executable: JavaCompatibilityExecutable): Optional<ImmutableList<String>> {
     return try {
       Optional.of(
-        ImmutableList.copyOf(constructorToFunction(constructor).parameters.map { it.name })
+        ImmutableList.copyOf(executableToFunction(executable).parameters.mapNotNull { it.name })
       )
     } catch (_: GetJavaExecutableFailureException) {
       // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
@@ -58,20 +46,9 @@ internal object KotlinHooksForTestParameterInjector {
   }
 
   @JvmStatic
-  fun hasOptionalParameters(method: java.lang.reflect.Method): Boolean {
+  fun hasOptionalParameters(executable: JavaCompatibilityExecutable): Boolean {
     return try {
-      methodToFunction(method).parameters.any { it.kind == KParameter.Kind.VALUE && it.isOptional }
-    } catch (_: GetJavaExecutableFailureException) {
-      // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
-      // consistency check. This is a workaround to avoid breaking these tests.
-      false
-    }
-  }
-
-  @JvmStatic
-  fun hasOptionalParameters(constructor: java.lang.reflect.Constructor<*>): Boolean {
-    return try {
-      constructorToFunction(constructor).parameters.any {
+      executableToFunction(executable).parameters.any {
         it.kind == KParameter.Kind.VALUE && it.isOptional
       }
     } catch (_: GetJavaExecutableFailureException) {
@@ -83,57 +60,19 @@ internal object KotlinHooksForTestParameterInjector {
 
   @JvmStatic
   fun extractValuesForEachParameter(
-    testInstance: Any,
-    method: java.lang.reflect.Method,
-    getExplicitValuesByIndex: (Int) -> Optional<ImmutableList<TestParameterValue>>,
-    getImplicitValuesByIndex: (Int) -> ImmutableList<TestParameterValue>,
-  ): ImmutableList<ImmutableList<TestParameterValue>> {
-    val function = methodToFunction(method)
-    val functionDescription = "${method.declaringClass.simpleName}.${function.name}"
-
-    return extractValuesForEachParameterInternal(
-      testInstance,
-      function,
-      functionDescription,
-      javaParameterTypes = method.parameterTypes,
-      getExplicitValuesByIndex,
-      getImplicitValuesByIndex,
-    )
-  }
-
-  @JvmStatic
-  fun extractValuesForEachParameter(
-    constructor: java.lang.reflect.Constructor<*>,
-    getExplicitValuesByIndex: (Int) -> Optional<ImmutableList<TestParameterValue>>,
-    getImplicitValuesByIndex: (Int) -> ImmutableList<TestParameterValue>,
-  ): ImmutableList<ImmutableList<TestParameterValue>> {
-    val function = constructorToFunction(constructor)
-    val functionDescription = "${constructor.declaringClass.simpleName}.constructor"
-
-    return extractValuesForEachParameterInternal(
-      testInstance = null,
-      function,
-      functionDescription,
-      javaParameterTypes = constructor.parameterTypes,
-      getExplicitValuesByIndex,
-      getImplicitValuesByIndex,
-    )
-  }
-
-  private fun extractValuesForEachParameterInternal(
     testInstance: Any?,
-    function: KFunction<*>,
-    functionDescription: String,
-    javaParameterTypes: Array<Class<*>>,
+    executable: JavaCompatibilityExecutable,
     getExplicitValuesByIndex: (Int) -> Optional<ImmutableList<TestParameterValue>>,
     getImplicitValuesByIndex: (Int) -> ImmutableList<TestParameterValue>,
   ): ImmutableList<ImmutableList<TestParameterValue>> {
+    val function = executableToFunction(executable)
+    val functionDescription = executable.humanReadableNameSummary
     val parameters = function.parameters.filter { it.kind == KParameter.Kind.VALUE }
 
     // Sanity check
-    require(parameters.size == javaParameterTypes.size) {
+    require(parameters.size == executable.parameterTypes.size) {
       ("$functionDescription: Number of parameters don't match: kotlinParameters=$parameters," +
-        " javaParameterTypes=${javaParameterTypes.toList()}, function=$function")
+        " javaParameterTypes=${executable.parameterTypes.toList()}, function=$function")
     }
 
     val parameterValues: MutableMap<KParameter, ImmutableList<TestParameterValue>> = mutableMapOf()
@@ -168,16 +107,26 @@ internal object KotlinHooksForTestParameterInjector {
     return ImmutableList.copyOf(parameters.map(parameterValues::getValue))
   }
 
-  private fun methodToFunction(method: java.lang.reflect.Method): KFunction<*> {
-    val kClass = method.declaringClass.kotlin
+  private fun executableToFunction(executable: JavaCompatibilityExecutable): KFunction<*> {
+    val kClass = executable.declaringClass.kotlin
 
-    val candidates = mutableListOf<KFunction<*>>()
+    val candidates: Collection<*> =
+      when (executable.javaReflectVersion) {
+        is java.lang.reflect.Method -> kClass.members
+        is java.lang.reflect.Constructor<*> -> kClass.constructors
+        else -> throw IllegalArgumentException("Unsupported executable type: $executable")
+      }
+    val matches = mutableListOf<KFunction<*>>()
     var caughtError = false
-    for (member in kClass.members) {
-      if (member is KFunction<*>) {
-        val javaMethodFromMember =
+    for (candidate in candidates) {
+      if (candidate is KFunction<*>) {
+        val candidateJavaExecutable =
           try {
-            member.javaMethod
+            when (executable.javaReflectVersion) {
+              is java.lang.reflect.Method -> candidate.javaMethod
+              is java.lang.reflect.Constructor<*> -> candidate.javaConstructor
+              else -> throw IllegalArgumentException("Unsupported executable type: $executable")
+            }
           } catch (_: Error) {
             // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
             // consistency check. If this happens, only throw a GetJavaExecutableFailureException if
@@ -185,42 +134,15 @@ internal object KotlinHooksForTestParameterInjector {
             caughtError = true
             continue
           }
-        if (javaMethodFromMember == method) {
-          candidates.add(member)
+        if (candidateJavaExecutable == executable.javaReflectVersion) {
+          matches.add(candidate)
         }
       }
     }
-    if (candidates.isEmpty() && caughtError) {
+    if (matches.isEmpty() && caughtError) {
       throw GetJavaExecutableFailureException()
     } else {
-      return candidates.single()
-    }
-  }
-
-  private fun constructorToFunction(constructor: java.lang.reflect.Constructor<*>): KFunction<*> {
-    val kClass = constructor.declaringClass.kotlin
-
-    val candidates = mutableListOf<KFunction<*>>()
-    var caughtError: Boolean = false
-    for (kotlinConstructor in kClass.constructors) {
-      val javaConstructorFromKotlin =
-        try {
-          kotlinConstructor.javaConstructor
-        } catch (e: Error) {
-          // For some Android methods, kFunction.javaConstructor fails because of a Kotlin-internal
-          // consistency check. If this happens, only throw a GetJavaExecutableFailureException if
-          // the method we are looking for has this error.
-          caughtError = true
-          continue
-        }
-      if (javaConstructorFromKotlin == constructor) {
-        candidates.add(kotlinConstructor)
-      }
-    }
-    if (candidates.isEmpty() and caughtError) {
-      throw GetJavaExecutableFailureException()
-    } else {
-      return candidates.single()
+      return matches.single()
     }
   }
 

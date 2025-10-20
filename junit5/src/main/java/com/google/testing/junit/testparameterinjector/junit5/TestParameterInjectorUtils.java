@@ -19,7 +19,10 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 
 /** Shared utility methods. */
 class TestParameterInjectorUtils {
@@ -66,4 +69,175 @@ class TestParameterInjectorUtils {
   }
 
   private TestParameterInjectorUtils() {}
+
+  /**
+   * Represents a Java method or constructor.
+   *
+   * <p>This is a replacement for java.lang.reflect.Executable that is not available on old Android
+   * SDKs, and isn't desugared.
+   */
+  abstract static class JavaCompatibilityExecutable {
+
+    private JavaCompatibilityExecutable() {}
+
+    /**
+     * A description of this executable that omits likely irrelevant details with the goal of making
+     * it a concise representation for human consumption.
+     */
+    abstract String getHumanReadableNameSummary();
+
+    /**
+     * Returns the java.lang.reflect.Constructor or java.lang.reflect.Method that is the equivalent
+     * of this instance.
+     */
+    abstract Object getJavaReflectVersion();
+
+    abstract String getName();
+
+    abstract Class<?> getDeclaringClass();
+
+    abstract boolean isAnnotationPresent(Class<? extends Annotation> annotationClass);
+
+    abstract <A extends Annotation> A getAnnotation(Class<A> annotationClass);
+
+    abstract <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationClass);
+
+    abstract Annotation[] getAnnotations();
+
+    abstract Annotation[][] getParameterAnnotations();
+
+    abstract Class<?>[] getParameterTypes();
+
+    @SuppressWarnings("AndroidJdkLibsChecker")
+    abstract Parameter[] getParameters();
+
+    final boolean isMethod() {
+      return getJavaReflectVersion() instanceof Method;
+    }
+
+    @Override
+    public final String toString() {
+      return getHumanReadableNameSummary();
+    }
+
+    static JavaCompatibilityExecutable create(Constructor<?> constructor) {
+      return new JavaCompatibilityExecutable() {
+        @Override
+        String getHumanReadableNameSummary() {
+          return constructor.getDeclaringClass().getSimpleName() + ".constructor";
+        }
+
+        @Override
+        Object getJavaReflectVersion() {
+          return constructor;
+        }
+
+        @Override
+        String getName() {
+          return constructor.getName();
+        }
+
+        @Override
+        Class<?> getDeclaringClass() {
+          return constructor.getDeclaringClass();
+        }
+
+        @Override
+        boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+          return constructor.isAnnotationPresent(annotationClass);
+        }
+
+        @Override
+        <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
+          return constructor.getAnnotation(annotationClass);
+        }
+
+        @Override
+        <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationClass) {
+          return constructor.getAnnotationsByType(annotationClass);
+        }
+
+        @Override
+        Annotation[] getAnnotations() {
+          return constructor.getAnnotations();
+        }
+
+        @Override
+        Annotation[][] getParameterAnnotations() {
+          return constructor.getParameterAnnotations();
+        }
+
+        @Override
+        Class<?>[] getParameterTypes() {
+          return constructor.getParameterTypes();
+        }
+
+        @Override
+        @SuppressWarnings("AndroidJdkLibsChecker")
+        Parameter[] getParameters() {
+          return constructor.getParameters();
+        }
+      };
+    }
+
+    static JavaCompatibilityExecutable create(Method method) {
+      return new JavaCompatibilityExecutable() {
+        @Override
+        String getHumanReadableNameSummary() {
+          return method.getDeclaringClass().getSimpleName() + "." + method.getName();
+        }
+
+        @Override
+        Object getJavaReflectVersion() {
+          return method;
+        }
+
+        @Override
+        String getName() {
+          return method.getName();
+        }
+
+        @Override
+        Class<?> getDeclaringClass() {
+          return method.getDeclaringClass();
+        }
+
+        @Override
+        boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+          return method.isAnnotationPresent(annotationClass);
+        }
+
+        @Override
+        <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
+          return method.getAnnotation(annotationClass);
+        }
+
+        @Override
+        <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationClass) {
+          return method.getAnnotationsByType(annotationClass);
+        }
+
+        @Override
+        Annotation[] getAnnotations() {
+          return method.getAnnotations();
+        }
+
+        @Override
+        Annotation[][] getParameterAnnotations() {
+          return method.getParameterAnnotations();
+        }
+
+        @Override
+        Class<?>[] getParameterTypes() {
+          return method.getParameterTypes();
+        }
+
+        @SuppressWarnings("AndroidJdkLibsChecker")
+        @Override
+        Parameter[] getParameters() {
+          return method.getParameters();
+        }
+      };
+    }
+  }
 }

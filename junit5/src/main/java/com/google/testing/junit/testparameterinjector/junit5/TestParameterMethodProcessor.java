@@ -36,6 +36,7 @@ import com.google.common.collect.Range;
 import com.google.common.primitives.Primitives;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.testing.junit.testparameterinjector.junit5.TestInfo.TestInfoParameter;
+import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorUtils.JavaCompatibilityExecutable;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterValuesProvider.Context;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameter.DefaultTestParameterValuesProvider;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameter.TestParameterValuesProvider;
@@ -427,24 +428,29 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     try {
       return parameterValuesCache.get(
           method,
-          () ->
-              Lists.cartesianProduct(
-                  FluentIterable.from(ImmutableList.<ImmutableList<TestParameterValueHolder>>of())
-                      .append(getFieldValueHolders(testClass))
-                      .append(
-                          calculateTestParameterValueList(
-                              TestParameterInjectorUtils.getOnlyConstructor(testClass),
-                              getAnnotationWithMetadataListWithType(
-                                  TestParameterInjectorUtils.getOnlyConstructor(testClass),
-                                  testClass),
-                              Origin.CONSTRUCTOR_PARAMETER))
-                      .append(
-                          calculateTestParameterValueList(
-                              method,
-                              getAnnotationWithMetadataListWithType(method, testClass),
-                              Origin.METHOD_PARAMETER,
-                              testClass))
-                      .toList()));
+          () -> {
+            JavaCompatibilityExecutable constructorExecutable =
+                JavaCompatibilityExecutable.create(
+                    TestParameterInjectorUtils.getOnlyConstructor(testClass));
+            JavaCompatibilityExecutable methodExecutable =
+                JavaCompatibilityExecutable.create(method);
+            return Lists.cartesianProduct(
+                FluentIterable.from(ImmutableList.<ImmutableList<TestParameterValueHolder>>of())
+                    .append(getFieldValueHolders(testClass))
+                    .append(
+                        calculateTestParameterValueList(
+                            constructorExecutable,
+                            getAnnotationWithMetadataListWithType(constructorExecutable, testClass),
+                            Origin.CONSTRUCTOR_PARAMETER,
+                            testClass))
+                    .append(
+                        calculateTestParameterValueList(
+                            methodExecutable,
+                            getAnnotationWithMetadataListWithType(methodExecutable, testClass),
+                            Origin.METHOD_PARAMETER,
+                            testClass))
+                    .toList());
+          });
     } catch (ExecutionException | UncheckedExecutionException e) {
       Throwables.throwIfUnchecked(e.getCause());
       throw new RuntimeException(e);
@@ -503,7 +509,8 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     }
 
     List<AnnotationWithMetadata> constructorAnnotations =
-        getAnnotationWithMetadataListWithType(constructor, testClass);
+        getAnnotationWithMetadataListWithType(
+            JavaCompatibilityExecutable.create(constructor), testClass);
 
     ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
     for (AnnotationWithMetadata fieldAnnotation : fieldAnnotations) {
@@ -575,62 +582,34 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         .toList();
   }
 
-  private static ImmutableList<ImmutableList<TestParameterValueHolder>>
-      calculateTestParameterValueList(
-          Constructor<?> constructor,
-          List<AnnotationWithMetadata> annotationWithMetadatas,
-          Origin origin) {
-    if (!isValidAndContainsRelevantAnnotations(constructor.getParameterAnnotations())) {
-      return ImmutableList.of();
-    }
-
-    if (isKotlinClass(constructor.getDeclaringClass())
-        && KotlinHooksForTestParameterInjector.hasOptionalParameters(constructor)) {
-      ImmutableList<ImmutableList<TestParameterValue>> valuesList =
-          KotlinHooksForTestParameterInjector.extractValuesForEachParameter(
-              constructor,
-              /* getExplicitValuesByIndex= */ index ->
-                  getExplicitValuesFromAnnotation(annotationWithMetadatas.get(index)),
-              /* getImplicitValuesByIndex= */ index ->
-                  getObviousValuesForParameterClass(
-                      annotationWithMetadatas.get(index).paramClass()));
-      return FluentIterable.from(
-              ContiguousSet.create(
-                  Range.closedOpen(0, annotationWithMetadatas.size()), DiscreteDomain.integers()))
-          .transform(
-              index ->
-                  toValueHolders(annotationWithMetadatas.get(index), valuesList.get(index), origin))
-          .toList();
-    } else {
-      return calculateTestParameterValueList(annotationWithMetadatas, origin);
-    }
-  }
-
   private ImmutableList<ImmutableList<TestParameterValueHolder>> calculateTestParameterValueList(
-      Method method,
+      JavaCompatibilityExecutable executable,
       List<AnnotationWithMetadata> annotationWithMetadatas,
       Origin origin,
       Class<?> testClass) {
-    if (!isValidAndContainsRelevantAnnotations(method.getParameterAnnotations())) {
+    if (!isValidAndContainsRelevantAnnotations(executable.getParameterAnnotations())) {
       return ImmutableList.of();
     }
 
-    if (isKotlinClass(method.getDeclaringClass())
-        && KotlinHooksForTestParameterInjector.hasOptionalParameters(method)) {
-      Object arbitraryTestInstance;
-      try {
-        arbitraryTestInstance =
-            arbitraryTestInstanceCache.get(
-                testClass,
-                () -> TestParameterMethodProcessor.createArbitraryTestInstance(testClass));
-      } catch (ExecutionException | UncheckedExecutionException e) {
-        Throwables.throwIfUnchecked(e.getCause());
-        throw new RuntimeException(e);
+    if (isKotlinClass(executable.getDeclaringClass())
+        && KotlinHooksForTestParameterInjector.hasOptionalParameters(executable)) {
+
+      Object arbitraryTestInstance = null;
+      if (executable.isMethod()) {
+        try {
+          arbitraryTestInstance =
+              arbitraryTestInstanceCache.get(
+                  testClass, () -> createArbitraryTestInstance(testClass));
+        } catch (ExecutionException | UncheckedExecutionException e) {
+          Throwables.throwIfUnchecked(e.getCause());
+          throw new RuntimeException(e);
+        }
       }
+
       ImmutableList<ImmutableList<TestParameterValue>> valuesList =
           KotlinHooksForTestParameterInjector.extractValuesForEachParameter(
               arbitraryTestInstance,
-              method,
+              executable,
               /* getExplicitValuesByIndex= */ index ->
                   getExplicitValuesFromAnnotation(annotationWithMetadatas.get(index)),
               /* getImplicitValuesByIndex= */ index ->
@@ -648,8 +627,10 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     }
   }
 
-  private static Object createArbitraryTestInstance(Class<?> testClass) {
+  private Object createArbitraryTestInstance(Class<?> testClass) {
     Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
+    JavaCompatibilityExecutable constructorExecutable =
+        JavaCompatibilityExecutable.create(constructor);
 
     List<Object> constructorParameters;
     if (constructor.getParameterTypes().length == 0) {
@@ -661,9 +642,10 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
           testClass.getName());
       ImmutableList<ImmutableList<TestParameterValueHolder>> valueList =
           calculateTestParameterValueList(
-              constructor,
-              getAnnotationWithMetadataListWithType(constructor, testClass),
-              Origin.CONSTRUCTOR_PARAMETER);
+              constructorExecutable,
+              getAnnotationWithMetadataListWithType(constructorExecutable, testClass),
+              Origin.CONSTRUCTOR_PARAMETER,
+              testClass);
       constructorParameters =
           FluentIterable.from(valueList)
               .transform(valueHolders -> valueHolders.get(0).unwrappedValue())
@@ -699,49 +681,24 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
   @SuppressWarnings("AndroidJdkLibsChecker")
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Method callable, Class<?> testClass) {
-    if (!isValidAndContainsRelevantAnnotations(callable.getParameterAnnotations())) {
+      JavaCompatibilityExecutable executable, Class<?> testClass) {
+    if (!isValidAndContainsRelevantAnnotations(executable.getParameterAnnotations())) {
       return ImmutableList.of();
     }
     Optional<ImmutableList<String>> maybeNamesFromKotlin =
         isKotlinClass(testClass)
-            ? KotlinHooksForTestParameterInjector.getParameterNames(callable)
+            ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
             : Optional.absent();
     try {
       // Parameter is not available on old Android SDKs, and isn't desugared. That's why this path
       // has a fallback that takes the parameter types and annotations (without the parameter names,
       // which are optional anyway).
       return getAnnotationWithMetadataListWithType(
-          callable.getParameters(), maybeNamesFromKotlin, testClass);
+          executable.getParameters(), maybeNamesFromKotlin, testClass);
     } catch (NoSuchMethodError ignored) {
       return getAnnotationWithMetadataListWithType(
-          callable.getParameterTypes(),
-          callable.getParameterAnnotations(),
-          maybeNamesFromKotlin,
-          testClass);
-    }
-  }
-
-  @SuppressWarnings("AndroidJdkLibsChecker")
-  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Constructor<?> callable, Class<?> testClass) {
-    if (!isValidAndContainsRelevantAnnotations(callable.getParameterAnnotations())) {
-      return ImmutableList.of();
-    }
-    Optional<ImmutableList<String>> maybeNamesFromKotlin =
-        isKotlinClass(testClass)
-            ? KotlinHooksForTestParameterInjector.getParameterNames(callable)
-            : Optional.absent();
-    try {
-      // Parameter is not available on old Android SDKs, and isn't desugared. That's why this path
-      // has a fallback that takes the parameter types and annotations (without the parameter names,
-      // which are optional anyway).
-      return getAnnotationWithMetadataListWithType(
-          callable.getParameters(), maybeNamesFromKotlin, testClass);
-    } catch (NoSuchMethodError ignored) {
-      return getAnnotationWithMetadataListWithType(
-          callable.getParameterTypes(),
-          callable.getParameterAnnotations(),
+          executable.getParameterTypes(),
+          executable.getParameterAnnotations(),
           maybeNamesFromKotlin,
           testClass);
     }
