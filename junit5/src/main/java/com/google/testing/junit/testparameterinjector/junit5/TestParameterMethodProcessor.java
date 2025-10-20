@@ -475,7 +475,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                         .asSet())
             .toList();
 
-    if (isKotlinClass(testClass)) {
+    if (TestParameterInjectorUtils.isKotlinClass(testClass)) {
       annotations = applyKotlinDuplicateAnnotationWorkaround(annotations, testClass);
     }
 
@@ -591,7 +591,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       return ImmutableList.of();
     }
 
-    if (isKotlinClass(executable.getDeclaringClass())
+    if (TestParameterInjectorUtils.isKotlinClass(executable.getDeclaringClass())
         && KotlinHooksForTestParameterInjector.hasOptionalParameters(executable)) {
 
       Object arbitraryTestInstance = null;
@@ -685,7 +685,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       return ImmutableList.of();
     }
     Optional<ImmutableList<String>> maybeNamesFromKotlin =
-        isKotlinClass(testClass)
+        TestParameterInjectorUtils.isKotlinClass(testClass)
             ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
             : Optional.absent();
 
@@ -731,11 +731,6 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     }
 
     return resultBuilder.build();
-  }
-
-  private static boolean isKotlinClass(Class<?> clazz) {
-    return FluentIterable.from(clazz.getDeclaredAnnotations())
-        .anyMatch(annotation -> annotation.annotationType().getName().equals("kotlin.Metadata"));
   }
 
   /** The origin of an annotation type. */

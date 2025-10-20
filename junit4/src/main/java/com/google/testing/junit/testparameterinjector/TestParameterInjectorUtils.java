@@ -77,6 +77,11 @@ class TestParameterInjectorUtils {
     return getOnlyElement(constructors);
   }
 
+  static boolean isKotlinClass(Class<?> clazz) {
+    return FluentIterable.from(clazz.getDeclaredAnnotations())
+        .anyMatch(annotation -> annotation.annotationType().getName().equals("kotlin.Metadata"));
+  }
+
   static ImmutableList<Annotation> filterSingleAndRepeatedAnnotations(
       Annotation[] allAnnotations, Class<? extends Annotation> annotationType) {
     ImmutableList<Annotation> candidates =
