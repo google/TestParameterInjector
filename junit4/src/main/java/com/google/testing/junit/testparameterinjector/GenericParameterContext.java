@@ -21,9 +21,9 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
+import com.google.testing.junit.testparameterinjector.TestParameterInjectorUtils.JavaCompatibilityExecutable;
 import com.google.testing.junit.testparameterinjector.TestParameterInjectorUtils.JavaCompatibilityParameter;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Parameter;
 import java.util.NoSuchElementException;
@@ -85,10 +85,8 @@ final class GenericParameterContext {
         testClass);
   }
 
-  // Executable is not available on old Android SDKs, and isn't desugared. This method is only
-  // called via @TestParameters, wich only supports newer SDKs anyway.
-  @SuppressWarnings("AndroidJdkLibsChecker")
-  static GenericParameterContext create(Executable executable, Class<?> testClass) {
+  static GenericParameterContext create(
+      JavaCompatibilityExecutable executable, Class<?> testClass) {
     return new GenericParameterContext(
         ImmutableList.copyOf(executable.getAnnotations()),
         /* getAnnotationsFunction= */ annotationType ->
