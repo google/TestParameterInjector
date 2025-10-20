@@ -688,28 +688,10 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         isKotlinClass(testClass)
             ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
             : Optional.absent();
-    return getAnnotationWithMetadataListWithType(
-        executable.getParametersWithFallback(), maybeNamesFromKotlin, testClass);
-  }
 
-  @SuppressWarnings("AndroidJdkLibsChecker")
-  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      ImmutableList<JavaCompatibilityParameter> parameters,
-      Optional<ImmutableList<String>> maybeNamesFromKotlin,
-      Class<?> testClass) {
-    if (maybeNamesFromKotlin.isPresent()) {
-      checkArgument(maybeNamesFromKotlin.get().size() == parameters.size());
-    }
-    ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
-    for (int parameterIndex = 0; parameterIndex < parameters.size(); parameterIndex++) {
-      int parameterIndexCopy = parameterIndex;
-      resultBuilder.add(
-          AnnotationWithMetadata.fromAnnotatedParameter(
-              parameters.get(parameterIndex),
-              testClass,
-              maybeNamesFromKotlin.transform(names -> names.get(parameterIndexCopy))));
-    }
-    return resultBuilder.build();
+    return FluentIterable.from(executable.getParametersWithFallback(maybeNamesFromKotlin))
+        .transform(parameter -> AnnotationWithMetadata.fromAnnotatedParameter(parameter, testClass))
+        .toList();
   }
 
   private static Optional<TestParameter> maybeGetTestParameter(Annotation[] annotations) {
@@ -840,21 +822,13 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
     @SuppressWarnings("AndroidJdkLibsChecker")
     public static AnnotationWithMetadata fromAnnotatedParameter(
-        JavaCompatibilityParameter parameter,
-        Class<?> testClass,
-        Optional<String> maybeParameterNameFromKotlin) {
+        JavaCompatibilityParameter parameter, Class<?> testClass) {
       TestParameter annotation = parameter.getAnnotation(TestParameter.class);
       checkNotNull(annotation, "Parameter %s is not annotated with @TestParameter", parameter);
-      if (maybeParameterNameFromKotlin.isPresent() && parameter.maybeGetName().isPresent()) {
-        checkState(
-            maybeParameterNameFromKotlin.equals(parameter.maybeGetName()),
-            "Parameter %s has different names in Kotlin and Java",
-            parameter);
-      }
       return AnnotationWithMetadata.withMetadata(
           annotation,
           parameter.getType(),
-          maybeParameterNameFromKotlin.or(parameter.maybeGetName()),
+          parameter.maybeGetName(),
           GenericParameterContext.create(parameter, testClass));
     }
 

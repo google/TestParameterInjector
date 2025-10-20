@@ -162,6 +162,42 @@ class TestParameterInjectorUtils {
 
     abstract ImmutableList<JavaCompatibilityParameter> getParameters();
 
+    /**
+     * Returns the same as {@link #getParameters}, with a fallback for old Android SDKs and with the
+     * given names from Kotlin reflection.
+     */
+    final ImmutableList<JavaCompatibilityParameter> getParametersWithFallback(
+        Optional<ImmutableList<String>> maybeParameterNamesFromKotlin) {
+      if (maybeParameterNamesFromKotlin.isPresent()) {
+        ImmutableList<JavaCompatibilityParameter> parameters = getParametersWithFallback();
+        ImmutableList<String> parameterNamesFromKotlin = maybeParameterNamesFromKotlin.get();
+        checkArgument(
+            parameters.size() == parameterNamesFromKotlin.size(),
+            "Expected the same number of parameters as parameter names from Kotlin reflection");
+
+        ImmutableList.Builder<JavaCompatibilityParameter> resultBuilder = ImmutableList.builder();
+        for (int parameterIndex = 0; parameterIndex < parameters.size(); parameterIndex++) {
+          JavaCompatibilityParameter parameter = parameters.get(parameterIndex);
+          String parameterNameFromKotlin = parameterNamesFromKotlin.get(parameterIndex);
+          if (parameter.maybeGetName().isPresent()) {
+            checkState(
+                parameterNameFromKotlin.equals(parameter.maybeGetName().get()),
+                "%s: Parameter %s has different names in Kotlin (%s) and Java (%s)",
+                getHumanReadableNameSummary(),
+                parameter,
+                parameterNameFromKotlin,
+                parameter.maybeGetName().get());
+            resultBuilder.add(parameter);
+          } else {
+            resultBuilder.add(parameter.withName(parameterNameFromKotlin));
+          }
+        }
+        return resultBuilder.build();
+      } else {
+        return getParametersWithFallback();
+      }
+    }
+
     /** Returns the same as {@link #getParameters}, with a fallback for old Android SDKs. */
     final ImmutableList<JavaCompatibilityParameter> getParametersWithFallback() {
       try {
@@ -341,6 +377,10 @@ class TestParameterInjectorUtils {
       } else {
         return String.format("Parameter(%s)", getType().getSimpleName());
       }
+    }
+
+    JavaCompatibilityParameter withName(String name) {
+      return create(Optional.of(name), getType(), getAnnotations(), this::getAnnotationsByType);
     }
 
     @SuppressWarnings("AndroidJdkLibsChecker")
