@@ -191,7 +191,8 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
           getExecutableParameters(executable, testClass);
       TestParametersValues parametersValues = parameterValuesList.get(parametersIndex.get());
 
-      ImmutableList<JavaCompatibilityParameter> parameters = executable.getParameters();
+      ImmutableList<JavaCompatibilityParameter> parameters =
+          getParametersWithKotlinFallback(executable, testClass);
       return Optional.of(
           FluentIterable.from(parameters)
               .transform(
@@ -220,8 +221,9 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
   private static ImmutableList<TestParametersValues> toParameterValuesList(
       JavaCompatibilityExecutable executable, Class<?> testClass) {
-    checkParameterNamesArePresent(executable);
-    ImmutableList<JavaCompatibilityParameter> parametersList = executable.getParameters();
+    ImmutableList<JavaCompatibilityParameter> parametersList =
+        getParametersWithKotlinFallback(executable, testClass);
+    checkParameterNamesArePresent(parametersList, executable);
 
     if (executable.isAnnotationPresent(TestParameters.class)) {
       checkState(
@@ -320,9 +322,10 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
     }
   }
 
-  private static void checkParameterNamesArePresent(JavaCompatibilityExecutable executable) {
+  private static void checkParameterNamesArePresent(
+      List<JavaCompatibilityParameter> parameters, JavaCompatibilityExecutable executable) {
     checkState(
-        FluentIterable.from(executable.getParameters()).allMatch(p -> p.maybeGetName().isPresent()),
+        FluentIterable.from(parameters).allMatch(p -> p.maybeGetName().isPresent()),
         ""
             + "No parameter name could be found for %s, which likely means that parameter names"
             + " aren't available at runtime. Please ensure that the this test was built with the"
@@ -347,7 +350,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
             + "</build>\n"
             + "\n"
             + "Don't forget to run `mvn clean` after making this change.",
-        executable.getName());
+        executable.getHumanReadableNameSummary());
   }
 
   private static String validateAndGetSingleValueFromRepeatedAnnotation(
@@ -438,6 +441,15 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   private static boolean hasRelevantAnnotation(JavaCompatibilityExecutable executable) {
     return executable.isAnnotationPresent(TestParameters.class)
         || executable.isAnnotationPresent(RepeatedTestParameters.class);
+  }
+
+  @SuppressWarnings("KotlinInternal")
+  private static ImmutableList<JavaCompatibilityParameter> getParametersWithKotlinFallback(
+      JavaCompatibilityExecutable executable, Class<?> testClass) {
+    return executable.getParametersWithFallback(
+        TestParameterInjectorUtils.isKotlinClass(testClass)
+            ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
+            : Optional.absent());
   }
 
   /**
