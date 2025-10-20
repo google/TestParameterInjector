@@ -127,6 +127,10 @@ internal object KotlinHooksForTestParameterInjector {
               is java.lang.reflect.Constructor<*> -> candidate.javaConstructor
               else -> throw IllegalArgumentException("Unsupported executable type: $executable")
             }
+          } catch (e: java.lang.LinkageError) {
+            // Rethrow NoClassDefFoundError and similar linkage errors. We don't want to
+            // swallow these.
+            throw e
           } catch (_: Error) {
             // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
             // consistency check. If this happens, only throw a GetJavaExecutableFailureException if
