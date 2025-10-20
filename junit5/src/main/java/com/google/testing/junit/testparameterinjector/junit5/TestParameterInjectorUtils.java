@@ -14,15 +14,21 @@
 
 package com.google.testing.junit.testparameterinjector.junit5;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
+import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorUtils.JavaCompatibilityParameter;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Proxy;
 
 /** Shared utility methods. */
 class TestParameterInjectorUtils {
@@ -108,8 +114,17 @@ class TestParameterInjectorUtils {
 
     abstract Class<?>[] getParameterTypes();
 
-    @SuppressWarnings("AndroidJdkLibsChecker")
-    abstract Parameter[] getParameters();
+    abstract ImmutableList<JavaCompatibilityParameter> getParameters();
+
+    /** Returns the same as {@link #getParameters}, with a fallback for old Android SDKs. */
+    final ImmutableList<JavaCompatibilityParameter> getParametersWithFallback() {
+      try {
+        return getParameters();
+      } catch (NoSuchMethodError ignored) {
+        // Parameter is not available on old Android SDKs, and isn't desugared
+        return JavaCompatibilityParameter.createListFromExecutable(this);
+      }
+    }
 
     final boolean isMethod() {
       return getJavaReflectVersion() instanceof Method;
@@ -173,9 +188,10 @@ class TestParameterInjectorUtils {
         }
 
         @Override
-        @SuppressWarnings("AndroidJdkLibsChecker")
-        Parameter[] getParameters() {
-          return constructor.getParameters();
+        ImmutableList<JavaCompatibilityParameter> getParameters() {
+          return FluentIterable.from(constructor.getParameters())
+              .transform(JavaCompatibilityParameter::create)
+              .toList();
         }
       };
     }
@@ -232,12 +248,152 @@ class TestParameterInjectorUtils {
           return method.getParameterTypes();
         }
 
-        @SuppressWarnings("AndroidJdkLibsChecker")
         @Override
-        Parameter[] getParameters() {
-          return method.getParameters();
+        ImmutableList<JavaCompatibilityParameter> getParameters() {
+          return FluentIterable.from(method.getParameters())
+              .transform(JavaCompatibilityParameter::create)
+              .toList();
         }
       };
+    }
+  }
+
+  /**
+   * Represents a constructor or method parameter.
+   *
+   * <p>This is a replacement for java.lang.reflect.Parameter that is not available on old Android
+   * SDKs, and isn't desugared.
+   */
+  abstract static class JavaCompatibilityParameter {
+
+    abstract Optional<String> maybeGetName();
+
+    abstract Class<?> getType();
+
+    abstract Annotation[] getAnnotations();
+
+    abstract <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationClass);
+
+    @SuppressWarnings("unchecked") // Safe because of the filter operation
+    <A extends Annotation> A getAnnotation(Class<A> annotationType) {
+      return (A)
+          getOnlyElement(
+              FluentIterable.from(getAnnotations())
+                  .filter(annotation -> annotation.annotationType().equals(annotationType))
+                  .toList());
+    }
+
+    @Override
+    public final String toString() {
+      if (maybeGetName().isPresent()) {
+        return String.format("Parameter(%s %s)", getType().getSimpleName(), maybeGetName().get());
+      } else {
+        return String.format("Parameter(%s)", getType().getSimpleName());
+      }
+    }
+
+    @SuppressWarnings("AndroidJdkLibsChecker")
+    static JavaCompatibilityParameter create(Parameter parameter) {
+      return create(
+          parameter.isNamePresent() ? Optional.of(parameter.getName()) : Optional.absent(),
+          parameter.getType(),
+          parameter.getAnnotations(),
+          parameter::getAnnotationsByType);
+    }
+
+    @SuppressWarnings("AndroidJdkLibsChecker")
+    static JavaCompatibilityParameter create(
+        Optional<String> maybeName,
+        Class<?> type,
+        Annotation[] annotations,
+        Function<Class<? extends Annotation>, Annotation[]> getAnnotationsByType) {
+      return new JavaCompatibilityParameter() {
+        @Override
+        Optional<String> maybeGetName() {
+          return maybeName;
+        }
+
+        @Override
+        Class<?> getType() {
+          return type;
+        }
+
+        @Override
+        Annotation[] getAnnotations() {
+          return annotations;
+        }
+
+        @SuppressWarnings("unchecked") // Safe because all (package private) callers are known
+        @Override
+        <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationClass) {
+          return (A[]) getAnnotationsByType.apply(annotationClass);
+        }
+      };
+    }
+
+    static ImmutableList<JavaCompatibilityParameter> createListFromExecutable(
+        JavaCompatibilityExecutable executable) {
+      Class<?>[] parameterTypes = executable.getParameterTypes();
+      Annotation[][] annotations = executable.getParameterAnnotations();
+      checkArgument(parameterTypes.length == annotations.length);
+
+      ImmutableList.Builder<JavaCompatibilityParameter> resultBuilder = ImmutableList.builder();
+      for (int parameterIndex = 0; parameterIndex < annotations.length; parameterIndex++) {
+        Annotation[] parameterAnnotations = executable.getParameterAnnotations()[parameterIndex];
+        resultBuilder.add(
+            create(
+                /* maybeName= */ Optional.absent(),
+                /* type= */ parameterTypes[parameterIndex],
+                /* annotations= */ annotations[parameterIndex],
+                /* getAnnotationsByType= */ annotationClass ->
+                    getAnnotationsFallback(parameterAnnotations, annotationClass)
+                        .toArray(new Annotation[0])));
+      }
+      return resultBuilder.build();
+    }
+
+    private static ImmutableList<Annotation> getAnnotationsFallback(
+        Annotation[] annotationsOnParameter, Class<? extends Annotation> annotationType) {
+      ImmutableList<Annotation> candidates =
+          FluentIterable.from(annotationsOnParameter)
+              .filter(annotation -> annotation.annotationType().equals(annotationType))
+              .toList();
+      if (candidates.isEmpty() && getContainerType(annotationType).isPresent()) {
+        ImmutableList<Annotation> containerAnnotations =
+            getAnnotationsFallback(annotationsOnParameter, getContainerType(annotationType).get());
+        if (containerAnnotations.size() == 1) {
+          Annotation containerAnnotation = getOnlyElement(containerAnnotations);
+          try {
+            Method annotationValueMethod =
+                containerAnnotation.annotationType().getDeclaredMethod("value");
+            annotationValueMethod.setAccessible(true);
+            return ImmutableList.copyOf(
+                (Annotation[])
+                    Proxy.getInvocationHandler(containerAnnotation)
+                        .invoke(containerAnnotation, annotationValueMethod, null));
+          } catch (Throwable e) {
+            throw new RuntimeException(e);
+          }
+        }
+        return ImmutableList.of();
+      } else {
+        return candidates;
+      }
+    }
+
+    private static Optional<Class<? extends Annotation>> getContainerType(
+        Class<? extends Annotation> annotationType) {
+      try {
+        Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
+        if (repeatable == null) {
+          return Optional.absent();
+        } else {
+          return Optional.of(repeatable.value());
+        }
+      } catch (NoClassDefFoundError ignored) {
+        // If @Repeatable does not exist, then there is no container type by definition
+        return Optional.absent();
+      }
     }
   }
 }

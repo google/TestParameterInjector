@@ -37,6 +37,7 @@ import com.google.common.primitives.Primitives;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import com.google.testing.junit.testparameterinjector.TestParameterInjectorUtils.JavaCompatibilityExecutable;
+import com.google.testing.junit.testparameterinjector.TestParameterInjectorUtils.JavaCompatibilityParameter;
 import com.google.testing.junit.testparameterinjector.TestParameterValuesProvider.Context;
 import com.google.testing.junit.testparameterinjector.TestParameter.DefaultTestParameterValuesProvider;
 import com.google.testing.junit.testparameterinjector.TestParameter.TestParameterValuesProvider;
@@ -47,7 +48,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -679,7 +679,6 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         .toList();
   }
 
-  @SuppressWarnings("AndroidJdkLibsChecker")
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
       JavaCompatibilityExecutable executable, Class<?> testClass) {
     if (!isValidAndContainsRelevantAnnotations(executable.getParameterAnnotations())) {
@@ -689,58 +688,26 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         isKotlinClass(testClass)
             ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
             : Optional.absent();
-    try {
-      // Parameter is not available on old Android SDKs, and isn't desugared. That's why this path
-      // has a fallback that takes the parameter types and annotations (without the parameter names,
-      // which are optional anyway).
-      return getAnnotationWithMetadataListWithType(
-          executable.getParameters(), maybeNamesFromKotlin, testClass);
-    } catch (NoSuchMethodError ignored) {
-      return getAnnotationWithMetadataListWithType(
-          executable.getParameterTypes(),
-          executable.getParameterAnnotations(),
-          maybeNamesFromKotlin,
-          testClass);
-    }
+    return getAnnotationWithMetadataListWithType(
+        executable.getParametersWithFallback(), maybeNamesFromKotlin, testClass);
   }
 
   @SuppressWarnings("AndroidJdkLibsChecker")
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Parameter[] parameters,
+      ImmutableList<JavaCompatibilityParameter> parameters,
       Optional<ImmutableList<String>> maybeNamesFromKotlin,
       Class<?> testClass) {
     if (maybeNamesFromKotlin.isPresent()) {
-      checkArgument(maybeNamesFromKotlin.get().size() == parameters.length);
+      checkArgument(maybeNamesFromKotlin.get().size() == parameters.size());
     }
     ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
-    for (int parameterIndex = 0; parameterIndex < parameters.length; parameterIndex++) {
+    for (int parameterIndex = 0; parameterIndex < parameters.size(); parameterIndex++) {
       int parameterIndexCopy = parameterIndex;
       resultBuilder.add(
           AnnotationWithMetadata.fromAnnotatedParameter(
-              parameters[parameterIndex],
+              parameters.get(parameterIndex),
               testClass,
               maybeNamesFromKotlin.transform(names -> names.get(parameterIndexCopy))));
-    }
-    return resultBuilder.build();
-  }
-
-  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Class<?>[] parameterTypes,
-      Annotation[][] annotations,
-      Optional<ImmutableList<String>> maybeNamesFromKotlin,
-      Class<?> testClass) {
-    checkArgument(parameterTypes.length == annotations.length);
-
-    ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
-    for (int parameterIndex = 0; parameterIndex < annotations.length; parameterIndex++) {
-      int parameterIndexCopy = parameterIndex;
-      resultBuilder.add(
-          AnnotationWithMetadata.withMetadata(
-              maybeGetTestParameter(annotations[parameterIndex]).get(),
-              parameterTypes[parameterIndex],
-              maybeNamesFromKotlin.transform(names -> names.get(parameterIndexCopy)),
-              GenericParameterContext.createWithRepeatableAnnotationsFallback(
-                  annotations[parameterIndex], testClass)));
     }
     return resultBuilder.build();
   }
@@ -873,20 +840,21 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
     @SuppressWarnings("AndroidJdkLibsChecker")
     public static AnnotationWithMetadata fromAnnotatedParameter(
-        Parameter parameter, Class<?> testClass, Optional<String> maybeParameterNameFromKotlin) {
+        JavaCompatibilityParameter parameter,
+        Class<?> testClass,
+        Optional<String> maybeParameterNameFromKotlin) {
       TestParameter annotation = parameter.getAnnotation(TestParameter.class);
       checkNotNull(annotation, "Parameter %s is not annotated with @TestParameter", parameter);
-      if (maybeParameterNameFromKotlin.isPresent() && parameter.isNamePresent()) {
+      if (maybeParameterNameFromKotlin.isPresent() && parameter.maybeGetName().isPresent()) {
         checkState(
-            maybeParameterNameFromKotlin.get().equals(parameter.getName()),
+            maybeParameterNameFromKotlin.equals(parameter.maybeGetName()),
             "Parameter %s has different names in Kotlin and Java",
             parameter);
       }
       return AnnotationWithMetadata.withMetadata(
           annotation,
           parameter.getType(),
-          maybeParameterNameFromKotlin.or(
-              parameter.isNamePresent() ? Optional.of(parameter.getName()) : Optional.absent()),
+          maybeParameterNameFromKotlin.or(parameter.maybeGetName()),
           GenericParameterContext.create(parameter, testClass));
     }
 

@@ -22,6 +22,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
+import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorUtils.JavaCompatibilityParameter;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Executable;
@@ -73,6 +74,14 @@ final class GenericParameterContext {
   // should only be called with a fallback.
   @SuppressWarnings("AndroidJdkLibsChecker")
   static GenericParameterContext create(Parameter parameter, Class<?> testClass) {
+    return new GenericParameterContext(
+        ImmutableList.copyOf(parameter.getAnnotations()),
+        /* getAnnotationsFunction= */ annotationType ->
+            ImmutableList.copyOf(parameter.getAnnotationsByType(annotationType)),
+        testClass);
+  }
+
+  static GenericParameterContext create(JavaCompatibilityParameter parameter, Class<?> testClass) {
     return new GenericParameterContext(
         ImmutableList.copyOf(parameter.getAnnotations()),
         /* getAnnotationsFunction= */ annotationType ->
