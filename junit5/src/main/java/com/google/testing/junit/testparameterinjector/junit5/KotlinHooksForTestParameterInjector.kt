@@ -30,6 +30,32 @@ import kotlin.reflect.jvm.javaMethod
 object KotlinHooksForTestParameterInjector {
 
   @JvmStatic
+  fun getParameterNames(method: java.lang.reflect.Method): Optional<ImmutableList<String>> {
+    return try {
+      Optional.of(ImmutableList.copyOf(methodToFunction(method).parameters.mapNotNull { it.name }))
+    } catch (_: GetJavaExecutableFailureException) {
+      // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
+      // consistency check. This is a workaround to avoid breaking these tests.
+      Optional.absent()
+    }
+  }
+
+  @JvmStatic
+  fun getParameterNames(
+    constructor: java.lang.reflect.Constructor<*>
+  ): Optional<ImmutableList<String>> {
+    return try {
+      Optional.of(
+        ImmutableList.copyOf(constructorToFunction(constructor).parameters.map { it.name })
+      )
+    } catch (_: GetJavaExecutableFailureException) {
+      // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
+      // consistency check. This is a workaround to avoid breaking these tests.
+      Optional.absent()
+    }
+  }
+
+  @JvmStatic
   fun hasOptionalParameters(method: java.lang.reflect.Method): Boolean {
     return try {
       methodToFunction(method).parameters.any { it.kind == KParameter.Kind.VALUE && it.isOptional }

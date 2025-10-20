@@ -1,3 +1,8 @@
+## 1.20
+
+- For Kotlin tests: Get parameter names via Kotlin reflection (which always
+  seems to work). This should make the breaking change in 1.19 non-breaking.
+
 ## 1.19
 
 - Fix for 2025 Kotlin change  that causes the field/parameter of a primary

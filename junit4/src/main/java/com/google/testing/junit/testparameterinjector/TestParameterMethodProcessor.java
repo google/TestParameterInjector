@@ -463,7 +463,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                                 AnnotationWithMetadata.withMetadata(
                                     annotation,
                                     field.getType(),
-                                    field.getName(),
+                                    Optional.of(field.getName()),
                                     GenericParameterContext.create(field, testClass)))
                         .asSet())
             .toList();
@@ -702,17 +702,22 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     if (!isValidAndContainsRelevantAnnotations(callable.getParameterAnnotations())) {
       return ImmutableList.of();
     }
+    Optional<ImmutableList<String>> maybeNamesFromKotlin =
+        isKotlinClass(testClass)
+            ? KotlinHooksForTestParameterInjector.getParameterNames(callable)
+            : Optional.absent();
     try {
       // Parameter is not available on old Android SDKs, and isn't desugared. That's why this path
       // has a fallback that takes the parameter types and annotations (without the parameter names,
       // which are optional anyway).
-      return FluentIterable.from(callable.getParameters())
-          .transform(
-              parameter -> AnnotationWithMetadata.fromAnnotatedParameter(parameter, testClass))
-          .toList();
+      return getAnnotationWithMetadataListWithType(
+          callable.getParameters(), maybeNamesFromKotlin, testClass);
     } catch (NoSuchMethodError ignored) {
       return getAnnotationWithMetadataListWithType(
-          callable.getParameterTypes(), callable.getParameterAnnotations(), testClass);
+          callable.getParameterTypes(),
+          callable.getParameterAnnotations(),
+          maybeNamesFromKotlin,
+          testClass);
     }
   }
 
@@ -722,30 +727,60 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     if (!isValidAndContainsRelevantAnnotations(callable.getParameterAnnotations())) {
       return ImmutableList.of();
     }
+    Optional<ImmutableList<String>> maybeNamesFromKotlin =
+        isKotlinClass(testClass)
+            ? KotlinHooksForTestParameterInjector.getParameterNames(callable)
+            : Optional.absent();
     try {
       // Parameter is not available on old Android SDKs, and isn't desugared. That's why this path
       // has a fallback that takes the parameter types and annotations (without the parameter names,
       // which are optional anyway).
-      return FluentIterable.from(callable.getParameters())
-          .transform(
-              parameter -> AnnotationWithMetadata.fromAnnotatedParameter(parameter, testClass))
-          .toList();
+      return getAnnotationWithMetadataListWithType(
+          callable.getParameters(), maybeNamesFromKotlin, testClass);
     } catch (NoSuchMethodError ignored) {
       return getAnnotationWithMetadataListWithType(
-          callable.getParameterTypes(), callable.getParameterAnnotations(), testClass);
+          callable.getParameterTypes(),
+          callable.getParameterAnnotations(),
+          maybeNamesFromKotlin,
+          testClass);
     }
   }
 
+  @SuppressWarnings("AndroidJdkLibsChecker")
   private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
-      Class<?>[] parameterTypes, Annotation[][] annotations, Class<?> testClass) {
+      Parameter[] parameters,
+      Optional<ImmutableList<String>> maybeNamesFromKotlin,
+      Class<?> testClass) {
+    if (maybeNamesFromKotlin.isPresent()) {
+      checkArgument(maybeNamesFromKotlin.get().size() == parameters.length);
+    }
+    ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
+    for (int parameterIndex = 0; parameterIndex < parameters.length; parameterIndex++) {
+      int parameterIndexCopy = parameterIndex;
+      resultBuilder.add(
+          AnnotationWithMetadata.fromAnnotatedParameter(
+              parameters[parameterIndex],
+              testClass,
+              maybeNamesFromKotlin.transform(names -> names.get(parameterIndexCopy))));
+    }
+    return resultBuilder.build();
+  }
+
+  private static ImmutableList<AnnotationWithMetadata> getAnnotationWithMetadataListWithType(
+      Class<?>[] parameterTypes,
+      Annotation[][] annotations,
+      Optional<ImmutableList<String>> maybeNamesFromKotlin,
+      Class<?> testClass) {
     checkArgument(parameterTypes.length == annotations.length);
 
     ImmutableList.Builder<AnnotationWithMetadata> resultBuilder = ImmutableList.builder();
     for (int parameterIndex = 0; parameterIndex < annotations.length; parameterIndex++) {
+      int parameterIndexCopy = parameterIndex;
       resultBuilder.add(
           AnnotationWithMetadata.withMetadata(
               maybeGetTestParameter(annotations[parameterIndex]).get(),
               parameterTypes[parameterIndex],
+              maybeNamesFromKotlin.transform(names -> names.get(parameterIndexCopy)),
               GenericParameterContext.createWithRepeatableAnnotationsFallback(
                   annotations[parameterIndex], testClass)));
     }
@@ -872,33 +907,29 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     public static AnnotationWithMetadata withMetadata(
         TestParameter annotation,
         Class<?> paramClass,
-        String paramName,
+        Optional<String> paramName,
         GenericParameterContext context) {
       return new AutoValue_TestParameterMethodProcessor_AnnotationWithMetadata(
-          annotation, paramClass, Optional.of(paramName), context);
-    }
-
-    public static AnnotationWithMetadata withMetadata(
-        TestParameter annotation, Class<?> paramClass, GenericParameterContext context) {
-      return new AutoValue_TestParameterMethodProcessor_AnnotationWithMetadata(
-          annotation, paramClass, /* paramName= */ Optional.absent(), context);
+          annotation, paramClass, paramName, context);
     }
 
     @SuppressWarnings("AndroidJdkLibsChecker")
     public static AnnotationWithMetadata fromAnnotatedParameter(
-        Parameter parameter, Class<?> testClass) {
+        Parameter parameter, Class<?> testClass, Optional<String> maybeParameterNameFromKotlin) {
       TestParameter annotation = parameter.getAnnotation(TestParameter.class);
       checkNotNull(annotation, "Parameter %s is not annotated with @TestParameter", parameter);
-      return parameter.isNamePresent()
-          ? AnnotationWithMetadata.withMetadata(
-              annotation,
-              parameter.getType(),
-              parameter.getName(),
-              GenericParameterContext.create(parameter, testClass))
-          : AnnotationWithMetadata.withMetadata(
-              annotation,
-              parameter.getType(),
-              GenericParameterContext.create(parameter, testClass));
+      if (maybeParameterNameFromKotlin.isPresent() && parameter.isNamePresent()) {
+        checkState(
+            maybeParameterNameFromKotlin.get().equals(parameter.getName()),
+            "Parameter %s has different names in Kotlin and Java",
+            parameter);
+      }
+      return AnnotationWithMetadata.withMetadata(
+          annotation,
+          parameter.getType(),
+          maybeParameterNameFromKotlin.or(
+              parameter.isNamePresent() ? Optional.of(parameter.getName()) : Optional.absent()),
+          GenericParameterContext.create(parameter, testClass));
     }
 
     // Prevent anyone relying on equals() and hashCode() so that it remains possible to add fields
