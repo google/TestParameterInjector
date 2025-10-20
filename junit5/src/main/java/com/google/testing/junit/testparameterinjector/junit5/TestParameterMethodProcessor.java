@@ -209,7 +209,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       AnnotationWithMetadata annotationWithMetadata) {
     TestParameter annotation = annotationWithMetadata.annotation();
 
-    boolean valueIsSet = annotation.value().length > 0;
+    boolean valueIsSet = !valueIsEmpty(annotation);
     Class<? extends TestParameterValuesProvider> valuesProvider = valuesProvider(annotation);
     boolean valuesProviderIsSet = !valuesProvider.equals(DefaultTestParameterValuesProvider.class);
     checkState(
@@ -218,8 +218,26 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         annotation);
 
     if (valueIsSet) {
+      if (isAndroidMarshmallow()) {
+        System.err.println("Note from TestParameterInjector:");
+        System.err.println(
+            "Under Android 23, we have seen crashes on the operation we are about to perform.");
+        System.err.println(
+            "If you see a crash here, you may be able to work around it by changing your"
+                + " @TestParameter annotation to specify a valuesProvider instead of a value"
+                + " array.");
+        System.err.println("For background, see bug 287424109.");
+        System.err.println("We will now perform the operation...");
+      }
+      String[] value = annotation.value();
+      if (isAndroidMarshmallow()) {
+        System.err.println("The operation has succeeded.");
+        System.err.println(
+            "Any crash after now is unrelated to TestParameterInjector or is at least somewhat"
+                + " different from the usual crash.");
+      }
       return Optional.of(
-          FluentIterable.from(annotation.value())
+          FluentIterable.from(value)
               .transform(
                   v ->
                       TestParameterValue.maybeWrap(
@@ -245,7 +263,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
    */
   private static Class<? extends TestParameterValuesProvider> valuesProvider(
       TestParameter annotation) {
-    if (!isAndroid()) {
+    if (!isAndroidMarshmallow()) {
       return annotation.valuesProvider();
     }
 
@@ -276,8 +294,30 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     }
   }
 
-  private static boolean isAndroid() {
-    return System.getProperty("java.runtime.name", "").contains("Android");
+  /**
+   * Checks whether {@code annotation.value()} is an empty array, working around b/287424109.
+   *
+   * <p>Compare {@link #valuesProvider}.
+   */
+  private static boolean valueIsEmpty(TestParameter annotation) {
+    return isAndroidMarshmallow()
+        ? annotation.toString().contains("TestParameter(value=[], valuesProvider=")
+        : annotation.value().length == 0;
+  }
+
+  private static boolean isAndroidMarshmallow() {
+    if (!System.getProperty("java.runtime.name", "").contains("Android")) {
+      return false;
+    }
+
+    try {
+      int version = (int) Class.forName("android.os.Build$VERSION").getField("SDK_INT").get(null);
+      int marshmallow =
+          (int) Class.forName("android.os.Build$VERSION_CODES").getField("M").get(null);
+      return version == marshmallow;
+    } catch (ReflectiveOperationException e) {
+      throw new LinkageError(e.getMessage(), e);
+    }
   }
 
   /**
