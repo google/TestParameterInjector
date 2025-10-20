@@ -120,24 +120,28 @@ internal object KotlinHooksForTestParameterInjector {
     var caughtError = false
     for (candidate in candidates) {
       if (candidate is KFunction<*>) {
-        val candidateJavaExecutable =
-          try {
-            when (executable.javaReflectVersion) {
-              is java.lang.reflect.Method -> candidate.javaMethod
-              is java.lang.reflect.Constructor<*> -> candidate.javaConstructor
-              else -> throw IllegalArgumentException("Unsupported executable type: $executable")
-            }
-          } catch (e: java.lang.LinkageError) {
-            // Rethrow NoClassDefFoundError and similar linkage errors. We don't want to
-            // swallow these.
-            throw e
-          } catch (_: Error) {
-            // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
-            // consistency check. If this happens, only throw a GetJavaExecutableFailureException if
-            // the method we are looking for has this error.
-            caughtError = true
-            continue
+        val candidateJavaExecutable: Any?
+        try {
+          // Using if statements instead of when because Kotlin's compiler can optimize the Method
+          // and Constructor types into an Executable, which fails on older Android SDKs.
+          if (executable.javaReflectVersion is java.lang.reflect.Method) {
+            candidateJavaExecutable = candidate.javaMethod
+          } else if (executable.javaReflectVersion is java.lang.reflect.Constructor<*>) {
+            candidateJavaExecutable = candidate.javaConstructor
+          } else {
+            throw IllegalArgumentException("Unsupported executable type: $executable")
           }
+        } catch (e: java.lang.LinkageError) {
+          // Rethrow NoClassDefFoundError and similar linkage errors. We don't want to
+          // swallow these.
+          throw e
+        } catch (_: Error) {
+          // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
+          // consistency check. If this happens, only throw a GetJavaExecutableFailureException if
+          // the method we are looking for has this error.
+          caughtError = true
+          continue
+        }
         if (candidateJavaExecutable == executable.javaReflectVersion) {
           matches.add(candidate)
         }
