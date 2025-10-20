@@ -19,6 +19,7 @@ import static com.google.common.base.Verify.verify;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -43,7 +44,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -168,33 +168,35 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   @Override
   public Optional<List<Object>> maybeGetConstructorParameters(
       Constructor<?> constructor, TestInfo testInfo) {
-    JavaCompatibilityExecutable constructorExecutable =
-        JavaCompatibilityExecutable.create(constructor);
-    if (hasRelevantAnnotation(constructorExecutable)) {
-      ImmutableList<TestParametersValues> parameterValuesList =
-          getExecutableParameters(constructorExecutable, constructor.getDeclaringClass());
-      TestParametersValues parametersValues =
-          parameterValuesList.get(
-              testInfo.getAnnotation(TestIndexHolder.class).constructorParametersIndex());
-
-      return Optional.of(toParameterList(parametersValues, constructorExecutable.getParameters()));
-    } else {
-      return Optional.absent();
-    }
+    return maybeGetExecutableParameters(
+        JavaCompatibilityExecutable.create(constructor),
+        testInfo.getTestClass(),
+        () -> testInfo.getAnnotation(TestIndexHolder.class).constructorParametersIndex());
   }
 
   @Override
   public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
-    JavaCompatibilityExecutable testMethodExecutable =
-        JavaCompatibilityExecutable.create(testInfo.getMethod());
-    if (hasRelevantAnnotation(testMethodExecutable)) {
-      ImmutableList<TestParametersValues> parameterValuesList =
-          getExecutableParameters(testMethodExecutable, testInfo.getTestClass());
-      TestParametersValues parametersValues =
-          parameterValuesList.get(
-              testInfo.getAnnotation(TestIndexHolder.class).methodParametersIndex());
+    return maybeGetExecutableParameters(
+        JavaCompatibilityExecutable.create(testInfo.getMethod()),
+        testInfo.getTestClass(),
+        () -> testInfo.getAnnotation(TestIndexHolder.class).methodParametersIndex());
+  }
 
-      return Optional.of(toParameterList(parametersValues, testMethodExecutable.getParameters()));
+  private Optional<List<Object>> maybeGetExecutableParameters(
+      JavaCompatibilityExecutable executable,
+      Class<?> testClass,
+      Supplier<Integer> parametersIndex) {
+    if (hasRelevantAnnotation(executable)) {
+      ImmutableList<TestParametersValues> parameterValuesList =
+          getExecutableParameters(executable, testClass);
+      TestParametersValues parametersValues = parameterValuesList.get(parametersIndex.get());
+
+      ImmutableList<JavaCompatibilityParameter> parameters = executable.getParameters();
+      return Optional.of(
+          FluentIterable.from(parameters)
+              .transform(
+                  parameter -> parametersValues.parametersMap().get(parameter.maybeGetName().get()))
+              .copyInto(new ArrayList<>(parameters.size())));
     } else {
       return Optional.absent();
     }
@@ -436,14 +438,6 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   private static boolean hasRelevantAnnotation(JavaCompatibilityExecutable executable) {
     return executable.isAnnotationPresent(TestParameters.class)
         || executable.isAnnotationPresent(RepeatedTestParameters.class);
-  }
-
-  private static List<Object> toParameterList(
-      TestParametersValues parametersValues, Collection<JavaCompatibilityParameter> parameters) {
-    return FluentIterable.from(parameters)
-        .transform(
-            parameter -> parametersValues.parametersMap().get(parameter.maybeGetName().get()))
-        .copyInto(new ArrayList<>(parameters.size()));
   }
 
   /**
