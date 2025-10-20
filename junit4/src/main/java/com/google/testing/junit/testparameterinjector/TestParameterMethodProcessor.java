@@ -58,6 +58,7 @@ import javax.annotation.Nullable;
 /**
  * {@code TestMethodProcessor} implementation for supporting the {@link TestParameter} annotation.
  */
+@SuppressWarnings("KotlinInternal")
 class TestParameterMethodProcessor implements TestMethodProcessor {
 
   private final Cache<Method, List<List<TestParameterValueHolder>>> parameterValuesCache =
