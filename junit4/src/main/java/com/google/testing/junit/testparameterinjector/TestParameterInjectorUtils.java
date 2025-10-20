@@ -25,7 +25,7 @@ import java.lang.reflect.Constructor;
 class TestParameterInjectorUtils {
 
   static Constructor<?> getOnlyConstructor(Class<?> testClass) {
-    return getOnlyConstructorInternal(testClass, /* allowNonPublicConstructor= */ false);
+    return getOnlyConstructorInternal(testClass, /* allowNonPublicConstructor= */ true);
   }
 
   static void validateOnlyOneConstructor(Class<?> testClass, boolean allowNonPublicConstructor) {
