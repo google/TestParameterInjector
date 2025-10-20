@@ -100,15 +100,6 @@ final class GenericParameterContext {
         testClass);
   }
 
-  static GenericParameterContext createWithRepeatableAnnotationsFallback(
-      Annotation[] annotationsOnParameter, Class<?> testClass) {
-    return new GenericParameterContext(
-        ImmutableList.copyOf(annotationsOnParameter),
-        /* getAnnotationsFunction= */ annotationType ->
-            getAnnotationsFallback(ImmutableList.copyOf(annotationsOnParameter), annotationType),
-        testClass);
-  }
-
   static GenericParameterContext createWithoutParameterAnnotations(Class<?> testClass) {
     return new GenericParameterContext(
         /* annotationsOnParameter= */ ImmutableList.of(),

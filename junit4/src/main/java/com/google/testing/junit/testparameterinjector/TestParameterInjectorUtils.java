@@ -29,6 +29,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.Proxy;
+import javax.annotation.Nullable;
 
 /** Shared utility methods. */
 class TestParameterInjectorUtils {
@@ -275,12 +276,17 @@ class TestParameterInjectorUtils {
     abstract <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationClass);
 
     @SuppressWarnings("unchecked") // Safe because of the filter operation
+    @Nullable
     <A extends Annotation> A getAnnotation(Class<A> annotationType) {
-      return (A)
-          getOnlyElement(
-              FluentIterable.from(getAnnotations())
-                  .filter(annotation -> annotation.annotationType().equals(annotationType))
-                  .toList());
+      ImmutableList<Annotation> candidates =
+          FluentIterable.from(getAnnotations())
+              .filter(annotation -> annotation.annotationType().equals(annotationType))
+              .toList();
+      if (candidates.size() == 0) {
+        return null;
+      } else {
+        return (A) getOnlyElement(candidates);
+      }
     }
 
     @Override
