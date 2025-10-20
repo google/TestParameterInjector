@@ -314,7 +314,9 @@ class TestParameterInjectorKotlinTest {
   internal class TestParameter_WithDefaultValues_OnConstructor(
     @TestParameter("11") private val depth: Int,
     @TestParameter private val width: Int = KotlinTestParameters.testValues(5, 6),
-    @TestParameter private val height: Int = KotlinTestParameters.testValues(8, 9),
+    @TestParameter
+    private val height: Int =
+      KotlinTestParameters.namedTestValuesIn(mapOf("very short" to 5, "very tall" to 55)),
     @TestParameter("false") private val isCircular: Boolean,
   ) : SuccessfulTestCaseBase() {
 
@@ -325,10 +327,10 @@ class TestParameterInjectorKotlinTest {
 
     override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
       return ImmutableMap.builder<String, String>()
-        .put("test[depth=11,width=5,height=8,isCircular=false]", "11:5:8:false")
-        .put("test[depth=11,width=5,height=9,isCircular=false]", "11:5:9:false")
-        .put("test[depth=11,width=6,height=8,isCircular=false]", "11:6:8:false")
-        .put("test[depth=11,width=6,height=9,isCircular=false]", "11:6:9:false")
+        .put("test[depth=11,width=5,very short,isCircular=false]", "11:5:5:false")
+        .put("test[depth=11,width=5,very tall,isCircular=false]", "11:5:55:false")
+        .put("test[depth=11,width=6,very short,isCircular=false]", "11:6:5:false")
+        .put("test[depth=11,width=6,very tall,isCircular=false]", "11:6:55:false")
         .buildOrThrow()
     }
   }

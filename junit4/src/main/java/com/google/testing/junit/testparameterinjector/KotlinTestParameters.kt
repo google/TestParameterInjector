@@ -72,6 +72,17 @@ object KotlinTestParameters {
     )
   }
 
+  /**
+   * Specifies the values to be used for a parameter keyed by name. The parameter names will be used
+   * in the test name.
+   */
+  @JvmName("-namedTestValuesIn") // Invalid JVM name to effectively prohibit Java use
+  fun <T> namedTestValuesIn(values: Map<String, T>): T {
+    throw KotlinDefaultParameterHolderException(
+      values.entries.map { TestParameterValue.wrap(it.value).withName(it.key) }
+    )
+  }
+
   internal class KotlinDefaultParameterHolderException(
     val testParameterValues: List<TestParameterValue>
   ) :
