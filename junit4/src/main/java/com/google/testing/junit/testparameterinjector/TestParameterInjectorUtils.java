@@ -75,6 +75,51 @@ class TestParameterInjectorUtils {
     return getOnlyElement(constructors);
   }
 
+  static ImmutableList<Annotation> filterSingleAndRepeatedAnnotations(
+      Annotation[] allAnnotations, Class<? extends Annotation> annotationType) {
+    ImmutableList<Annotation> candidates =
+        FluentIterable.from(allAnnotations)
+            .filter(annotation -> annotation.annotationType().equals(annotationType))
+            .toList();
+    if (candidates.isEmpty() && getContainerType(annotationType).isPresent()) {
+      ImmutableList<Annotation> containerAnnotations =
+          filterSingleAndRepeatedAnnotations(
+              allAnnotations, getContainerType(annotationType).get());
+      if (containerAnnotations.size() == 1) {
+        Annotation containerAnnotation = getOnlyElement(containerAnnotations);
+        try {
+          Method annotationValueMethod =
+              containerAnnotation.annotationType().getDeclaredMethod("value");
+          annotationValueMethod.setAccessible(true);
+          return ImmutableList.copyOf(
+              (Annotation[])
+                  Proxy.getInvocationHandler(containerAnnotation)
+                      .invoke(containerAnnotation, annotationValueMethod, null));
+        } catch (Throwable e) {
+          throw new RuntimeException(e);
+        }
+      }
+      return ImmutableList.of();
+    } else {
+      return candidates;
+    }
+  }
+
+  private static Optional<Class<? extends Annotation>> getContainerType(
+      Class<? extends Annotation> annotationType) {
+    try {
+      Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
+      if (repeatable == null) {
+        return Optional.absent();
+      } else {
+        return Optional.of(repeatable.value());
+      }
+    } catch (NoClassDefFoundError ignored) {
+      // If @Repeatable does not exist, then there is no container type by definition
+      return Optional.absent();
+    }
+  }
+
   private TestParameterInjectorUtils() {}
 
   /**
@@ -352,54 +397,10 @@ class TestParameterInjectorUtils {
                 /* type= */ parameterTypes[parameterIndex],
                 /* annotations= */ annotations[parameterIndex],
                 /* getAnnotationsByType= */ annotationClass ->
-                    getAnnotationsFallback(parameterAnnotations, annotationClass)
+                    filterSingleAndRepeatedAnnotations(parameterAnnotations, annotationClass)
                         .toArray(new Annotation[0])));
       }
       return resultBuilder.build();
-    }
-
-    private static ImmutableList<Annotation> getAnnotationsFallback(
-        Annotation[] annotationsOnParameter, Class<? extends Annotation> annotationType) {
-      ImmutableList<Annotation> candidates =
-          FluentIterable.from(annotationsOnParameter)
-              .filter(annotation -> annotation.annotationType().equals(annotationType))
-              .toList();
-      if (candidates.isEmpty() && getContainerType(annotationType).isPresent()) {
-        ImmutableList<Annotation> containerAnnotations =
-            getAnnotationsFallback(annotationsOnParameter, getContainerType(annotationType).get());
-        if (containerAnnotations.size() == 1) {
-          Annotation containerAnnotation = getOnlyElement(containerAnnotations);
-          try {
-            Method annotationValueMethod =
-                containerAnnotation.annotationType().getDeclaredMethod("value");
-            annotationValueMethod.setAccessible(true);
-            return ImmutableList.copyOf(
-                (Annotation[])
-                    Proxy.getInvocationHandler(containerAnnotation)
-                        .invoke(containerAnnotation, annotationValueMethod, null));
-          } catch (Throwable e) {
-            throw new RuntimeException(e);
-          }
-        }
-        return ImmutableList.of();
-      } else {
-        return candidates;
-      }
-    }
-
-    private static Optional<Class<? extends Annotation>> getContainerType(
-        Class<? extends Annotation> annotationType) {
-      try {
-        Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
-        if (repeatable == null) {
-          return Optional.absent();
-        } else {
-          return Optional.of(repeatable.value());
-        }
-      } catch (NoClassDefFoundError ignored) {
-        // If @Repeatable does not exist, then there is no container type by definition
-        return Optional.absent();
-      }
     }
   }
 }

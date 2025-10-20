@@ -18,18 +18,14 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.google.testing.junit.testparameterinjector.TestParameterInjectorUtils.JavaCompatibilityParameter;
 import java.lang.annotation.Annotation;
-import java.lang.annotation.Repeatable;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.lang.reflect.Proxy;
 import java.util.NoSuchElementException;
 
 /** A value class that contains extra information about the context of a field or parameter. */
@@ -63,8 +59,8 @@ final class GenericParameterContext {
           try {
             return ImmutableList.copyOf(field.getAnnotationsByType(annotationType));
           } catch (NoSuchMethodError ignored) {
-            return getAnnotationsFallback(
-                ImmutableList.copyOf(field.getAnnotations()), annotationType);
+            return TestParameterInjectorUtils.filterSingleAndRepeatedAnnotations(
+                field.getAnnotations(), annotationType);
           }
         },
         testClass);
@@ -103,8 +99,7 @@ final class GenericParameterContext {
   static GenericParameterContext createWithoutParameterAnnotations(Class<?> testClass) {
     return new GenericParameterContext(
         /* annotationsOnParameter= */ ImmutableList.of(),
-        /* getAnnotationsFunction= */ annotationType ->
-            getAnnotationsFallback(ImmutableList.of(), annotationType),
+        /* getAnnotationsFunction= */ annotationType -> ImmutableList.of(),
         testClass);
   }
 
@@ -154,50 +149,5 @@ final class GenericParameterContext {
                 annotation -> String.format("@%s", annotation.annotationType().getSimpleName()))
             .join(Joiner.on(',')),
         testClass().getSimpleName());
-  }
-
-  private static ImmutableList<Annotation> getAnnotationsFallback(
-      ImmutableList<Annotation> annotationsOnParameter,
-      Class<? extends Annotation> annotationType) {
-    ImmutableList<Annotation> candidates =
-        FluentIterable.from(annotationsOnParameter)
-            .filter(annotation -> annotation.annotationType().equals(annotationType))
-            .toList();
-    if (candidates.isEmpty() && getContainerType(annotationType).isPresent()) {
-      ImmutableList<Annotation> containerAnnotations =
-          getAnnotationsFallback(annotationsOnParameter, getContainerType(annotationType).get());
-      if (containerAnnotations.size() == 1) {
-        Annotation containerAnnotation = getOnlyElement(containerAnnotations);
-        try {
-          Method annotationValueMethod =
-              containerAnnotation.annotationType().getDeclaredMethod("value");
-          annotationValueMethod.setAccessible(true);
-          return ImmutableList.copyOf(
-              (Annotation[])
-                  Proxy.getInvocationHandler(containerAnnotation)
-                      .invoke(containerAnnotation, annotationValueMethod, null));
-        } catch (Throwable e) {
-          throw new RuntimeException(e);
-        }
-      }
-      return ImmutableList.of();
-    } else {
-      return candidates;
-    }
-  }
-
-  private static Optional<Class<? extends Annotation>> getContainerType(
-      Class<? extends Annotation> annotationType) {
-    try {
-      Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
-      if (repeatable == null) {
-        return Optional.absent();
-      } else {
-        return Optional.of(repeatable.value());
-      }
-    } catch (NoClassDefFoundError ignored) {
-      // If @Repeatable does not exist, then there is no container type by definition
-      return Optional.absent();
-    }
   }
 }
