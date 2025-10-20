@@ -51,6 +51,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 /**
@@ -208,8 +210,8 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     TestParameter annotation = annotationWithMetadata.annotation();
 
     boolean valueIsSet = annotation.value().length > 0;
-    boolean valuesProviderIsSet =
-        !annotation.valuesProvider().equals(DefaultTestParameterValuesProvider.class);
+    Class<? extends TestParameterValuesProvider> valuesProvider = valuesProvider(annotation);
+    boolean valuesProviderIsSet = !valuesProvider.equals(DefaultTestParameterValuesProvider.class);
     checkState(
         !(valueIsSet && valuesProviderIsSet),
         "It is not allowed to specify both value and valuesProvider on annotation %s",
@@ -226,11 +228,56 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     } else if (valuesProviderIsSet) {
       return Optional.of(
           TestParameterValue.maybeWrapList(
-              getValuesFromProvider(
-                  annotation.valuesProvider(), annotationWithMetadata.context())));
+              getValuesFromProvider(valuesProvider, annotationWithMetadata.context())));
     } else {
       return Optional.absent();
     }
+  }
+
+  /**
+   * Returns the value of {@code annotation.valuesProvider()}, working around b/287424109.
+   *
+   * <p>Under Android API Level 23, we have seen calls to {@code valuesProvider()} sometimes crash
+   * with a segmentation fault. The crashes appear and disappear with "unrelated" changes elswhere
+   * in the binary. To work around them, we try to derive the value of {@code valuesProvider()} from
+   * the {@code toString()} value of the annotation, at least when running under an Android
+   * emulator. If we have any trouble, we fall back to calling {@code valuesProvider()}.
+   */
+  private static Class<? extends TestParameterValuesProvider> valuesProvider(
+      TestParameter annotation) {
+    if (!isAndroid()) {
+      return annotation.valuesProvider();
+    }
+
+    String string = annotation.toString();
+    // The format of toString() is unspecified.
+    // But under API Level 23, the only format we've seen so far is something like this:
+    // @com.google.testing.junit.testparameterinjector.TestParameter(value=[], valuesProvider=class
+    // com.google.testing.junit.testparameterinjector.TestParameterValuesProvider$DefaultTestParameterValuesProvider)
+    Matcher matcher = Pattern.compile("valuesProvider=class ([^),]*)").matcher(string);
+    if (!matcher.find()) {
+      // Maybe we're seeing a different format under a different version of Android?
+      // Rather than give up, we fall back to at least trying to read the value normally.
+      // Since the problem seems to be specific to API Level 23, we'd hope that this will succeed.
+      return annotation.valuesProvider();
+    }
+    try {
+      /*
+       * TODO: b/287424109 - Should we pass a specific ClassLoader, like use getContextClassLoader
+       * or the ClassLoader that loaded TestParameter or the class that contains the TestParameter
+       * usage (which we'd need to plumb through to here)?
+       */
+      return Class.forName(matcher.group(1)).asSubclass(TestParameterValuesProvider.class);
+    } catch (ClassNotFoundException e) {
+      // Falling back is unlikely to help here, but we might as well try.
+      // If we're lucky, it will somehow work, or at least the user will get a sensible failure.
+      // If we're unlucky, it will trigger the segfault.
+      return annotation.valuesProvider();
+    }
+  }
+
+  private static boolean isAndroid() {
+    return System.getProperty("java.runtime.name", "").contains("Android");
   }
 
   /**
