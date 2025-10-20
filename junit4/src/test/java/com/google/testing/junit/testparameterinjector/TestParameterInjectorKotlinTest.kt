@@ -16,8 +16,13 @@ package com.google.testing.junit.testparameterinjector
 
 import com.google.common.collect.ImmutableList
 import com.google.common.collect.ImmutableMap
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.TruthJUnit.assume
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase
 import java.util.Arrays
+import kotlin.annotation.AnnotationRetention.RUNTIME
+import kotlin.annotation.AnnotationTarget.CLASS
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -194,8 +199,9 @@ class TestParameterInjectorKotlinTest {
   }
 
   @RunAsTest
-  internal class TestParameter_Mixed(@TestParameter private val testBoolean1: Boolean) :
-    SuccessfulTestCaseBase() {
+  internal class TestParameter_PrimaryConstructorParamMixedWithField(
+    @TestParameter private val testBoolean1: Boolean
+  ) : SuccessfulTestCaseBase() {
     @TestParameter private var testBoolean2: Boolean = false
     @TestParameter private var testBoolean3: Boolean = false
 
@@ -238,6 +244,68 @@ class TestParameterInjectorKotlinTest {
           "testWithPrimaryConstructorParam[testBoolean2=true,testBoolean3=true,testBoolean1=true]",
           "true:true",
         )
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
+  internal class TestParameter_WithDefaultValues_OnMethod() : SuccessfulTestCaseBase() {
+
+    @Test
+    fun test(
+      @TestParameter width: Int = KotlinTestParameters.testValues(5, 6),
+      @TestParameter("11") height: Int,
+      @TestParameter
+      middle: PointDataClass = KotlinTestParameters.testValuesIn(listOf(PointDataClass(1.0, 2.0))),
+      @TestParameter
+      hasDepth: Boolean =
+        KotlinTestParameters.namedTestValues("hasDepth" to true, "noDepth" to false),
+      @TestParameter("false") isCircular: Boolean,
+    ) {
+      storeTestParametersForThisTest(width, height, middle, hasDepth, isCircular)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put(
+          "test[width=5,height=11,PointDataClass(x=1.0, y=2.0),hasDepth,isCircular=false]",
+          "5:11:PointDataClass(x=1.0, y=2.0):true:false",
+        )
+        .put(
+          "test[width=5,height=11,PointDataClass(x=1.0, y=2.0),noDepth,isCircular=false]",
+          "5:11:PointDataClass(x=1.0, y=2.0):false:false",
+        )
+        .put(
+          "test[width=6,height=11,PointDataClass(x=1.0, y=2.0),hasDepth,isCircular=false]",
+          "6:11:PointDataClass(x=1.0, y=2.0):true:false",
+        )
+        .put(
+          "test[width=6,height=11,PointDataClass(x=1.0, y=2.0),noDepth,isCircular=false]",
+          "6:11:PointDataClass(x=1.0, y=2.0):false:false",
+        )
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
+  internal class TestParameter_WithDefaultValues_OnMethod_withParameterizedConstructor(
+    @TestParameter("1", "2") private val width: Int
+  ) : SuccessfulTestCaseBase() {
+
+    @Test
+    fun test(
+      @TestParameter height: Int = KotlinTestParameters.testValues(11, 12),
+      @TestParameter("false") isCircular: Boolean,
+    ) {
+      storeTestParametersForThisTest(width, height, isCircular)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test[width=1,height=11,isCircular=false]", "1:11:false")
+        .put("test[width=1,height=12,isCircular=false]", "1:12:false")
+        .put("test[width=2,height=11,isCircular=false]", "2:11:false")
+        .put("test[width=2,height=12,isCircular=false]", "2:12:false")
         .buildOrThrow()
     }
   }
@@ -299,6 +367,38 @@ class TestParameterInjectorKotlinTest {
     }
   }
 
+  @RunAsTest(
+    failsWithMessage =
+      "TestParameter_WithDefaultValues_CombinedExplicitAndDefaultParameter.test:" +
+        " @TestParameter annotation found on height with specified value and a default value, which" +
+        " is not allowed"
+  )
+  internal class TestParameter_WithDefaultValues_CombinedExplicitAndDefaultParameter {
+    @Test
+    fun test(@TestParameter("11", "12") height: Int = KotlinTestParameters.testValues(11, 12)) {}
+  }
+
+  @RunAsTest(
+    failsWithMessage =
+      "TestParameter_WithDefaultValues_ParameterListIsEmpty.test: A default parameter value" +
+        " returned an empty value list. This is not allowed, because it would cause the test" +
+        " to be skipped."
+  )
+  internal class TestParameter_WithDefaultValues_ParameterListIsEmpty {
+    @Test fun test(@TestParameter height: Int = KotlinTestParameters.testValuesIn(listOf())) {}
+  }
+
+  @RunAsTest(
+    failsWithMessage =
+      "TestParameter_WithDefaultValues_WithUnsupportedConstructor:" +
+        " Expected each constructor parameter to be annotated with @TestParameter"
+  )
+  internal class TestParameter_WithDefaultValues_WithUnsupportedConstructor(
+    private val width: Int
+  ) {
+    @Test fun test(@TestParameter height: Int = KotlinTestParameters.testValues(11, 12)) {}
+  }
+
   // ********** Test infrastructure ********** //
 
   private val testClass: Class<*>
@@ -309,10 +409,28 @@ class TestParameterInjectorKotlinTest {
 
   @Test
   fun test_success() {
+    assume().that(runAsTsetAnnotation().failsWithMessage).isEmpty()
+
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
       object : PluggableTestRunner(testClass) {}
     )
   }
+
+  @Test
+  fun test_failure() {
+    assume().that(runAsTsetAnnotation().failsWithMessage).isNotEmpty()
+
+    val throwable =
+      assertThrows(Throwable::class.java) {
+        SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
+          object : PluggableTestRunner(testClass) {}
+        )
+      }
+
+    assertThat(throwable).hasMessageThat().contains(runAsTsetAnnotation().failsWithMessage)
+  }
+
+  private fun runAsTsetAnnotation(): RunAsTest = testClass.getAnnotation(RunAsTest::class.java)!!
 
   companion object {
     @JvmStatic
@@ -325,8 +443,9 @@ class TestParameterInjectorKotlinTest {
     }
   }
 
-  annotation class RunAsTest
+  @Target(CLASS) @Retention(RUNTIME) annotation class RunAsTest(val failsWithMessage: String = "")
 
+  // ********** Test subtypes ********** //
   enum class Color {
     RED,
     BLUE,
@@ -338,4 +457,6 @@ class TestParameterInjectorKotlinTest {
   @JvmInline value class StringValueClass(val onlyValue: String)
 
   @JvmInline value class DoubleValueClass(val onlyValue: Double)
+
+  data class PointDataClass(val x: Double, val y: Double)
 }

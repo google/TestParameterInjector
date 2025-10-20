@@ -60,6 +60,8 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
   private final Cache<Method, List<List<TestParameterValueHolder>>> parameterValuesCache =
       CacheBuilder.newBuilder().maximumSize(1000).build();
+  private final Cache<Class<?>, Object> arbitraryTestInstanceCache =
+      CacheBuilder.newBuilder().maximumSize(1).build();
 
   /** Calculates the cartesian product of all relevant @TestParameter values. */
   @Override
@@ -342,15 +344,17 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                   FluentIterable.from(ImmutableList.<ImmutableList<TestParameterValueHolder>>of())
                       .append(getFieldValueHolders(testClass))
                       .append(
-                          toTestParameterValueList(
+                          calculateTestParameterValueList(
                               getAnnotationWithMetadataListWithType(
                                   TestParameterInjectorUtils.getOnlyConstructor(testClass),
                                   testClass),
                               Origin.CONSTRUCTOR_PARAMETER))
                       .append(
-                          toTestParameterValueList(
+                          calculateTestParameterValueList(
+                              method,
                               getAnnotationWithMetadataListWithType(method, testClass),
-                              Origin.METHOD_PARAMETER))
+                              Origin.METHOD_PARAMETER,
+                              testClass))
                       .toList()));
     } catch (ExecutionException | UncheckedExecutionException e) {
       Throwables.throwIfUnchecked(e.getCause());
@@ -380,7 +384,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       annotations = applyKotlinDuplicateAnnotationWorkaround(annotations, testClass);
     }
 
-    return toTestParameterValueList(annotations, Origin.FIELD);
+    return calculateTestParameterValueList(annotations, Origin.FIELD);
   }
 
   /**
@@ -465,34 +469,110 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     return resultBuilder.build();
   }
 
-  private static ImmutableList<ImmutableList<TestParameterValueHolder>> toTestParameterValueList(
-      List<AnnotationWithMetadata> annotationWithMetadatas, Origin origin) {
+  private static ImmutableList<ImmutableList<TestParameterValueHolder>>
+      calculateTestParameterValueList(
+          List<AnnotationWithMetadata> annotationWithMetadatas, Origin origin) {
     return FluentIterable.from(annotationWithMetadatas)
         .transform(
-            annotationWithMetadata -> {
-              List<TestParameterValue> allParameterValues =
-                  getExplicitValuesFromAnnotation(annotationWithMetadata)
-                      .or(
-                          () ->
-                              getObviousValuesForParameterClass(
-                                  annotationWithMetadata.paramClass()));
-              checkState(
-                  !allParameterValues.isEmpty(),
-                  "The number of parameter values should not be 0"
-                      + ", otherwise the parameter would cause the test to be skipped.");
-              return FluentIterable.from(
-                      ContiguousSet.create(
-                          Range.closedOpen(0, allParameterValues.size()),
-                          DiscreteDomain.integers()))
-                  .transform(
-                      valueIndex ->
-                          TestParameterValueHolder.create(
-                              origin,
-                              allParameterValues.get(valueIndex),
-                              valueIndex,
-                              annotationWithMetadata.paramName()))
-                  .toList();
-            })
+            annotationWithMetadata ->
+                toValueHolders(
+                    annotationWithMetadata,
+                    getExplicitValuesFromAnnotation(annotationWithMetadata)
+                        .or(
+                            () ->
+                                getObviousValuesForParameterClass(
+                                    annotationWithMetadata.paramClass())),
+                    origin))
+        .toList();
+  }
+
+  private ImmutableList<ImmutableList<TestParameterValueHolder>> calculateTestParameterValueList(
+      Method method,
+      List<AnnotationWithMetadata> annotationWithMetadatas,
+      Origin origin,
+      Class<?> testClass) {
+    if (!isValidAndContainsRelevantAnnotations(method.getParameterAnnotations())) {
+      return ImmutableList.of();
+    }
+
+    if (isKotlinClass(method.getDeclaringClass())
+        && KotlinHooksForTestParameterInjector.hasOptionalParameters(method)) {
+      Object arbitraryTestInstance;
+      try {
+        arbitraryTestInstance =
+            arbitraryTestInstanceCache.get(
+                testClass,
+                () -> TestParameterMethodProcessor.createArbitraryTestInstance(testClass));
+      } catch (ExecutionException | UncheckedExecutionException e) {
+        Throwables.throwIfUnchecked(e.getCause());
+        throw new RuntimeException(e);
+      }
+      ImmutableList<ImmutableList<TestParameterValue>> valuesList =
+          KotlinHooksForTestParameterInjector.extractValuesForEachParameter(
+              arbitraryTestInstance,
+              method,
+              /* getExplicitValuesByIndex= */ index ->
+                  getExplicitValuesFromAnnotation(annotationWithMetadatas.get(index)),
+              /* getImplicitValuesByIndex= */ index ->
+                  getObviousValuesForParameterClass(
+                      annotationWithMetadatas.get(index).paramClass()));
+      return FluentIterable.from(
+              ContiguousSet.create(
+                  Range.closedOpen(0, annotationWithMetadatas.size()), DiscreteDomain.integers()))
+          .transform(
+              index ->
+                  toValueHolders(annotationWithMetadatas.get(index), valuesList.get(index), origin))
+          .toList();
+    } else {
+      return calculateTestParameterValueList(annotationWithMetadatas, origin);
+    }
+  }
+
+  private static Object createArbitraryTestInstance(Class<?> testClass) {
+    Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
+
+    List<Object> constructorParameters;
+    if (constructor.getParameterTypes().length == 0) {
+      constructorParameters = ImmutableList.of();
+    } else {
+      checkState(
+          isValidAndContainsRelevantAnnotations(constructor.getParameterAnnotations()),
+          "%s: Expected each constructor parameter to be annotated with @TestParameter",
+          testClass.getName());
+      ImmutableList<ImmutableList<TestParameterValueHolder>> valueList =
+          calculateTestParameterValueList(
+              getAnnotationWithMetadataListWithType(constructor, testClass),
+              Origin.CONSTRUCTOR_PARAMETER);
+      constructorParameters =
+          FluentIterable.from(valueList)
+              .transform(valueHolders -> valueHolders.get(0).unwrappedValue())
+              .toList();
+    }
+    try {
+      return constructor.newInstance(constructorParameters.toArray());
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static ImmutableList<TestParameterValueHolder> toValueHolders(
+      AnnotationWithMetadata annotationWithMetadata,
+      List<TestParameterValue> allParameterValues,
+      Origin origin) {
+    checkState(
+        !allParameterValues.isEmpty(),
+        "The number of parameter values should not be 0"
+            + ", otherwise the parameter would cause the test to be skipped.");
+    return FluentIterable.from(
+            ContiguousSet.create(
+                Range.closedOpen(0, allParameterValues.size()), DiscreteDomain.integers()))
+        .transform(
+            valueIndex ->
+                TestParameterValueHolder.create(
+                    origin,
+                    allParameterValues.get(valueIndex),
+                    valueIndex,
+                    annotationWithMetadata.paramName()))
         .toList();
   }
 
