@@ -31,8 +31,7 @@ package com.google.testing.junit.testparameterinjector
  * ```
  */
 // TODO: jnyman - Expose this to the open source version.
-// copybara:insert internal
-object KotlinTestParameters {
+internal object KotlinTestParameters {
 
   /** Specifies the values to be used for a parameter. */
   @JvmName("-testValues") // Invalid JVM name to effectively prohibit Java use
