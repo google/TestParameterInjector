@@ -315,6 +315,18 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   }
 
   @Override
+  protected void validateOnlyOneConstructor(List<Throwable> errors) {
+    // Replace the default check by TestParameterInjectorUtils.validateOnlyOneConstructor() because
+    // it is more lenient.
+    try {
+      TestParameterInjectorUtils.validateOnlyOneConstructor(
+          getTestClass().getJavaClass(), /* allowNonPublicConstructor= */ false);
+    } catch (RuntimeException e) {
+      errors.add(e);
+    }
+  }
+
+  @Override
   protected final void validateZeroArgConstructor(List<Throwable> errorsReturned) {
     ExecutableValidationResult validationResult =
         getTestMethodProcessors()

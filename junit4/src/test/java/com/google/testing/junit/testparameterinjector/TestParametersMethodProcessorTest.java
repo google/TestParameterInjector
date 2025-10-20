@@ -614,7 +614,7 @@ public class TestParametersMethodProcessorTest {
     public void test1(TestEnum testEnum) {}
   }
 
-  @RunAsTest(failsWithMessage = "Test class should have exactly one public constructor")
+  @RunAsTest(failsWithMessage = "Expected exactly one constructor, but got []")
   public static class InvalidTestBecausePackagePrivateConstructor {
     InvalidTestBecausePackagePrivateConstructor() {}
 

@@ -311,6 +311,52 @@ class TestParameterInjectorKotlinTest {
   }
 
   @RunAsTest
+  internal class TestParameter_WithDefaultValues_OnConstructor(
+    @TestParameter("11") private val depth: Int,
+    @TestParameter private val width: Int = KotlinTestParameters.testValues(5, 6),
+    @TestParameter private val height: Int = KotlinTestParameters.testValues(8, 9),
+    @TestParameter("false") private val isCircular: Boolean,
+  ) : SuccessfulTestCaseBase() {
+
+    @Test
+    fun test() {
+      storeTestParametersForThisTest(depth, width, height, isCircular)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test[depth=11,width=5,height=8,isCircular=false]", "11:5:8:false")
+        .put("test[depth=11,width=5,height=9,isCircular=false]", "11:5:9:false")
+        .put("test[depth=11,width=6,height=8,isCircular=false]", "11:6:8:false")
+        .put("test[depth=11,width=6,height=9,isCircular=false]", "11:6:9:false")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
+  internal class TestParameter_WithDefaultValues_OnConstructorAndMethod(
+    @TestParameter private val depth: Int = KotlinTestParameters.testValues(11),
+    @TestParameter("5", "6") private val width: Int,
+    @TestParameter("8", "9") private val height: Int,
+    @TestParameter private val isCircular: Boolean = KotlinTestParameters.testValues(false),
+  ) : SuccessfulTestCaseBase() {
+
+    @Test
+    fun test(@TestParameter weight: Double = KotlinTestParameters.testValues(1.8)) {
+      storeTestParametersForThisTest(depth, width, height, isCircular, weight)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test[depth=11,width=5,height=8,isCircular=false,weight=1.8]", "11:5:8:false:1.8")
+        .put("test[depth=11,width=5,height=9,isCircular=false,weight=1.8]", "11:5:9:false:1.8")
+        .put("test[depth=11,width=6,height=8,isCircular=false,weight=1.8]", "11:6:8:false:1.8")
+        .put("test[depth=11,width=6,height=9,isCircular=false,weight=1.8]", "11:6:9:false:1.8")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
   internal class TestParameters_MethodParam : SuccessfulTestCaseBase() {
     @TestParameters("{width: 3, height: 8}")
     @TestParameters("{width: 5, height: 2.5}")
@@ -397,6 +443,16 @@ class TestParameterInjectorKotlinTest {
     private val width: Int
   ) {
     @Test fun test(@TestParameter height: Int = KotlinTestParameters.testValues(11, 12)) {}
+  }
+
+  @RunAsTest(
+    failsWithMessage =
+      "TestParameter_WithDefaultValues_NotViaTestValues.test:" +
+        " Expected all default parameter values to be produced by a call to" +
+        " KotlinTestParameters.testValues()"
+  )
+  internal class TestParameter_WithDefaultValues_NotViaTestValues {
+    @Test fun test(@TestParameter height: Int = 12) {}
   }
 
   // ********** Test infrastructure ********** //

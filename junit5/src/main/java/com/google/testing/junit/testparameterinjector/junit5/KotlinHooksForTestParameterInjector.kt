@@ -19,9 +19,9 @@ import com.google.common.base.Optional
 import com.google.common.collect.ImmutableList
 import java.lang.reflect.InvocationTargetException
 import kotlin.jvm.kotlin
-import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
+import kotlin.reflect.jvm.javaConstructor
 import kotlin.reflect.jvm.javaMethod
 
 /**
@@ -33,14 +33,25 @@ object KotlinHooksForTestParameterInjector {
 
   @JvmStatic
   fun hasOptionalParameters(method: java.lang.reflect.Method): Boolean {
-    try {
-      return methodToFunction(method).parameters.any {
-        it.kind == KParameter.Kind.VALUE && it.isOptional
-      }
-    } catch (e: GetJavaMethodFailureException) {
+    return try {
+      methodToFunction(method).parameters.any { it.kind == KParameter.Kind.VALUE && it.isOptional }
+    } catch (_: GetJavaExecutableFailureException) {
       // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
       // consistency check. This is a workaround to avoid breaking these tests.
-      return false
+      false
+    }
+  }
+
+  @JvmStatic
+  fun hasOptionalParameters(constructor: java.lang.reflect.Constructor<*>): Boolean {
+    return try {
+      constructorToFunction(constructor).parameters.any {
+        it.kind == KParameter.Kind.VALUE && it.isOptional
+      }
+    } catch (_: GetJavaExecutableFailureException) {
+      // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
+      // consistency check. This is a workaround to avoid breaking these tests.
+      false
     }
   }
 
@@ -51,13 +62,52 @@ object KotlinHooksForTestParameterInjector {
     getExplicitValuesByIndex: (Int) -> Optional<ImmutableList<TestParameterValue>>,
     getImplicitValuesByIndex: (Int) -> ImmutableList<TestParameterValue>,
   ): ImmutableList<ImmutableList<TestParameterValue>> {
-    val kClass = method.declaringClass.kotlin
     val function = methodToFunction(method)
+    val functionDescription = "${method.declaringClass.simpleName}.${function.name}"
+
+    return extractValuesForEachParameterInternal(
+      testInstance,
+      function,
+      functionDescription,
+      javaParameterTypes = method.parameterTypes,
+      getExplicitValuesByIndex,
+      getImplicitValuesByIndex,
+    )
+  }
+
+  @JvmStatic
+  fun extractValuesForEachParameter(
+    constructor: java.lang.reflect.Constructor<*>,
+    getExplicitValuesByIndex: (Int) -> Optional<ImmutableList<TestParameterValue>>,
+    getImplicitValuesByIndex: (Int) -> ImmutableList<TestParameterValue>,
+  ): ImmutableList<ImmutableList<TestParameterValue>> {
+    val function = constructorToFunction(constructor)
+    val functionDescription = "${constructor.declaringClass.simpleName}.constructor"
+
+    return extractValuesForEachParameterInternal(
+      testInstance = null,
+      function,
+      functionDescription,
+      javaParameterTypes = constructor.parameterTypes,
+      getExplicitValuesByIndex,
+      getImplicitValuesByIndex,
+    )
+  }
+
+  private fun extractValuesForEachParameterInternal(
+    testInstance: Any?,
+    function: KFunction<*>,
+    functionDescription: String,
+    javaParameterTypes: Array<Class<*>>,
+    getExplicitValuesByIndex: (Int) -> Optional<ImmutableList<TestParameterValue>>,
+    getImplicitValuesByIndex: (Int) -> ImmutableList<TestParameterValue>,
+  ): ImmutableList<ImmutableList<TestParameterValue>> {
     val parameters = function.parameters.filter { it.kind == KParameter.Kind.VALUE }
 
     // Sanity check
-    require(parameters.size == method.parameterTypes.size) {
-      "parameters=$parameters, method=$method, function=$function"
+    require(parameters.size == javaParameterTypes.size) {
+      ("$functionDescription: Number of parameters don't match: kotlinParameters=$parameters," +
+        " javaParameterTypes=${javaParameterTypes.toList()}, function=$function")
     }
 
     val parameterValues: MutableMap<KParameter, ImmutableList<TestParameterValue>> = mutableMapOf()
@@ -67,8 +117,7 @@ object KotlinHooksForTestParameterInjector {
         parameterValues[parameter] =
           assertAtLeastOneValue(
             getExplicitValuesByIndex(index).or { getImplicitValuesByIndex(index) },
-            kClass,
-            function,
+            functionDescription,
           )
       }
     }
@@ -76,12 +125,17 @@ object KotlinHooksForTestParameterInjector {
     for ((index, parameter) in parameters.withIndex()) {
       if (parameter.isOptional) {
         require(!getExplicitValuesByIndex(index).isPresent) {
-          "${kClass.simpleName}.${function.name}: @TestParameter annotation found on " +
+          "$functionDescription: @TestParameter annotation found on " +
             "${parameter.name} with specified value and a default value, which is not " +
             "allowed: parameter=$parameter"
         }
         parameterValues[parameter] =
-          getValuesFromNextDefaultValue(testInstance, function, parameterValues, kClass)
+          getValuesFromNextDefaultValue(
+            testInstance,
+            function,
+            parameterValues,
+            functionDescription,
+          )
       }
     }
 
@@ -92,16 +146,16 @@ object KotlinHooksForTestParameterInjector {
     val kClass = method.declaringClass.kotlin
 
     val candidates = mutableListOf<KFunction<*>>()
-    var caughtError: Boolean = false
+    var caughtError = false
     for (member in kClass.members) {
       if (member is KFunction<*>) {
         val javaMethodFromMember =
           try {
             member.javaMethod
-          } catch (e: Error) {
+          } catch (_: Error) {
             // For some Android methods, kFunction.javaMethod fails because of a Kotlin-internal
-            // consistency check. If this happens, only throw a GetJavaMethodFailureException if the
-            // method we are looking for has this error.
+            // consistency check. If this happens, only throw a GetJavaExecutableFailureException if
+            // the method we are looking for has this error.
             caughtError = true
             continue
           }
@@ -110,28 +164,59 @@ object KotlinHooksForTestParameterInjector {
         }
       }
     }
+    if (candidates.isEmpty() && caughtError) {
+      throw GetJavaExecutableFailureException()
+    } else {
+      return candidates.single()
+    }
+  }
+
+  private fun constructorToFunction(constructor: java.lang.reflect.Constructor<*>): KFunction<*> {
+    val kClass = constructor.declaringClass.kotlin
+
+    val candidates = mutableListOf<KFunction<*>>()
+    var caughtError: Boolean = false
+    for (kotlinConstructor in kClass.constructors) {
+      val javaConstructorFromKotlin =
+        try {
+          kotlinConstructor.javaConstructor
+        } catch (e: Error) {
+          // For some Android methods, kFunction.javaConstructor fails because of a Kotlin-internal
+          // consistency check. If this happens, only throw a GetJavaExecutableFailureException if
+          // the method we are looking for has this error.
+          caughtError = true
+          continue
+        }
+      if (javaConstructorFromKotlin == constructor) {
+        candidates.add(kotlinConstructor)
+      }
+    }
     if (candidates.isEmpty() and caughtError) {
-      throw GetJavaMethodFailureException()
+      throw GetJavaExecutableFailureException()
     } else {
       return candidates.single()
     }
   }
 
   private fun getValuesFromNextDefaultValue(
-    testInstance: Any,
+    testInstance: Any?,
     function: KFunction<*>,
     parameterValuesSoFar: Map<KParameter, ImmutableList<TestParameterValue>>,
-    kClass: KClass<*>,
+    functionDescription: String,
   ): ImmutableList<TestParameterValue> {
     try {
       val unused =
         function.callBy(
-          mapOf(
-            function.parameters.single { it.kind == KParameter.Kind.INSTANCE } to testInstance
-          ) + parameterValuesSoFar.mapValues { it.value[0].wrappedValue }
+          if (testInstance == null) {
+            mapOf()
+          } else {
+            mapOf(
+              function.parameters.single { it.kind == KParameter.Kind.INSTANCE } to testInstance
+            )
+          } + parameterValuesSoFar.mapValues { it.value[0].wrappedValue }
         )
       throw RuntimeException(
-        "${kClass.simpleName}.${function.name}: Expected all default parameter values to" +
+        "$functionDescription: Expected all default parameter values to" +
           " be produced by a call to KotlinTestParameters.testValues()"
       )
     } catch (e: InvocationTargetException) {
@@ -140,12 +225,11 @@ object KotlinHooksForTestParameterInjector {
         is KotlinTestParameters.KotlinDefaultParameterHolderException ->
           return assertAtLeastOneValue(
             ImmutableList.copyOf(cause.testParameterValues),
-            kClass,
-            function,
+            functionDescription,
           )
         else ->
           throw IllegalStateException(
-            "${kClass.simpleName}.${function.name}: Caught exception while getting the default" +
+            "$functionDescription: Caught exception while getting the default" +
               " parameter values",
             e,
           )
@@ -155,15 +239,14 @@ object KotlinHooksForTestParameterInjector {
 
   private fun assertAtLeastOneValue(
     values: ImmutableList<TestParameterValue>,
-    kClass: KClass<*>,
-    function: KFunction<*>,
+    functionDescription: String,
   ): ImmutableList<TestParameterValue> {
     require(values.isNotEmpty()) {
-      "${kClass.simpleName}.${function.name}: A default parameter value returned an empty" +
+      "$functionDescription: A default parameter value returned an empty" +
         " value list. This is not allowed, because it would cause the test to be skipped."
     }
     return values
   }
 
-  private class GetJavaMethodFailureException : RuntimeException()
+  private class GetJavaExecutableFailureException : RuntimeException()
 }

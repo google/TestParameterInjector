@@ -16,13 +16,14 @@ package com.google.testing.junit.testparameterinjector;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
 import static com.google.common.truth.TruthJUnit.assume;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
+import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -493,7 +494,7 @@ public class TestParameterMethodProcessorTest {
     void test(@TestParameter boolean b) {}
   }
 
-  @RunAsTest(failsWithMessage = "Test class should have exactly one public constructor")
+  @RunAsTest(failsWithMessage = "Expected exactly one constructor, but got []")
   public static class ErrorPackagePrivateConstructor {
     ErrorPackagePrivateConstructor() {}
 
@@ -541,7 +542,10 @@ public class TestParameterMethodProcessorTest {
                 SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
                     new PluggableTestRunner(testClass) {}));
 
-    assertThat(throwable).hasMessageThat().contains(maybeFailureMessage.get());
+    assertWithMessage("Full stack trace: %s", Throwables.getStackTraceAsString(throwable))
+        .that(throwable)
+        .hasMessageThat()
+        .contains(maybeFailureMessage.get());
   }
 
   private static ImmutableList<Class<? extends Annotation>> annotationTypes(

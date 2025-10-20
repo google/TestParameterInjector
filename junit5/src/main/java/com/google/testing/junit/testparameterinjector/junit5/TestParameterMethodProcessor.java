@@ -345,6 +345,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                       .append(getFieldValueHolders(testClass))
                       .append(
                           calculateTestParameterValueList(
+                              TestParameterInjectorUtils.getOnlyConstructor(testClass),
                               getAnnotationWithMetadataListWithType(
                                   TestParameterInjectorUtils.getOnlyConstructor(testClass),
                                   testClass),
@@ -486,6 +487,37 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         .toList();
   }
 
+  private static ImmutableList<ImmutableList<TestParameterValueHolder>>
+      calculateTestParameterValueList(
+          Constructor<?> constructor,
+          List<AnnotationWithMetadata> annotationWithMetadatas,
+          Origin origin) {
+    if (!isValidAndContainsRelevantAnnotations(constructor.getParameterAnnotations())) {
+      return ImmutableList.of();
+    }
+
+    if (isKotlinClass(constructor.getDeclaringClass())
+        && KotlinHooksForTestParameterInjector.hasOptionalParameters(constructor)) {
+      ImmutableList<ImmutableList<TestParameterValue>> valuesList =
+          KotlinHooksForTestParameterInjector.extractValuesForEachParameter(
+              constructor,
+              /* getExplicitValuesByIndex= */ index ->
+                  getExplicitValuesFromAnnotation(annotationWithMetadatas.get(index)),
+              /* getImplicitValuesByIndex= */ index ->
+                  getObviousValuesForParameterClass(
+                      annotationWithMetadatas.get(index).paramClass()));
+      return FluentIterable.from(
+              ContiguousSet.create(
+                  Range.closedOpen(0, annotationWithMetadatas.size()), DiscreteDomain.integers()))
+          .transform(
+              index ->
+                  toValueHolders(annotationWithMetadatas.get(index), valuesList.get(index), origin))
+          .toList();
+    } else {
+      return calculateTestParameterValueList(annotationWithMetadatas, origin);
+    }
+  }
+
   private ImmutableList<ImmutableList<TestParameterValueHolder>> calculateTestParameterValueList(
       Method method,
       List<AnnotationWithMetadata> annotationWithMetadatas,
@@ -541,6 +573,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
           testClass.getName());
       ImmutableList<ImmutableList<TestParameterValueHolder>> valueList =
           calculateTestParameterValueList(
+              constructor,
               getAnnotationWithMetadataListWithType(constructor, testClass),
               Origin.CONSTRUCTOR_PARAMETER);
       constructorParameters =

@@ -17,11 +17,20 @@ package com.google.testing.junit.testparameterinjector;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
 
 /** Shared utility methods. */
 class TestParameterInjectorUtils {
+
+  static Constructor<?> getOnlyConstructor(Class<?> testClass) {
+    return getOnlyConstructorInternal(testClass, /* allowNonPublicConstructor= */ false);
+  }
+
+  static void validateOnlyOneConstructor(Class<?> testClass, boolean allowNonPublicConstructor) {
+    Constructor<?> unused = getOnlyConstructorInternal(testClass, allowNonPublicConstructor);
+  }
 
   /**
    * Return the only public constructor of the given test class. If there is none, return the only
@@ -31,13 +40,26 @@ class TestParameterInjectorUtils {
    * introduce an extra non-public constructor (see
    * https://github.com/google/TestParameterInjector/issues/40).
    */
-  static Constructor<?> getOnlyConstructor(Class<?> testClass) {
+  private static Constructor<?> getOnlyConstructorInternal(
+      Class<?> testClass, boolean allowNonPublicConstructor) {
     ImmutableList<Constructor<?>> constructors = ImmutableList.copyOf(testClass.getConstructors());
-    if (constructors.isEmpty()) {
+
+    if (allowNonPublicConstructor && constructors.isEmpty()) {
       // There are no public constructors. This is likely a JUnit5 test, so we should take the only
       // non-public constructor instead.
       constructors = ImmutableList.copyOf(testClass.getDeclaredConstructors());
     }
+
+    constructors =
+        FluentIterable.from(constructors)
+            .filter(
+                c ->
+                    // Filter out synthetic constructors introduced by the compiler. This is a
+                    // fix to cope with an extra Kotlin-introduced constructor when it has default
+                    // parameter values (with a bit mask and a DefaultConstructorMarker).
+                    !c.isSynthetic())
+            .toList();
+
     checkState(
         constructors.size() == 1, "Expected exactly one constructor, but got %s", constructors);
     return getOnlyElement(constructors);
