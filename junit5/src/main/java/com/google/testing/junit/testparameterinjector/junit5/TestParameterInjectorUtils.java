@@ -20,6 +20,7 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorUtils.JavaCompatibilityParameter;
@@ -29,6 +30,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
 import javax.annotation.Nullable;
 
 /** Shared utility methods. */
@@ -160,6 +162,8 @@ class TestParameterInjectorUtils {
 
     abstract Class<?>[] getParameterTypes();
 
+    abstract Type[] getGenericParameterTypes();
+
     abstract ImmutableList<JavaCompatibilityParameter> getParameters();
 
     /**
@@ -270,6 +274,11 @@ class TestParameterInjectorUtils {
         }
 
         @Override
+        Type[] getGenericParameterTypes() {
+          return constructor.getGenericParameterTypes();
+        }
+
+        @Override
         ImmutableList<JavaCompatibilityParameter> getParameters() {
           return FluentIterable.from(constructor.getParameters())
               .transform(JavaCompatibilityParameter::create)
@@ -331,6 +340,11 @@ class TestParameterInjectorUtils {
         }
 
         @Override
+        Type[] getGenericParameterTypes() {
+          return method.getGenericParameterTypes();
+        }
+
+        @Override
         ImmutableList<JavaCompatibilityParameter> getParameters() {
           return FluentIterable.from(method.getParameters())
               .transform(JavaCompatibilityParameter::create)
@@ -353,6 +367,8 @@ class TestParameterInjectorUtils {
     abstract Class<?> getType();
 
     abstract Annotation[] getAnnotations();
+
+    abstract Type getParameterizedType();
 
     abstract <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationClass);
 
@@ -380,7 +396,12 @@ class TestParameterInjectorUtils {
     }
 
     JavaCompatibilityParameter withName(String name) {
-      return create(Optional.of(name), getType(), getAnnotations(), this::getAnnotationsByType);
+      return create(
+          Optional.of(name),
+          getType(),
+          getAnnotations(),
+          this::getParameterizedType,
+          this::getAnnotationsByType);
     }
 
     @SuppressWarnings("AndroidJdkLibsChecker")
@@ -389,14 +410,18 @@ class TestParameterInjectorUtils {
           parameter.isNamePresent() ? Optional.of(parameter.getName()) : Optional.absent(),
           parameter.getType(),
           parameter.getAnnotations(),
+          parameter::getParameterizedType,
           parameter::getAnnotationsByType);
     }
 
-    @SuppressWarnings("AndroidJdkLibsChecker")
     static JavaCompatibilityParameter create(
         Optional<String> maybeName,
         Class<?> type,
         Annotation[] annotations,
+        // Note: This is a Supplier because not all code paths need this value. Since it is a
+        // relatively advanced Java feature, we don't want to risk a client not being able to use
+        // TestParameterInjector at all because of this dependency.
+        Supplier<Type> getParameterizedType,
         Function<Class<? extends Annotation>, Annotation[]> getAnnotationsByType) {
       return new JavaCompatibilityParameter() {
         @Override
@@ -412,6 +437,11 @@ class TestParameterInjectorUtils {
         @Override
         Annotation[] getAnnotations() {
           return annotations;
+        }
+
+        @Override
+        Type getParameterizedType() {
+          return getParameterizedType.get();
         }
 
         @SuppressWarnings("unchecked") // Safe because all (package private) callers are known
@@ -431,11 +461,14 @@ class TestParameterInjectorUtils {
       ImmutableList.Builder<JavaCompatibilityParameter> resultBuilder = ImmutableList.builder();
       for (int parameterIndex = 0; parameterIndex < annotations.length; parameterIndex++) {
         Annotation[] parameterAnnotations = executable.getParameterAnnotations()[parameterIndex];
+        int parameterIndexCopy = parameterIndex;
         resultBuilder.add(
             create(
                 /* maybeName= */ Optional.absent(),
                 /* type= */ parameterTypes[parameterIndex],
                 /* annotations= */ annotations[parameterIndex],
+                /* getParameterizedType= */ () ->
+                    executable.getGenericParameterTypes()[parameterIndexCopy],
                 /* getAnnotationsByType= */ annotationClass ->
                     filterSingleAndRepeatedAnnotations(parameterAnnotations, annotationClass)
                         .toArray(new Annotation[0])));
