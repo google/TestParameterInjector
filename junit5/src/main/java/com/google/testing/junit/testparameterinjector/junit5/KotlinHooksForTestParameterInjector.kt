@@ -27,7 +27,9 @@ import kotlin.reflect.jvm.javaMethod
  * Helper functions for the TestParameterInjector implementation, providing functionality that can
  * only be implemented using Kotlin.
  */
-object KotlinHooksForTestParameterInjector {
+// Only marking as internal for the open source version because the Google version is built in
+// separate build targets.
+internal object KotlinHooksForTestParameterInjector {
 
   @JvmStatic
   fun getParameterNames(method: java.lang.reflect.Method): Optional<ImmutableList<String>> {
