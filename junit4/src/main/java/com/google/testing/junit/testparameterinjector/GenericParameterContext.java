@@ -14,6 +14,7 @@
 
 package com.google.testing.junit.testparameterinjector;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
 import com.google.common.base.Function;
@@ -109,11 +110,21 @@ final class GenericParameterContext {
    */
   @SuppressWarnings("unchecked") // Safe because of the filter operation
   <A extends Annotation> A getAnnotation(Class<A> annotationType) {
-    return (A)
-        getOnlyElement(
+    ImmutableList<A> candidates =
+        (ImmutableList<A>)
             FluentIterable.from(annotationsOnParameter)
                 .filter(annotation -> annotation.annotationType().equals(annotationType))
-                .toList());
+                .toList();
+    checkArgument(
+        candidates.size() <= 1,
+        "Expected at most one annotation of type %s, but got %s",
+        annotationType.getSimpleName(),
+        candidates);
+    checkArgument(
+        !candidates.isEmpty(),
+        "Expected at least one annotation of type %s, but got none",
+        annotationType.getSimpleName());
+    return getOnlyElement(candidates);
   }
 
   /**
