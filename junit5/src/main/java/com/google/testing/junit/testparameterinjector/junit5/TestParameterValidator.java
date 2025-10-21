@@ -21,7 +21,11 @@ import java.util.List;
 /**
  * Validator interface which allows {@link TestParameterAnnotation} annotations to validate the set
  * of annotation values for a given test instance, and to selectively skip the test.
+ *
+ * @deprecated This interface only exists to support custom legacy annotations (strongly
+ *     discouraged). This class is in feature mode.
  */
+@Deprecated
 interface TestParameterValidator {
 
   /**
