@@ -419,7 +419,7 @@ class TestParameterInjectorKotlinTest {
 
   @Test
   fun test_success() {
-    assume().that(runAsTsetAnnotation().failsWithMessage).isEmpty()
+    assume().that(runAsTestAnnotation().failsWithMessage).isEmpty()
 
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
       object : PluggableTestRunner(testClass) {}
@@ -428,7 +428,7 @@ class TestParameterInjectorKotlinTest {
 
   @Test
   fun test_failure() {
-    assume().that(runAsTsetAnnotation().failsWithMessage).isNotEmpty()
+    assume().that(runAsTestAnnotation().failsWithMessage).isNotEmpty()
 
     val throwable =
       assertThrows(Throwable::class.java) {
@@ -437,10 +437,10 @@ class TestParameterInjectorKotlinTest {
         )
       }
 
-    assertThat(throwable).hasMessageThat().contains(runAsTsetAnnotation().failsWithMessage)
+    assertThat(throwable).hasMessageThat().contains(runAsTestAnnotation().failsWithMessage)
   }
 
-  private fun runAsTsetAnnotation(): RunAsTest = testClass.getAnnotation(RunAsTest::class.java)!!
+  private fun runAsTestAnnotation(): RunAsTest = testClass.getAnnotation(RunAsTest::class.java)!!
 
   companion object {
     @JvmStatic
