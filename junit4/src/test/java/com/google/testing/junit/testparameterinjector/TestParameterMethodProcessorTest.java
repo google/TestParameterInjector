@@ -499,6 +499,42 @@ public class TestParameterMethodProcessorTest {
 
   @RunAsTest(
       failsWithMessage =
+          "EmptyValuesList_OnParameter.test1(): myParam: The number of parameter values should not"
+              + " be 0, otherwise the parameter would cause the test to be skipped.")
+  public static class EmptyValuesList_OnParameter {
+    @Test
+    public void test1(
+        @TestParameter(valuesProvider = EmptyParametersProvider.class) boolean myParam) {}
+
+    private static final class EmptyParametersProvider extends TestParameterValuesProvider {
+      @Override
+      public List<?> provideValues(Context context) {
+        return ImmutableList.of();
+      }
+    }
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "myParam: The number of parameter values should not be 0,"
+              + " otherwise the parameter would cause the test to be skipped.")
+  public static class EmptyValuesList_OnField {
+    @TestParameter(valuesProvider = EmptyParametersProvider.class)
+    boolean myParam;
+
+    @Test
+    public void test1() {}
+
+    private static final class EmptyParametersProvider extends TestParameterValuesProvider {
+      @Override
+      public List<?> provideValues(Context context) {
+        return ImmutableList.of();
+      }
+    }
+  }
+
+  @RunAsTest(
+      failsWithMessage =
           "ErrorPackagePrivateConstructor: Expected exactly one constructor, but got []")
   public static class ErrorPackagePrivateConstructor {
     ErrorPackagePrivateConstructor() {}

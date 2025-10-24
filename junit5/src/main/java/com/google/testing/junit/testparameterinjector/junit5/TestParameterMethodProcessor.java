@@ -479,7 +479,8 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       annotations = applyKotlinDuplicateAnnotationWorkaround(annotations, testClass);
     }
 
-    return calculateTestParameterValueList(annotations, Origin.FIELD);
+    return calculateTestParameterValueList(
+        annotations, Origin.FIELD, /* executable= */ Optional.absent());
   }
 
   /**
@@ -567,7 +568,9 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
   private static ImmutableList<ImmutableList<TestParameterValueHolder>>
       calculateTestParameterValueList(
-          List<AnnotationWithMetadata> annotationWithMetadatas, Origin origin) {
+          List<AnnotationWithMetadata> annotationWithMetadatas,
+          Origin origin,
+          Optional<JavaCompatibilityExecutable> executable) {
     return FluentIterable.from(annotationWithMetadatas)
         .transform(
             annotationWithMetadata ->
@@ -578,7 +581,8 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                             () ->
                                 getObviousValuesForParameterClass(
                                     annotationWithMetadata.paramClass())),
-                    origin))
+                    origin,
+                    executable))
         .toList();
   }
 
@@ -620,10 +624,15 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                   Range.closedOpen(0, annotationWithMetadatas.size()), DiscreteDomain.integers()))
           .transform(
               index ->
-                  toValueHolders(annotationWithMetadatas.get(index), valuesList.get(index), origin))
+                  toValueHolders(
+                      annotationWithMetadatas.get(index),
+                      valuesList.get(index),
+                      origin,
+                      Optional.of(executable)))
           .toList();
     } else {
-      return calculateTestParameterValueList(annotationWithMetadatas, origin);
+      return calculateTestParameterValueList(
+          annotationWithMetadatas, origin, Optional.of(executable));
     }
   }
 
@@ -661,11 +670,14 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   private static ImmutableList<TestParameterValueHolder> toValueHolders(
       AnnotationWithMetadata annotationWithMetadata,
       List<TestParameterValue> allParameterValues,
-      Origin origin) {
+      Origin origin,
+      Optional<JavaCompatibilityExecutable> executable) {
     checkState(
         !allParameterValues.isEmpty(),
-        "The number of parameter values should not be 0"
-            + ", otherwise the parameter would cause the test to be skipped.");
+        "%s%s: The number of parameter values should not be 0"
+            + ", otherwise the parameter would cause the test to be skipped.",
+        executable.transform(s -> s.getHumanReadableNameSummary() + ": ").or(""),
+        annotationWithMetadata.paramName().or(annotationWithMetadata.paramClass().getSimpleName()));
     return FluentIterable.from(
             ContiguousSet.create(
                 Range.closedOpen(0, allParameterValues.size()), DiscreteDomain.integers()))
