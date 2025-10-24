@@ -481,7 +481,10 @@ public class TestParameterMethodProcessorTest {
     }
   }
 
-  @RunAsTest(failsWithMessage = "parameter number 2 is not annotated with @TestParameter")
+  @RunAsTest(
+      failsWithMessage =
+          "NotAllParametersAnnotated.test1() has at least one parameter annotated with"
+              + " @TestParameter, but parameter number 2 is not annotated with @TestParameter")
   public static class NotAllParametersAnnotated {
     @Test
     public void test1(@TestParameter boolean bool, boolean bool2) {}
@@ -494,7 +497,9 @@ public class TestParameterMethodProcessorTest {
     void test(@TestParameter boolean b) {}
   }
 
-  @RunAsTest(failsWithMessage = "Expected exactly one constructor, but got []")
+  @RunAsTest(
+      failsWithMessage =
+          "ErrorPackagePrivateConstructor: Expected exactly one constructor, but got []")
   public static class ErrorPackagePrivateConstructor {
     ErrorPackagePrivateConstructor() {}
 

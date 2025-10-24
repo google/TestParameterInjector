@@ -73,7 +73,10 @@ class TestParameterInjectorUtils {
             .toList();
 
     checkState(
-        constructors.size() == 1, "Expected exactly one constructor, but got %s", constructors);
+        constructors.size() == 1,
+        "%s: Expected exactly one constructor, but got %s",
+        testClass.getSimpleName(),
+        constructors);
     return getOnlyElement(constructors);
   }
 

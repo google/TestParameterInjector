@@ -109,12 +109,12 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
   @Override
   public ExecutableValidationResult validateConstructor(Constructor<?> constructor) {
-    return validateAnnotations(constructor.getParameterAnnotations(), "constructor");
+    return validateAnnotations(JavaCompatibilityExecutable.create(constructor));
   }
 
   @Override
   public ExecutableValidationResult validateTestMethod(Method testMethod, Class<?> testClass) {
-    return validateAnnotations(testMethod.getParameterAnnotations(), testMethod.getName());
+    return validateAnnotations(JavaCompatibilityExecutable.create(testMethod));
   }
 
   @Override
@@ -182,10 +182,10 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   }
 
   private static ExecutableValidationResult validateAnnotations(
-      Annotation[][] annotations, String executableName) {
-    if (containsRelevantAnnotation(annotations)) {
+      JavaCompatibilityExecutable executable) {
+    if (containsRelevantAnnotation(executable.getParameterAnnotations())) {
       int parameterIndex = 0;
-      for (Annotation[] annotationsOnParameter : annotations) {
+      for (Annotation[] annotationsOnParameter : executable.getParameterAnnotations()) {
         boolean hasTestParameter =
             FluentIterable.from(annotationsOnParameter)
                 .anyMatch(annotation -> annotation instanceof TestParameter);
@@ -195,7 +195,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                   String.format(
                       "%s has at least one parameter annotated with @TestParameter, but"
                           + " parameter number %d is not annotated with @TestParameter.",
-                      executableName, parameterIndex + 1)));
+                      executable.getHumanReadableNameSummary(), parameterIndex + 1)));
         }
         parameterIndex++;
       }
