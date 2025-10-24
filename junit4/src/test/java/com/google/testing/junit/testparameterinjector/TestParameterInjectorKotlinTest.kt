@@ -369,7 +369,7 @@ class TestParameterInjectorKotlinTest {
 
   @RunAsTest(
     failsWithMessage =
-      "TestParameter_WithDefaultValues_CombinedExplicitAndDefaultParameter.test:" +
+      "TestParameter_WithDefaultValues_CombinedExplicitAndDefaultParameter.test():" +
         " @TestParameter annotation found on height with specified value and a default value, which" +
         " is not allowed"
   )
@@ -380,7 +380,7 @@ class TestParameterInjectorKotlinTest {
 
   @RunAsTest(
     failsWithMessage =
-      "TestParameter_WithDefaultValues_ParameterListIsEmpty.test: A default parameter value" +
+      "TestParameter_WithDefaultValues_ParameterListIsEmpty.test(): A default parameter value" +
         " returned an empty value list. This is not allowed, because it would cause the test" +
         " to be skipped."
   )
@@ -401,7 +401,7 @@ class TestParameterInjectorKotlinTest {
 
   @RunAsTest(
     failsWithMessage =
-      "TestParameter_WithDefaultValues_NotViaTestValues.test:" +
+      "TestParameter_WithDefaultValues_NotViaTestValues.test():" +
         " Expected all default parameter values to be produced by a call to" +
         " KotlinTestParameters.testValues()"
   )

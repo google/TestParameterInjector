@@ -237,21 +237,21 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
       checkState(
           !(valueIsSet && valuesProviderIsSet),
-          "It is not allowed to specify both value and valuesProvider in @TestParameters(value=%s,"
-              + " valuesProvider=%s) on %s()",
+          "%s: It is not allowed to specify both value and valuesProvider in"
+              + " @TestParameters(value=%s, valuesProvider=%s)",
+          executable.getHumanReadableNameSummary(),
           Arrays.toString(annotation.value()),
-          annotation.valuesProvider().getSimpleName(),
-          executable.getName());
+          annotation.valuesProvider().getSimpleName());
       checkState(
           valueIsSet || valuesProviderIsSet,
-          "Either a value or a valuesProvider must be set in @TestParameters on %s()",
-          executable.getName());
+          "%s: Either a value or a valuesProvider must be set in @TestParameters",
+          executable.getHumanReadableNameSummary());
       if (!annotation.customName().isEmpty()) {
         checkState(
             annotation.value().length == 1,
-            "Setting @TestParameters.customName is only allowed if there is exactly one YAML string"
-                + " in @TestParameters.value (on %s())",
-            executable.getName());
+            "%s: Setting @TestParameters.customName is only allowed if there is exactly one YAML"
+                + " string in @TestParameters.value",
+            executable.getHumanReadableNameSummary());
       }
 
       if (valueIsSet) {
@@ -357,19 +357,19 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
       TestParameters annotation, JavaCompatibilityExecutable executable) {
     checkState(
         annotation.valuesProvider().equals(DefaultTestParametersValuesProvider.class),
-        "Setting a valuesProvider is not supported for methods/constructors with"
-            + " multiple @TestParameters annotations on %s()",
-        executable.getName());
+        "%s: Setting a valuesProvider is not supported for methods/constructors with"
+            + " multiple @TestParameters annotations",
+        executable.getHumanReadableNameSummary());
     checkState(
         annotation.value().length > 0,
-        "Either a value or a valuesProvider must be set in @TestParameters on %s()",
-        executable.getName());
+        "%s: Either a value or a valuesProvider must be set in @TestParameters",
+        executable.getHumanReadableNameSummary());
     checkState(
         annotation.value().length == 1,
-        "When specifying more than one @TestParameter for a method/constructor, each annotation"
-            + " must have exactly one value. Instead, got %s values on %s(): %s",
+        "%s: When specifying more than one @TestParameter for a method/constructor, each annotation"
+            + " must have exactly one value. Instead, got %s values: %s",
+        executable.getHumanReadableNameSummary(),
         annotation.value().length,
-        executable.getName(),
         Arrays.toString(annotation.value()));
 
     return annotation.value()[0];

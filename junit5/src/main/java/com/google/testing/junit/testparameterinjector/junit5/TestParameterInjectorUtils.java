@@ -296,7 +296,7 @@ class TestParameterInjectorUtils {
       return new JavaCompatibilityExecutable() {
         @Override
         String getHumanReadableNameSummary() {
-          return method.getDeclaringClass().getSimpleName() + "." + method.getName();
+          return method.getDeclaringClass().getSimpleName() + "." + method.getName() + "()";
         }
 
         @Override
