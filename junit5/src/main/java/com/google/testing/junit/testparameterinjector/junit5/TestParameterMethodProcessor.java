@@ -815,7 +815,6 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
           annotation, paramClass, paramName, context);
     }
 
-    @SuppressWarnings("AndroidJdkLibsChecker")
     public static AnnotationWithMetadata fromAnnotatedParameter(
         JavaCompatibilityParameter parameter, Class<?> testClass) {
       TestParameter annotation = parameter.getAnnotation(TestParameter.class);

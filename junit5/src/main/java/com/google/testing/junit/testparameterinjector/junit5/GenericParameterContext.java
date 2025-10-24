@@ -52,7 +52,6 @@ final class GenericParameterContext {
 
   // Field.getAnnotationsByType() is not available on old Android SDKs. There is a fallback in that
   // case in this method.
-  @SuppressWarnings("AndroidJdkLibsChecker")
   static GenericParameterContext create(Field field, Class<?> testClass) {
     return new GenericParameterContext(
         ImmutableList.copyOf(field.getAnnotations()),
@@ -69,7 +68,6 @@ final class GenericParameterContext {
 
   // Parameter is not available on old Android SDKs, and isn't desugared. That's why this method
   // should only be called with a fallback.
-  @SuppressWarnings("AndroidJdkLibsChecker")
   static GenericParameterContext create(Parameter parameter, Class<?> testClass) {
     return new GenericParameterContext(
         ImmutableList.copyOf(parameter.getAnnotations()),

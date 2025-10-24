@@ -412,7 +412,6 @@ class TestParameterInjectorUtils {
           this::getAnnotationsByType);
     }
 
-    @SuppressWarnings("AndroidJdkLibsChecker")
     static JavaCompatibilityParameter create(Parameter parameter) {
       return create(
           parameter.isNamePresent() ? Optional.of(parameter.getName()) : Optional.absent(),
