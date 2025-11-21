@@ -639,11 +639,6 @@ public class TestParametersMethodProcessorTest {
       protected List<TestParametersValues> provideValues(Context context) {
         return ImmutableList.of();
       }
-
-      @Override
-      protected boolean valuesListCanBeEmptyWhichMeansThatTheTestWillBeSkipped() {
-        return false;
-      }
     }
   }
 

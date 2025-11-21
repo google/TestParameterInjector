@@ -56,7 +56,7 @@ public abstract class TestParametersValuesProvider
    */
   @Deprecated
   protected boolean valuesListCanBeEmptyWhichMeansThatTheTestWillBeSkipped() {
-    return true; // TODO: b/454594676 - Change to false
+    return false;
   }
 
   /**
