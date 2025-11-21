@@ -672,12 +672,17 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       List<TestParameterValue> allParameterValues,
       Origin origin,
       Optional<JavaCompatibilityExecutable> executable) {
-    checkState(
-        !allParameterValues.isEmpty(),
-        "%s%s: The number of parameter values should not be 0"
-            + ", otherwise the parameter would cause the test to be skipped.",
-        executable.transform(s -> s.getHumanReadableNameSummary() + ": ").or(""),
-        annotationWithMetadata.paramName().or(annotationWithMetadata.paramClass().getSimpleName()));
+    if (allParameterValues.isEmpty()) {
+      // Not  using checkState() because class.getSimpleName() fails for some Android tests
+      throw new IllegalStateException(
+          String.format(
+              "%s%s: The number of parameter values should not be 0"
+                  + ", otherwise the parameter would cause the test to be skipped.",
+              executable.transform(s -> s.getHumanReadableNameSummary() + ": ").or(""),
+              annotationWithMetadata
+                  .paramName()
+                  .or(annotationWithMetadata.paramClass().getSimpleName())));
+    }
     return FluentIterable.from(
             ContiguousSet.create(
                 Range.closedOpen(0, allParameterValues.size()), DiscreteDomain.integers()))
