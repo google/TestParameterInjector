@@ -1,7 +1,10 @@
 ## 1.20
 
-- For Kotlin tests: Get parameter names via Kotlin reflection (which always
-  seems to work). This should make the breaking change in 1.19 non-breaking.
+- Bugfix for Kotlin v2.2.20: Get parameter names via Kotlin reflection because
+  those via Java reflection have changed to include the class.
+- Fix the breaking change in TestParameterInjector v1.19: By getting the
+  parameter names via Kotlin, the breaking change in 1.19 is no longer breaking
+  when directly upgrading to 1.10
 
 ## 1.19
 
