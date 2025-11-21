@@ -1,5 +1,13 @@
 ## 1.20
 
+- **New Compile-Time Dependency on Kotlin:** The library now includes a
+  compile-time dependency on the **Kotlin Standard Library (`kotlin-stdlib`)**
+  and **Kotlin Reflection (`kotlin-reflect`)**. This is required to properly
+  support Kotlin tests (see the next two changes).
+
+  If this dependency is causing problems, please let us know by raising an
+  issue. If there is enough need for this, we can justify adding an extra
+  artefact that omits the Kotlin part.
 - Bugfix for Kotlin v2.2.20: Get parameter names via Kotlin reflection because
   those via Java reflection have changed to include the class.
 - Fix the breaking change in TestParameterInjector v1.19: By getting the
