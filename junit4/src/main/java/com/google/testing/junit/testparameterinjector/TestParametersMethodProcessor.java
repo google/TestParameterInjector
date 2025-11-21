@@ -310,7 +310,13 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
       if (!valuesListCanBeEmpty) {
         checkState(
             !testParametersValues.isEmpty(),
-            "%s: %s returned an empty list of TestParametersValues",
+            "%s: %s returned an empty list of TestParametersValues\n\n"
+                + "This usually indicates a bug because an empty list means the test as a whole"
+                + " will be skipped, even if there are other (field or constructor) test"
+                + " parameters.\n\n"
+                + "If this behavior is intended, please override"
+                + " valuesListCanBeEmptyWhichMeansThatTheTestWillBeSkipped() in your"
+                + " TestParametersValuesProvider.",
             executable.getHumanReadableNameSummary(),
             valuesProvider.getSimpleName());
       }
