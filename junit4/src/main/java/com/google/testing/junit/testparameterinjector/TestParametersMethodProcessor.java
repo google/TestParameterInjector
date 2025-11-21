@@ -261,9 +261,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
             .toList();
       } else {
         return toParameterValuesList(
-            annotation.valuesProvider(),
-            parametersList,
-            GenericParameterContext.create(executable, testClass));
+            annotation.valuesProvider(), parametersList, executable, testClass);
       }
     } else { // Not annotated with @TestParameters
       verify(
@@ -285,20 +283,37 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
   private static ImmutableList<TestParametersValues> toParameterValuesList(
       Class<? extends TestParametersValuesProvider> valuesProvider,
       List<JavaCompatibilityParameter> parameters,
-      GenericParameterContext context) {
+      JavaCompatibilityExecutable executable,
+      Class<?> testClass) {
     try {
       Constructor<? extends TestParametersValuesProvider> constructor =
           valuesProvider.getDeclaredConstructor();
       constructor.setAccessible(true);
       TestParametersValuesProvider provider = constructor.newInstance();
+      Context context = new Context(GenericParameterContext.create(executable, testClass));
       List<TestParametersValues> testParametersValues =
           provider
                   instanceof
                   com.google.testing.junit.testparameterinjector.TestParametersValuesProvider
               ? ((com.google.testing.junit.testparameterinjector.TestParametersValuesProvider)
                       provider)
-                  .provideValues(new Context(context))
+                  .provideValues(context)
               : provider.provideValues();
+      boolean valuesListCanBeEmpty =
+          provider
+                  instanceof
+                  com.google.testing.junit.testparameterinjector.TestParametersValuesProvider
+              ? ((com.google.testing.junit.testparameterinjector.TestParametersValuesProvider)
+                      provider)
+                  .valuesListCanBeEmptyWhichMeansThatTheTestWillBeSkipped()
+              : false;
+      if (!valuesListCanBeEmpty) {
+        checkState(
+            !testParametersValues.isEmpty(),
+            "%s: %s returned an empty list of TestParametersValues",
+            executable.getHumanReadableNameSummary(),
+            valuesProvider.getSimpleName());
+      }
       for (TestParametersValues testParametersValue : testParametersValues) {
         validateThatValuesMatchParameters(testParametersValue, parameters);
       }

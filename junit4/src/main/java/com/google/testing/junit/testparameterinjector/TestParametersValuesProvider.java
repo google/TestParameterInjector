@@ -33,7 +33,31 @@ import java.util.NoSuchElementException;
 public abstract class TestParametersValuesProvider
     implements TestParameters.TestParametersValuesProvider {
 
+  /**
+   * Returns a list of {@link TestParametersValues} instances to be used as test parameters. This
+   * method is invoked exactly once for each test method.
+   *
+   * <p>The returned list should not be empty unless {@link
+   * #valuesListCanBeEmptyWhichMeansThatTheTestWillBeSkipped()} returns true.
+   */
   protected abstract List<TestParametersValues> provideValues(Context context) throws Exception;
+
+  /**
+   * If this method returns true, then it is ok for the {@link #provideValues(Context)} to return an
+   * empty list.
+   *
+   * <p>Warning: This is generally discouraged because it means that the @Test method will never be
+   * executed. This can be justified for complex tests setups that depend on external input or a
+   * test class hierarchy, but in general this indicates a bug because a reader will assume the test
+   * is run when it is not.
+   *
+   * @deprecated This method exists to gracefully migrate pre-v1.20 clients. Pre-v1.20, all
+   *     TestParametersValuesProvider implementations were allowed to return empty lists.
+   */
+  @Deprecated
+  protected boolean valuesListCanBeEmptyWhichMeansThatTheTestWillBeSkipped() {
+    return true; // TODO: b/454594676 - Change to false
+  }
 
   /**
    * @deprecated This method should never be called as it will simply throw an {@link

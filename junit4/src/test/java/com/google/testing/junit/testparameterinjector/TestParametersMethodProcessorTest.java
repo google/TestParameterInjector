@@ -624,6 +624,29 @@ public class TestParametersMethodProcessorTest {
     public void test1() {}
   }
 
+  @RunAsTest(
+      failsWithMessage =
+          "InvalidTestBecauseProviderReturnsZeroValues.test1(): ReturnZeroValuesProvider returned"
+              + " an empty list of TestParametersValues")
+  public static class InvalidTestBecauseProviderReturnsZeroValues {
+
+    @Test
+    @TestParameters(valuesProvider = ReturnZeroValuesProvider.class)
+    public void test1(TestEnum testEnum) {}
+
+    private static final class ReturnZeroValuesProvider extends TestParametersValuesProvider {
+      @Override
+      protected List<TestParametersValues> provideValues(Context context) {
+        return ImmutableList.of();
+      }
+
+      @Override
+      protected boolean valuesListCanBeEmptyWhichMeansThatTheTestWillBeSkipped() {
+        return false;
+      }
+    }
+  }
+
   @Parameters(name = "{0}")
   public static Collection<Object[]> parameters() {
     return Arrays.stream(TestParametersMethodProcessorTest.class.getClasses())
