@@ -190,19 +190,9 @@ class TestParameterInjectorUtils {
         ImmutableList.Builder<JavaCompatibilityParameter> resultBuilder = ImmutableList.builder();
         for (int parameterIndex = 0; parameterIndex < parameters.size(); parameterIndex++) {
           JavaCompatibilityParameter parameter = parameters.get(parameterIndex);
-          String parameterNameFromKotlin = parameterNamesFromKotlin.get(parameterIndex);
-          if (parameter.maybeGetName().isPresent()) {
-            checkState(
-                parameterNameFromKotlin.equals(parameter.maybeGetName().get()),
-                "%s: Parameter %s has different names in Kotlin (%s) and Java (%s)",
-                getHumanReadableNameSummary(),
-                parameter,
-                parameterNameFromKotlin,
-                parameter.maybeGetName().get());
-            resultBuilder.add(parameter);
-          } else {
-            resultBuilder.add(parameter.withName(parameterNameFromKotlin));
-          }
+          // Always use the name from Kotlin reflection because the Kotlin compiler does not always
+          // populate the Java version with the expected name. See b/461760071 for more info.
+          resultBuilder.add(parameter.withName(parameterNamesFromKotlin.get(parameterIndex)));
         }
         return resultBuilder.build();
       } else {
