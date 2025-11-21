@@ -12,7 +12,7 @@
   those via Java reflection have changed to include the class.
 - Fix the breaking change in TestParameterInjector v1.19: By getting the
   parameter names via Kotlin, the breaking change in 1.19 is no longer breaking
-  when directly upgrading to 1.10
+  when directly upgrading to 1.20
 - **Breaking change:** TestParametersValuesProvider must return at least one
   value. If your use case requires (sometimes) disabling the test by returning
   zero values, override
