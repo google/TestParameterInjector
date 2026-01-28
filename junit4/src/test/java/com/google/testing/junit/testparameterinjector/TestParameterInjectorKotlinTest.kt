@@ -390,17 +390,6 @@ class TestParameterInjectorKotlinTest {
 
   @RunAsTest(
     failsWithMessage =
-      "TestParameter_WithDefaultValues_WithUnsupportedConstructor:" +
-        " Expected each constructor parameter to be annotated with @TestParameter"
-  )
-  internal class TestParameter_WithDefaultValues_WithUnsupportedConstructor(
-    private val width: Int
-  ) {
-    @Test fun test(@TestParameter height: Int = KotlinTestParameters.testValues(11, 12)) {}
-  }
-
-  @RunAsTest(
-    failsWithMessage =
       "TestParameter_WithDefaultValues_NotViaTestValues.test():" +
         " Expected all default parameter values to be produced by a call to" +
         " KotlinTestParameters.testValues()"

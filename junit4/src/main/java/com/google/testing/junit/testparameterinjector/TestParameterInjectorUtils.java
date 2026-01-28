@@ -72,6 +72,14 @@ class TestParameterInjectorUtils {
                     !c.isSynthetic())
             .toList();
 
+    if (constructors.size() == 2 && isKotlinClass(testClass)) {
+      // Kotlin hack: If a constructor has only parameters with default values, then there will be
+      // two public constructors: one with the parameters and one with no parameters. We only care
+      // about the former one. See b/463217659.
+      constructors =
+          FluentIterable.from(constructors).filter(c -> c.getParameterTypes().length > 0).toList();
+    }
+
     checkState(
         constructors.size() == 1,
         "%s: Expected exactly one constructor, but got %s",

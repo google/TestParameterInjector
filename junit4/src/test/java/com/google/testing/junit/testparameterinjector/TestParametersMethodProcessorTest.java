@@ -689,6 +689,8 @@ public class TestParametersMethodProcessorTest {
 
   private static ImmutableList<Class<? extends Annotation>> annotationTypes(
       Iterable<Annotation> annotations) {
-    return FluentIterable.from(annotations).transform(Annotation::annotationType).toList();
+    return FluentIterable.from(annotations)
+        .<Class<? extends Annotation>>transform(Annotation::annotationType)
+        .toList();
   }
 }
