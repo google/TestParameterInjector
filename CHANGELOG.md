@@ -1,3 +1,9 @@
+## 1.21
+
+- Add public method `computeTestMethods(List<FrameworkMethod> methods)` to
+  `TestParameterInjector` API. This can be useful for creating custom extensions
+  of `TestParameterInjector`.
+
 ## 1.20
 
 - **New Compile-Time Dependency on Kotlin:** The library now includes a
