@@ -189,7 +189,6 @@
         </executions>
         <configuration>
           <jvmTarget>17</jvmTarget>
-          <javaParameters>true</javaParameters>
           <args>
             <!--
               Opt in to upcoming Kotlin compiler change which is causing issues with
