@@ -434,6 +434,20 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                     TestParameterInjectorUtils.getOnlyConstructor(testClass));
             JavaCompatibilityExecutable methodExecutable =
                 JavaCompatibilityExecutable.create(method);
+
+            // Explicitly fail tests using @TestParameters with @TestParameter on a param as well.
+            // It doesn't make sense to combine the two because there is no way to apply the
+            // contracts simultaneously.
+            if (methodExecutable.isAnnotationPresent(TestParameters.class)) {
+              if (containsRelevantAnnotation(methodExecutable.getParameterAnnotations())) {
+                throw new IllegalStateException(
+                    String.format(
+                        "Method %s is annotated with @TestParameters and has a @TestParameter"
+                            + " annotated method parameter. This is not supported.",
+                        methodExecutable.getName()));
+              }
+            }
+
             return Lists.cartesianProduct(
                 FluentIterable.from(ImmutableList.<ImmutableList<TestParameterValueHolder>>of())
                     .append(getFieldValueHolders(testClass))

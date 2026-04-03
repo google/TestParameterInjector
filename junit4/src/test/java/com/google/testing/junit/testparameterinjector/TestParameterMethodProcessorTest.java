@@ -543,6 +543,31 @@ public class TestParameterMethodProcessorTest {
     public void test1() {}
   }
 
+  @RunAsTest(
+      failsWithMessage =
+          "Method testWithExplicitValues is annotated with @TestParameters and has a"
+              + " @TestParameter annotated method parameter. This is not supported.")
+  public static final class TestParametersAnnotationOverridesTestParameterAnnotation1 {
+
+    @Test
+    @TestParameters("{unused: FROM_TEST_PARAMETERS}")
+    @SuppressWarnings("SingleTestParameter")
+    public void testWithExplicitValues(
+        @TestParameter(value = "FROM_TEST_PARAMETER") String unused) {}
+  }
+
+  @RunAsTest(
+      failsWithMessage =
+          "Method testWithoutValues is annotated with @TestParameters and has a"
+              + " @TestParameter annotated method parameter. This is not supported.")
+  public static final class TestParametersAnnotationOverridesTestParameterAnnotation2 {
+
+    @Test
+    @TestParameters("{unused: FROM_TEST_PARAMETERS}")
+    @SuppressWarnings("SingleTestParameter")
+    public void testWithoutValues(@TestParameter String unused) {}
+  }
+
   @Parameters(name = "{0}")
   public static Collection<Object[]> parameters() {
     return Arrays.stream(TestParameterMethodProcessorTest.class.getClasses())
