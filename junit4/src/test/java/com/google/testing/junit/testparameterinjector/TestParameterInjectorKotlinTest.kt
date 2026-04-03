@@ -16,11 +16,13 @@ package com.google.testing.junit.testparameterinjector
 
 import com.google.common.collect.ImmutableList
 import com.google.common.collect.ImmutableMap
+import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.TruthJUnit.assume
 import com.google.testing.junit.testparameterinjector.SharedTestUtilitiesJUnit4.SuccessfulTestCaseBase
 import java.util.Arrays
 import kotlin.annotation.AnnotationRetention.RUNTIME
 import kotlin.annotation.AnnotationTarget.CLASS
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -411,6 +413,20 @@ class TestParameterInjectorKotlinTest {
     SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
       object : PluggableTestRunner(testClass) {}
     )
+  }
+
+  @Test
+  fun test_failure() {
+    assume().that(runAsTestAnnotation().failsWithMessage).isNotEmpty()
+
+    val throwable =
+      assertThrows(Throwable::class.java) {
+        SharedTestUtilitiesJUnit4.runTestsAndAssertNoFailures(
+          object : PluggableTestRunner(testClass) {}
+        )
+      }
+
+    assertThat(throwable).hasMessageThat().contains(runAsTestAnnotation().failsWithMessage)
   }
 
   private fun runAsTestAnnotation(): RunAsTest = testClass.getAnnotation(RunAsTest::class.java)!!
