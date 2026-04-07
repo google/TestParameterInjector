@@ -23,28 +23,45 @@ frameworks used at Google.
 
 ## Getting started
 
-### JUnit4
+<details>
+<summary><b>JUnit4 (Java)</b></summary>
 
 To start using `TestParameterInjector` right away, copy the following snippet:
 
 ```java
 import com.google.testing.junit.testparameterinjector.TestParameterInjector;
 import com.google.testing.junit.testparameterinjector.TestParameter;
+import com.google.testing.junit.testparameterinjector.TestParameters;
 
 @RunWith(TestParameterInjector.class)
 public class MyTest {
 
   @TestParameter boolean isDryRun;
 
-  @Test public void test1(@TestParameter boolean enableFlag) {
-    // ...
+  enum FetchResponseCode { FOUND, NOT_FOUND, ERROR }
+
+  @Test
+  public void test1(@TestParameter FetchResponseCode responseCode) {
+    // This test method is run 6 times for all combinations of isDryRun and responseCode
   }
 
-  @Test public void test2(@TestParameter MyEnum myEnum) {
-    // ...
+  @Test
+  public void test2(
+      @TestParameter boolean withDeadline,
+      @TestParameter({"20", "100"}) int limit) {
+    // This test method is run 2*2*2=8 times
   }
 
-  enum MyEnum { VALUE_A, VALUE_B, VALUE_C }
+  @Test
+  @TestParameters("{age: 17, expectIsAdult: false}")
+  @TestParameters("{age: 22, expectIsAdult: true}")
+  public void test3(int age, boolean expectIsAdult) {
+    // This test method is run 4 times:
+    //   - isDryRun=false, age=17, expectIsAdult=false
+    //   - isDryRun=false, age=22, expectIsAdult=true
+    //   - isDryRun=true,  age=17, expectIsAdult=false
+    //   - isDryRun=true,  age=22, expectIsAdult=true
+  }
 }
 ```
 
@@ -62,32 +79,108 @@ And add the following dependency to your `.pom` file:
 or see [this maven.org
 page](https://search.maven.org/artifact/com.google.testparameterinjector/test-parameter-injector)
 for instructions for other build tools.
-
-### JUnit5 (Jupiter)
+</details>
 <details>
-<summary>Click to expand</summary>
+<summary><b>JUnit4 (Kotlin)</b></summary>
+
+To start using `TestParameterInjector` right away, copy the following snippet:
+
+```kotlin
+import com.google.testing.junit.testparameterinjector.TestParameterInjector
+import com.google.testing.junit.testparameterinjector.TestParameter
+import com.google.testing.junit.testparameterinjector.KotlinTestParameters.testValues
+
+@RunWith(TestParameterInjector::class)
+class MyTest(
+  @TestParameter val isDryRun: Boolean
+) {
+
+  enum class FetchResponseCode { FOUND, NOT_FOUND, ERROR }
+
+  @Test
+  fun test1(@TestParameter responseCode: FetchResponseCode) {
+    // This test method is run 6 times for all combinations of isDryRun and responseCode
+  }
+
+  @Test
+  fun test2(
+      @TestParameter withDeadline: Boolean
+      @TestParameter limit: Int = testValues(20, 100)) {
+    // This test method is run 2*2*2=8 times
+  }
+
+  data class AgeCheckTestCase(val age: Int, val expectIsAdult: Boolean)
+
+  @Test
+  fun test3(
+    @TestParameter testCase: AgeCheckTestCase = testValues(
+        AgeCheckTestCase(17, false),
+        AgeCheckTestCase(22, true),
+    )
+  ) {
+    // This test method is run 4 times:
+    //   - isDryRun=false, testCase=AgeCheckTestCase(17, false)
+    //   - isDryRun=false, testCase=AgeCheckTestCase(22, true)
+    //   - isDryRun=true,  testCase=AgeCheckTestCase(17, false)
+    //   - isDryRun=true,  testCase=AgeCheckTestCase(22, true)
+  }
+}
+```
+
+And add the following dependency to your `.pom` file:
+
+```xml
+<dependency>
+  <groupId>com.google.testparameterinjector</groupId>
+  <artifactId>test-parameter-injector</artifactId>
+  <version>1.21</version>
+  <scope>test</scope>
+</dependency>
+```
+
+or see [this maven.org
+page](https://search.maven.org/artifact/com.google.testparameterinjector/test-parameter-injector)
+for instructions for other build tools.
+</details>
+
+<details>
+<summary><b>JUnit5 (Jupiter)</b></summary>
 
 To start using `TestParameterInjector` right away, copy the following snippet:
 
 ```java
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorTest;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameter;
+import com.google.testing.junit.testparameterinjector.junit5.TestParameters;
 
 class MyTest {
 
   @TestParameter boolean isDryRun;
 
+  enum FetchResponseCode { FOUND, NOT_FOUND, ERROR }
+
   @TestParameterInjectorTest
-  void test1(@TestParameter boolean enableFlag) {
-    // ...
+  public void test1(@TestParameter FetchResponseCode responseCode) {
+    // This test method is run 6 times for all combinations of isDryRun and responseCode
   }
 
   @TestParameterInjectorTest
-  void test2(@TestParameter MyEnum myEnum) {
-    // ...
+  public void test2(
+      @TestParameter boolean withDeadline,
+      @TestParameter({"20", "100"}) int limit) {
+    // This test method is run 2*2*2=8 times
   }
 
-  enum MyEnum { VALUE_A, VALUE_B, VALUE_C }
+  @TestParameterInjectorTest
+  @TestParameters("{age: 17, expectIsAdult: false}")
+  @TestParameters("{age: 22, expectIsAdult: true}")
+  public void test3(int age, boolean expectIsAdult) {
+    // This test method is run 4 times:
+    //   - isDryRun=false, age=17, expectIsAdult=false
+    //   - isDryRun=false, age=22, expectIsAdult=true
+    //   - isDryRun=true,  age=17, expectIsAdult=false
+    //   - isDryRun=true,  age=22, expectIsAdult=true
+  }
 }
 ```
 
