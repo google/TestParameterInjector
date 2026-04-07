@@ -273,6 +273,9 @@ and behavior in `@Before` methods.
 
 The following examples show most of the supported types. See the `@TestParameter` javadoc for more details. 
 
+<details>
+<summary><b>Java</b></summary>
+
 ```java
 // Enums
 @TestParameter AnimalEnum a; // Implies all possible values of AnimalEnum
@@ -295,6 +298,27 @@ The following examples show most of the supported types. See the `@TestParameter
 ```
 
 For non-primitive types (e.g. String, enums, bytes), `"null"` is always parsed as the `null` reference.
+</details>
+<details>
+<summary><b>Kotlin</b></summary>
+
+```kotlin
+// Enums
+@TestParameter a: AnimalEnum // Implies all possible values of AnimalEnum
+@TestParameter a: AnimalEnum = testValues(AnimalEnum.CAT, AnimalEnum.DOG)
+
+// Strings
+@TestParameter animalName: String = testValues("cat", "dog")
+
+// Primitives
+@TestParameter b: Boolean // Implies {true, false}
+@TestParameter i: Int = testValues(1, 2, 3)
+@TestParameter d: Double = testValues(1.0, 1.5, 2.0)
+
+// ... Any type is supported when using testValues()
+```
+
+</details>
 
 #### Multiple parameters: All combinations are run
 
