@@ -648,3 +648,23 @@ static final class IsAdultValueProvider extends TestParametersValuesProvider {
   }
 }
 ```
+
+## Combination with other runners
+
+### Robolectric (Android)
+
+A Robolectric compatible version of `TestParameterInjector` is available as
+[`RobolectricTestParameterInjector`](https://robolectric.org/javadoc/latest/org/robolectric/RobolectricTestParameterInjector.html),
+which supports all the features of the base `RobolectricTestRunner` in addition
+to the parameterization features of `TestParameterInjector`.
+
+```java
+import org.robolectric.RobolectricTestParameterInjector;
+
+@RunWith(RobolectricTestParameterInjector.class)
+public class MyRobolectricTest {
+
+  @Test
+  public void test(@TestParameter boolean value) { /*...*/ }
+}
+```
