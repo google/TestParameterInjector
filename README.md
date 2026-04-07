@@ -271,7 +271,9 @@ and behavior in `@Before` methods.
 
 #### Supported types
 
-The following examples show most of the supported types. See the `@TestParameter` javadoc for more details. 
+The following examples show most of the supported types. See the
+[`@TestParameter` javadoc](https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameter.html)
+for more details. 
 
 <details>
 <summary><b>Java</b></summary>
@@ -456,7 +458,8 @@ MyTest#personIsAdult[{age: 22, expectIsAdult: true}]
 ```
 
 The string format supports the same types as `@TestParameter` (e.g. enums). See
-the `@TestParameters` javadoc for more info.
+the [`@TestParameters` javadoc](https://google.github.io/TestParameterInjector/docs/latest/com/google/testing/junit/testparameterinjector/TestParameters.html)
+for more info.
 
 `@TestParameters` works in the same way on the constructor, in which case all
 tests will be run for the given parameter sets.
