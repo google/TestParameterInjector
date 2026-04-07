@@ -1,3 +1,33 @@
+## 1.22
+
+- **Kotlin default parameters**: Added support for an alternative way to specify
+  test values in Kotlin:
+
+  Examples:
+
+```kotlin
+import com.google.testing.junit.testparameterinjector.KotlinTestParameters.testValues
+import com.google.testing.junit.testparameterinjector.KotlinTestParameters.namedTestValues
+import com.google.testing.junit.testparameterinjector.KotlinTestParameters.testValuesIn
+
+@TestParameter limit: Int = testValues(20, 100),
+
+@TestParameter testCase: AgeCheckTestCase = namedTestValues(
+    "teenager"  to AgeCheckTestCase(17, false),
+    "young adult"  to AgeCheckTestCase(22, true),
+),
+
+@TestParameter invalidRequest: Request =
+    testValuesIn(readRequestsFromFile("invalid_requests.json")),
+```
+
+- **Minor breaking change:** Because of the above, Kotlin test methods with
+  default parameters will no longer work. These defaults would never have been
+  used anyway.
+- **Minor breaking change:** TestParameterInjector will now fail tests that
+  specify both `@TestParameters` on the method and `@TestParameter` on a
+  parameter.
+
 ## 1.21
 
 - Add public method `computeTestMethods(List<FrameworkMethod> methods)` to
