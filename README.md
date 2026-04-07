@@ -436,7 +436,7 @@ class MyTest {
 
 </details>
 
-### `@TestParameters` for defining sets of parameters
+#### `@TestParameters`
 
 You can also explicitly enumerate the sets of test parameters via a list of YAML
 mappings:
@@ -445,7 +445,7 @@ mappings:
 @Test
 @TestParameters("{age: 17, expectIsAdult: false}")
 @TestParameters("{age: 22, expectIsAdult: true}")
-public void personIsAdult(int age, boolean expectIsAdult) { ... }
+public void personIsAdult(int age, boolean expectIsAdult) { /*...*/ }
 ```
 
 which would generate the following tests:
@@ -467,7 +467,7 @@ tests will be run for the given parameter sets.
 > @Test
 > @TestParameters(customName = "teenager", value = "{age: 17, expectIsAdult: false}")
 > @TestParameters(customName = "young adult", value = "{age: 22, expectIsAdult: true}")
-> public void personIsAdult(int age, boolean expectIsAdult) { ... }
+> public void personIsAdult(int age, boolean expectIsAdult) { /*...*/ }
 > ```
 >
 > This will generate the following test names:
@@ -475,6 +475,27 @@ tests will be run for the given parameter sets.
 > ```
 > MyTest#personIsAdult[teenager]
 > MyTest#personIsAdult[young adult]
+> ```
+
+> Note: The parameters string is parsed as YAML without knowing the target
+> types. Therefore, strings that could be interpreted as numbers or booleans
+> should be escaped.
+>
+> For example:
+>
+> ```java
+> @Test
+> @TestParameters("{phoneNumber: +12155555555}")
+> public void parsePhoneNumber_success(String phoneNumber) { /*...*/ }
+> ```
+>
+> will result `phoneNumber = "12155555555"`, without the `+` prefix. You can fix
+> this by surrounding the string value with quotes:
+>
+> ```java
+> @Test
+> @TestParameters("{phoneNumber: '+12155555555'}")
+> public void parsePhoneNumber_success(String phoneNumber) { /*...*/ }
 > ```
 
 ### Filtering unwanted parameters
