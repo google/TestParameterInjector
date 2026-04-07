@@ -76,8 +76,8 @@ And add the following dependency to your `.pom` file:
 </dependency>
 ```
 
-or see [this maven.org
-page](https://search.maven.org/artifact/com.google.testparameterinjector/test-parameter-injector)
+or see [this Maven
+page](https://central.sonatype.com/artifact/com.google.testparameterinjector/test-parameter-injector)
 for instructions for other build tools.
 </details>
 <details>
@@ -138,8 +138,8 @@ And add the following dependency to your `.pom` file:
 </dependency>
 ```
 
-or see [this maven.org
-page](https://search.maven.org/artifact/com.google.testparameterinjector/test-parameter-injector)
+or see [this Maven
+page](https://central.sonatype.com/artifact/com.google.testparameterinjector/test-parameter-injector)
 for instructions for other build tools.
 </details>
 
@@ -195,8 +195,8 @@ And add the following dependency to your `.pom` file:
 </dependency>
 ```
 
-or see [this maven.org
-page](https://search.maven.org/artifact/com.google.testparameterinjector/test-parameter-injector-junit5)
+or see [this Maven
+page](https://central.sonatype.com/artifact/com.google.testparameterinjector/test-parameter-injector-junit5)
 for instructions for other build tools.
 
 </details>
