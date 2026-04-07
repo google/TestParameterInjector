@@ -649,6 +649,25 @@ static final class IsAdultValueProvider extends TestParametersValuesProvider {
 }
 ```
 
+## Limitations
+
+### Kotlin constructor values
+
+Due to JUnit limitations (in both JUnit4 and JUnit5), it is impossible to
+use `KotlinTestParameters.testValues` and friends in a constructor:
+
+```kotlin
+// This does *not* work
+class MyTest(
+  @TestParameter val age: Int = testValues(17, 22)
+) { /* ... */ }
+
+// Fall back to Java version. This works:
+class MyTest(
+  @TestParameter("17", "22") val age: Int
+) { /* ... */ }
+```
+
 ## Combination with other runners
 
 ### Robolectric (Android)
