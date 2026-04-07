@@ -521,13 +521,16 @@ enum Fruit { APPLE, BANANA, CHERRY }
 Note that the above works regardless of what parameterization framework you
 choose.
 
-## Advanced usage
+## [Advanced] Dynamic parameter generation
 
 **Note about JUnit4 vs JUnit5:**<br />
 The code below assumes you're using JUnit4. For JUnit5 users, simply remove the
 `@RunWith` annotation and replace `@Test` by `@TestParameterInjectorTest`.
 
-### Dynamic parameter generation for `@TestParameter`
+### `@TestParameter`
+
+<details>
+<summary><b>Java</b></summary>
 
 Instead of providing a list of parsable strings, you can implement your own
 `TestParameterValuesProvider` as follows:
@@ -543,7 +546,7 @@ public void matchesAllOf_throwsOnNull(
 
 private static final class CharMatcherProvider extends TestParameterValuesProvider {
   @Override
-  public List<CharMatcher> provideValues(Context context) {
+  protected ImmutableList<CharMatcher> provideValues(Context context) {
     return ImmutableList.of(CharMatcher.any(), CharMatcher.ascii(), CharMatcher.whitespace());
   }
 }
@@ -562,7 +565,7 @@ Notes:
     ```java
     private static final class FruitProvider extends TestParameterValuesProvider {
       @Override
-      public List<?> provideValues(Context context) {
+      protected ImmutableList<?> provideValues(Context context) {
         return ImmutableList.of(
             value(new Apple()).withName("apple"),
             value(new Banana()).withName("banana"));
@@ -575,7 +578,47 @@ Notes:
     providers that take into account custom annotations with extra data, or the
     implementation of abstract methods on a base test class.
 
-### Dynamic parameter generation for `@TestParameters`
+</details>
+<details>
+<summary><b>Kotlin</b></summary>
+
+Instead of providing a varargs list of values, you can dynamically provide one
+as follows:
+
+```kotlin
+import com.google.testing.junit.testparameterinjector.KotlinTestParameters.testValuesIn
+
+@Test
+fun sendInvalidRequest_fails(
+      @TestParameter invalidRequest: GetGshoeRequest =
+          testValuesIn(readRequestsFromFile("invalid_get_gshoe_requests.textproto"))
+  ) { /*...*/ }
+
+private fun readRequestsFromFile(filename: String): List<GetGshoeRequest> { /*...*/ }
+```
+
+Notes:
+
+-   The test values are calculated before `@Before[Class]` or any `@Rule`s, so
+    don't rely on any state initialized in there.
+-   The test values' `toString()` will be used for the test names. If you want
+    to customize the value names, you can do that as follows:
+
+    ```kotlin
+    import com.google.testing.junit.testparameterinjector.KotlinTestParameters.namedTestValuesIn
+
+    @Test
+    fun sendInvalidRequest_fails(
+          @TestParameter invalidRequest: GetGshoeRequest =
+              namedTestValuesIn(readRequestsFromFile("invalid_get_gshoe_requests.textproto"))
+      ) { /*...*/ }
+
+    private fun readRequestsFromFile(filename: String): Map<String, GetGshoeRequest> { /*...*/ }
+    ```
+
+</details>
+
+### `@TestParameters`
 
 Instead of providing a YAML mapping of parameters, you can implement your own
 `TestParametersValuesProvider` as follows:
