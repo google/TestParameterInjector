@@ -79,6 +79,13 @@ And add the following dependency to your `.pom` file:
 or see [this Maven
 page](https://central.sonatype.com/artifact/com.google.testparameterinjector/test-parameter-injector)
 for instructions for other build tools.
+
+Additionally, Java needs to be compiled with the `-parameters` compiler option.
+This can be done for example:
+
+- In Maven with the `maven-compiler-plugin`: Add `<parameters>true</parameters>` to `<configuration>`
+- With Gradle: Add `options.compilerArgs << "-parameters"`
+
 </details>
 <details>
 <summary><b>JUnit4 (Kotlin)</b></summary>
@@ -198,6 +205,12 @@ And add the following dependency to your `.pom` file:
 or see [this Maven
 page](https://central.sonatype.com/artifact/com.google.testparameterinjector/test-parameter-injector-junit5)
 for instructions for other build tools.
+
+Additionally, Java needs to be compiled with the `-parameters` compiler option.
+This can be done for example:
+
+- In Maven with the `maven-compiler-plugin`: Add `<parameters>true</parameters>` to `<configuration>`
+- With Gradle: Add `options.compilerArgs << "-parameters"`
 
 </details>
 
