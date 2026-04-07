@@ -597,13 +597,16 @@ class TestParameterInjectorJUnit5KotlinTest {
     }
 
     private fun toCopyPastableJavaString(map: Map<String, String>): String {
-      val resultBuilder = StringBuilder()
-      resultBuilder.append("\n----------------------\n")
-      resultBuilder.append("ImmutableMap.<String, String>builder()\n")
-      map.forEach { (key, value) -> resultBuilder.append("    .put(\"$key\", \"$value\")\n") }
-      resultBuilder.append("    .build()\n")
-      resultBuilder.append("----------------------\n")
-      return resultBuilder.toString()
+      return """
+          |
+          |----------------------
+          |ImmutableMap.<String, String>builder()
+          |${map.map { (key, value) -> "    .put(\"$key\", \"$value\")" }.joinToString("\n")}
+          |    .build()
+          |----------------------
+          |
+      """
+        .trimMargin()
     }
   }
 }
