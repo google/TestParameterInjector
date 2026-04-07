@@ -348,9 +348,14 @@ public class MyTest {
 If you want to explicitly define which combinations are run, see the next
 sections.
 
-### Use a test enum for enumerating more complex parameter combinations
+### Defining correlated parameters
 
-Use this strategy if you want to:
+#### Custom type
+
+<details>
+<summary><b>Java</b></summary>
+
+Use a **test enum** if you want to:
 
 -   Explicitly specify the combination of parameters
 -   or your parameters are too large to be encoded in a `String` in a readable
@@ -360,7 +365,7 @@ Example:
 
 ```java
 @RunWith(TestParameterInjector.class)
-class MyTest {
+public class MyTest {
 
   enum FruitVolumeTestCase {
     APPLE(Fruit.newBuilder().setName("Apple").setShape(SPHERE).build(), /* expectedVolume= */ 3.1),
@@ -370,7 +375,10 @@ class MyTest {
     final Fruit fruit;
     final double expectedVolume;
 
-    FruitVolumeTestCase(Fruit fruit, double expectedVolume) { ... }
+    FruitVolumeTestCase(Fruit fruit, double expectedVolume) {
+      this.fruit = fruit;
+      this.expectedVolume = expectedVolume;
+    }
   }
 
   @Test
@@ -388,6 +396,45 @@ MyTest#calculateVolume_success[APPLE]
 MyTest#calculateVolume_success[BANANA]
 MyTest#calculateVolume_success[MELON]
 ```
+
+</details>
+<details>
+<summary><b>Kotlin</b></summary>
+
+To explicitly specify the combination of parameters, we recommend using a **data
+class** as follows:
+
+```kotlin
+@RunWith(TestParameterInjector::class)
+class MyTest {
+
+  data class AgeCheckTestCase(val age: Int, val expectIsAdult: Boolean)
+
+  @Test
+  fun personIsAdult(
+    @TestParameter testCase: AgeCheckTestCase = testValues(
+        AgeCheckTestCase(17, false),
+        AgeCheckTestCase(22, true),
+    )
+  ) { /*...*/ }
+}
+```
+
+> Tip: Consider setting a custom name if the data class is non-trivial:
+>
+> ```kotlin
+> import com.google.testing.junit.testparameterinjector.KotlinTestParameters.namedTestValues
+>
+> @Test
+> fun personIsAdult(
+>   @TestParameter testCase: AgeCheckTestCase = namedTestValues(
+>       "teenager"  to AgeCheckTestCase(17, false),
+>       "young adult"  to AgeCheckTestCase(22, true),
+>   )
+> ) { /*...*/ }
+> ```
+
+</details>
 
 ### `@TestParameters` for defining sets of parameters
 
