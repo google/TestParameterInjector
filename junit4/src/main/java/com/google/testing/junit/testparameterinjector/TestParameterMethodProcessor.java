@@ -50,6 +50,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
@@ -475,7 +476,12 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       Class<?> testClass) {
     List<AnnotationWithMetadata> annotations =
         FluentIterable.from(listWithParents(testClass))
-            .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
+            .transformAndConcat(
+                c -> {
+                  Field[] fields = c.getDeclaredFields();
+                  Arrays.sort(fields, Comparator.comparing(Field::getName));
+                  return Arrays.asList(fields);
+                })
             .transformAndConcat(
                 field ->
                     maybeGetTestParameter(field.getAnnotations())
