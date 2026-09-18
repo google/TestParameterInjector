@@ -20,6 +20,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.UnsignedLong;
 import com.google.protobuf.ByteString;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
@@ -44,11 +45,25 @@ public class ParameterValueParsingTest {
     "{yamlString: '{a: b, c: 15}', valid: true}",
     "{yamlString: '{a: b c: 15',   valid: false}",
     "{yamlString: 'a: b c: 15',    valid: false}",
+    // TODO: b/563287231 - This should be invalid. A duplicate mapping key is almost always a
+    // mistake, but the YAML parser silently accepts it (keeping only the last value).
+    "{yamlString: '{a: b, a: c}',  valid: true}",
   })
   public void isValidYamlString_success(String yamlString, boolean valid) throws Exception {
     boolean result = ParameterValueParsing.isValidYamlString(yamlString);
 
     assertThat(result).isEqualTo(valid);
+  }
+
+  // TODO: b/563287231 - A duplicate mapping key should cause an exception instead of silently
+  // dropping all values but the last one. This test documents the current (undesired) behavior.
+  @Test
+  public void parseYamlStringToObject_duplicateMapKey_doesNotThrow(
+      @TestParameter({"{a: 1, a: 2}", "{'a': 1, a: 2}", "a: 1\na: 2"}) String yamlString)
+      throws Exception {
+    Object result = ParameterValueParsing.parseYamlStringToObject(yamlString);
+
+    assertThat(result).isEqualTo(ImmutableMap.of("a", 2));
   }
 
   enum ParseYamlValueToJavaTypeCases {

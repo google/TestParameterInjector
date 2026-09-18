@@ -627,6 +627,24 @@ public class TestParametersMethodProcessorTest {
     public void test1(boolean desktop, boolean demoted) {}
   }
 
+  // TODO: b/563287231 - This should be an invalid test (see InvalidTestBecause* classes above). A
+  // duplicate key in the YAML string is almost always a mistake, but it is currently silently
+  // accepted, with the last value winning.
+  @RunAsTest
+  public static class DuplicateKeyInYamlString extends SuccessfulTestCaseBase {
+
+    @Test
+    @TestParameters("{testEnum: ONE, testEnum: TWO}")
+    public void test1(TestEnum testEnum) {
+      storeTestParametersForThisTest(testEnum);
+    }
+
+    @Override
+    ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
+      return ImmutableMap.of("test1[{testEnum: ONE, testEnum: TWO}]", "TWO");
+    }
+  }
+
   @RunAsTest(failsWithMessage = "Expected exactly one constructor, but got []")
   public static class InvalidTestBecausePackagePrivateConstructor {
     InvalidTestBecausePackagePrivateConstructor() {}
