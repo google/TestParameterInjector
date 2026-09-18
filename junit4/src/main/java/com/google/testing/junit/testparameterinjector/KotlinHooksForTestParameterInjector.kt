@@ -243,12 +243,5 @@ internal object KotlinHooksForTestParameterInjector {
     return values
   }
 
-  /**
-   * A single [TestParameterValue], paired with the index that it had in the list of values that it
-   * was taken from.
-   */
-  class IndexedTestParameterValue
-  internal constructor(val value: TestParameterValue, val indexInValueList: Int)
-
   private class GetJavaExecutableFailureException : RuntimeException()
 }

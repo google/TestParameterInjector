@@ -36,7 +36,6 @@ import com.google.common.collect.Range;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-import com.google.testing.junit.testparameterinjector.junit5.KotlinHooksForTestParameterInjector.IndexedTestParameterValue;
 import com.google.testing.junit.testparameterinjector.junit5.TestInfo.TestInfoParameter;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorUtils.JavaCompatibilityExecutable;
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorUtils.JavaCompatibilityParameter;
