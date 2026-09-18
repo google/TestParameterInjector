@@ -619,6 +619,21 @@ Notes:
     private fun readRequestsFromFile(filename: String): Map<String, GetGshoeRequest> { /*...*/ }
     ```
 
+-   A default value can depend on the parameters that precede it.
+
+    ```kotlin
+    @Test
+    fun rangeIsValid(
+          @TestParameter start: Int = testValues(1, 2),
+          @TestParameter end: Int = testValuesIn(start..3),
+      ) {
+      // This test method is run 5 times: (1,1), (1,2), (1,3), (2,2) and (2,3)
+    }
+    ```
+
+    The default values of a test method can also depend on the values of the
+    test class' fields and constructor parameters.
+
 </details>
 
 ### `@TestParameters`

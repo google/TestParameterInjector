@@ -261,6 +261,95 @@ class TestParameterInjectorKotlinTest {
   }
 
   @RunAsTest
+  internal class TestParameter_WithDefaultValues_DependingOnEarlierMethodParam :
+    SuccessfulTestCaseBase() {
+
+    @Test
+    fun test(
+      @TestParameter start: Int = KotlinTestParameters.testValues(1, 2),
+      @TestParameter end: Int = KotlinTestParameters.testValuesIn(start..3),
+    ) {
+      storeTestParametersForThisTest(start, end)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test[start=1,end=1]", "1:1")
+        .put("test[start=1,end=2]", "1:2")
+        .put("test[start=1,end=3]", "1:3")
+        .put("test[start=2,end=2]", "2:2")
+        .put("test[start=2,end=3]", "2:3")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
+  internal class TestParameter_WithDefaultValues_DependingOnMethodParamWithoutDefaultValue :
+    SuccessfulTestCaseBase() {
+
+    @Test
+    fun test(
+      @TestParameter("1", "2") start: Int,
+      @TestParameter end: Int = KotlinTestParameters.testValuesIn(start..3),
+      // This parameter has no default value, but it comes after one that has:
+      @TestParameter("false") isCircular: Boolean,
+    ) {
+      storeTestParametersForThisTest(start, end, isCircular)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test[start=1,end=1,isCircular=false]", "1:1:false")
+        .put("test[start=1,end=2,isCircular=false]", "1:2:false")
+        .put("test[start=1,end=3,isCircular=false]", "1:3:false")
+        .put("test[start=2,end=2,isCircular=false]", "2:2:false")
+        .put("test[start=2,end=3,isCircular=false]", "2:3:false")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
+  internal class TestParameter_WithDefaultValues_DependingOnField : SuccessfulTestCaseBase() {
+    @TestParameter("1", "2") private var start: Int = 0
+
+    @Test
+    fun test(@TestParameter end: Int = KotlinTestParameters.testValuesIn(start..3)) {
+      storeTestParametersForThisTest(start, end)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test[start=1,end=1]", "1:1")
+        .put("test[start=1,end=2]", "1:2")
+        .put("test[start=1,end=3]", "1:3")
+        .put("test[start=2,end=2]", "2:2")
+        .put("test[start=2,end=3]", "2:3")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
+  internal class TestParameter_WithDefaultValues_DependingOnConstructorParam(
+    @TestParameter("1", "2") private val start: Int
+  ) : SuccessfulTestCaseBase() {
+
+    @Test
+    fun test(@TestParameter end: Int = KotlinTestParameters.testValuesIn(start..3)) {
+      storeTestParametersForThisTest(start, end)
+    }
+
+    override fun expectedTestNameToStringifiedParameters(): ImmutableMap<String, String> {
+      return ImmutableMap.builder<String, String>()
+        .put("test[start=1,end=1]", "1:1")
+        .put("test[start=1,end=2]", "1:2")
+        .put("test[start=1,end=3]", "1:3")
+        .put("test[start=2,end=2]", "2:2")
+        .put("test[start=2,end=3]", "2:3")
+        .buildOrThrow()
+    }
+  }
+
+  @RunAsTest
   internal class TestParameters_MethodParam : SuccessfulTestCaseBase() {
     @TestParameters("{width: 3, height: 8}")
     @TestParameters("{width: 5, height: 2.5}")

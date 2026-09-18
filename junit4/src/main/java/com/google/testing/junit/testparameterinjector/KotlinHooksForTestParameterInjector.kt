@@ -58,13 +58,21 @@ internal object KotlinHooksForTestParameterInjector {
     }
   }
 
+  /**
+   * Returns all combinations of test parameter values for the given executable.
+   *
+   * Every element of the returned list contains exactly one value for each parameter of
+   * [executable], in declaration order. The default value of a parameter is evaluated once for
+   * every combination of the parameters that precede it, which is what allows a default value to
+   * depend on those earlier parameters.
+   */
   @JvmStatic
-  fun extractValuesForEachParameter(
+  fun extractValueCombinations(
     testInstance: Any?,
     executable: JavaCompatibilityExecutable,
     getExplicitValuesByIndex: (Int) -> Optional<ImmutableList<TestParameterValue>>,
     getImplicitValuesByIndex: (Int) -> ImmutableList<TestParameterValue>,
-  ): ImmutableList<ImmutableList<TestParameterValue>> {
+  ): ImmutableList<ImmutableList<IndexedTestParameterValue>> {
     val function = executableToFunction(executable)
     val functionDescription = executable.humanReadableNameSummary
     val parameters = function.parameters.filter { it.kind == KParameter.Kind.VALUE }
@@ -75,36 +83,53 @@ internal object KotlinHooksForTestParameterInjector {
         " javaParameterTypes=${executable.parameterTypes.toList()}, function=$function")
     }
 
-    val parameterValues: MutableMap<KParameter, ImmutableList<TestParameterValue>> = mutableMapOf()
-    // Start with non-optional parameters
     for ((index, parameter) in parameters.withIndex()) {
-      if (!parameter.isOptional) {
-        parameterValues[parameter] =
-          assertAtLeastOneValue(
-            getExplicitValuesByIndex(index).or { getImplicitValuesByIndex(index) },
-            functionDescription,
-          )
-      }
-    }
-    // Populate the optional parameter from first to last
-    for ((index, parameter) in parameters.withIndex()) {
-      if (parameter.isOptional) {
-        require(!getExplicitValuesByIndex(index).isPresent) {
-          "$functionDescription: @TestParameter annotation found on " +
-            "${parameter.name} with specified value and a default value, which is not " +
-            "allowed: parameter=$parameter"
-        }
-        parameterValues[parameter] =
-          getValuesFromNextDefaultValue(
-            testInstance,
-            function,
-            parameterValues,
-            functionDescription,
-          )
+      require(!parameter.isOptional || !getExplicitValuesByIndex(index).isPresent) {
+        "$functionDescription: @TestParameter annotation found on " +
+          "${parameter.name} with specified value and a default value, which is not " +
+          "allowed: parameter=$parameter"
       }
     }
 
-    return ImmutableList.copyOf(parameters.map(parameterValues::getValue))
+    // The values of the parameters without a default value. These never depend on other parameters.
+    val valuesOfRequiredParameters: Map<KParameter, ImmutableList<TestParameterValue>> =
+      parameters
+        .withIndex()
+        .filter { (_, parameter) -> !parameter.isOptional }
+        .associate { (index, parameter) ->
+          parameter to
+            assertAtLeastOneValue(
+              getExplicitValuesByIndex(index).or { getImplicitValuesByIndex(index) },
+              functionDescription,
+            )
+        }
+
+    var combinations: List<Map<KParameter, IndexedTestParameterValue>> = listOf(emptyMap())
+    for (parameter in parameters) {
+      combinations = combinations.flatMap { combination ->
+        val values: List<TestParameterValue> =
+          if (parameter.isOptional) {
+            getValuesFromDefaultValue(
+              testInstance,
+              function,
+              valuesOfRequiredParameters,
+              combination,
+              functionDescription,
+            )
+          } else {
+            valuesOfRequiredParameters.getValue(parameter)
+          }
+        values.mapIndexed { valueIndex, value ->
+          combination + (parameter to IndexedTestParameterValue(value, valueIndex))
+        }
+      }
+    }
+
+    return ImmutableList.copyOf(
+      combinations.map { combination ->
+        ImmutableList.copyOf(parameters.map(combination::getValue))
+      }
+    )
   }
 
   private fun executableToFunction(executable: JavaCompatibilityExecutable): KFunction<*> {
@@ -154,10 +179,22 @@ internal object KotlinHooksForTestParameterInjector {
     }
   }
 
-  private fun getValuesFromNextDefaultValue(
+  /**
+   * Returns the values produced by the default value expression of the first parameter that is
+   * missing from [resolvedValues].
+   *
+   * @param valuesOfRequiredParameters the values of all parameters without a default value.
+   *   [KFunction.callBy] requires a value for each of those, including the ones that come after the
+   *   default value being evaluated. Those later values can never be referenced by the default
+   *   value expression (Kotlin only allows references to preceding parameters), so an arbitrary
+   *   value is passed for them.
+   * @param resolvedValues the values of all parameters that precede the one being evaluated.
+   */
+  private fun getValuesFromDefaultValue(
     testInstance: Any?,
     function: KFunction<*>,
-    parameterValuesSoFar: Map<KParameter, ImmutableList<TestParameterValue>>,
+    valuesOfRequiredParameters: Map<KParameter, ImmutableList<TestParameterValue>>,
+    resolvedValues: Map<KParameter, IndexedTestParameterValue>,
     functionDescription: String,
   ): ImmutableList<TestParameterValue> {
     try {
@@ -169,7 +206,9 @@ internal object KotlinHooksForTestParameterInjector {
             mapOf(
               function.parameters.single { it.kind == KParameter.Kind.INSTANCE } to testInstance
             )
-          } + parameterValuesSoFar.mapValues { it.value[0].wrappedValue }
+          } +
+            valuesOfRequiredParameters.mapValues { it.value[0].wrappedValue } +
+            resolvedValues.mapValues { it.value.value.wrappedValue }
         )
       throw RuntimeException(
         "$functionDescription: Expected all default parameter values to" +
@@ -203,6 +242,13 @@ internal object KotlinHooksForTestParameterInjector {
     }
     return values
   }
+
+  /**
+   * A single [TestParameterValue], paired with the index that it had in the list of values that it
+   * was taken from.
+   */
+  class IndexedTestParameterValue
+  internal constructor(val value: TestParameterValue, val indexInValueList: Int)
 
   private class GetJavaExecutableFailureException : RuntimeException()
 }

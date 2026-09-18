@@ -36,6 +36,7 @@ import com.google.common.collect.Range;
 import com.google.common.primitives.Primitives;
 import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.testing.junit.testparameterinjector.KotlinHooksForTestParameterInjector.IndexedTestParameterValue;
 import com.google.testing.junit.testparameterinjector.TestInfo.TestInfoParameter;
 import com.google.testing.junit.testparameterinjector.TestParameterInjectorUtils.JavaCompatibilityExecutable;
 import com.google.testing.junit.testparameterinjector.TestParameterInjectorUtils.JavaCompatibilityParameter;
@@ -64,8 +65,6 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
   private final Cache<Method, List<List<TestParameterValueHolder>>> parameterValuesCache =
       CacheBuilder.newBuilder().maximumSize(1000).build();
-  private final Cache<Class<?>, Object> arbitraryTestInstanceCache =
-      CacheBuilder.newBuilder().maximumSize(1).build();
 
   /** Calculates the cartesian product of all relevant @TestParameter values. */
   @Override
@@ -150,29 +149,36 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   @Override
   public void postProcessTestInstance(Object testInstance, TestInfo testInfo) {
     TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
-    try {
-      if (testIndexHolder != null) {
-        List<TestParameterValueHolder> remainingTestParameterValuesForFieldInjection =
-            FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
-                .filter(p -> p.origin() == Origin.FIELD)
-                .copyInto(new ArrayList<>());
+    if (testIndexHolder != null) {
+      injectFieldValues(
+          testInstance, getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()));
+    }
+  }
 
-        for (Field declaredField :
-            FluentIterable.from(listWithParents(testInstance.getClass()))
-                .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
-                .toList()) {
-          for (TestParameterValueHolder testParameterValue :
-              remainingTestParameterValuesForFieldInjection) {
-            if (declaredField.isAnnotationPresent(TestParameter.class)) {
-              if (!declaredField.getName().equals(testParameterValue.paramName().get())) {
-                // names don't match
-                continue;
-              }
-              declaredField.setAccessible(true);
-              declaredField.set(testInstance, testParameterValue.unwrappedValue());
-              remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
-              break;
+  /** Sets all {@link Origin#FIELD} values of the given list on the given test instance. */
+  private static void injectFieldValues(
+      Object testInstance, List<TestParameterValueHolder> parameterValues) {
+    try {
+      List<TestParameterValueHolder> remainingTestParameterValuesForFieldInjection =
+          FluentIterable.from(parameterValues)
+              .filter(p -> p.origin() == Origin.FIELD)
+              .copyInto(new ArrayList<>());
+
+      for (Field declaredField :
+          FluentIterable.from(listWithParents(testInstance.getClass()))
+              .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
+              .toList()) {
+        for (TestParameterValueHolder testParameterValue :
+            remainingTestParameterValuesForFieldInjection) {
+          if (declaredField.isAnnotationPresent(TestParameter.class)) {
+            if (!declaredField.getName().equals(testParameterValue.paramName().get())) {
+              // names don't match
+              continue;
             }
+            declaredField.setAccessible(true);
+            declaredField.set(testInstance, testParameterValue.unwrappedValue());
+            remainingTestParameterValuesForFieldInjection.remove(testParameterValue);
+            break;
           }
         }
       }
@@ -363,27 +369,73 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
               }
             }
 
-            return Lists.cartesianProduct(
-                FluentIterable.from(ImmutableList.<ImmutableList<TestParameterValueHolder>>of())
-                    .append(getFieldValueHolders(testClass))
-                    .append(
-                        calculateTestParameterValueList(
-                            constructorExecutable,
-                            getAnnotationWithMetadataListWithType(constructorExecutable, testClass),
-                            Origin.CONSTRUCTOR_PARAMETER,
-                            testClass))
-                    .append(
-                        calculateTestParameterValueList(
-                            methodExecutable,
-                            getAnnotationWithMetadataListWithType(methodExecutable, testClass),
-                            Origin.METHOD_PARAMETER,
-                            testClass))
-                    .toList());
+            // The values that are set on the test instance (as opposed to passed to the test
+            // method).
+            List<List<TestParameterValueHolder>> testInstanceValueCombinations =
+                cartesianCombine(
+                    Lists.cartesianProduct(getFieldValueHolders(testClass)),
+                    calculateCartesianValueCombinations(
+                        constructorExecutable,
+                        getAnnotationWithMetadataListWithType(constructorExecutable, testClass),
+                        Origin.CONSTRUCTOR_PARAMETER,
+                        /* testInstance= */ null));
+
+            ImmutableList<AnnotationWithMetadata> methodAnnotations =
+                getAnnotationWithMetadataListWithType(methodExecutable, testClass);
+            if (!hasKotlinDefaultParameters(methodExecutable)) {
+              // Shortcut: No need to create a test instance if values are not specified via Kotlin
+              // default parameters.
+              return cartesianCombine(
+                  testInstanceValueCombinations,
+                  calculateCartesianValueCombinations(
+                      methodExecutable,
+                      methodAnnotations,
+                      Origin.METHOD_PARAMETER,
+                      /* testInstance= */ null));
+            }
+
+            // The default parameter values of the test method are evaluated on a test instance, so
+            // they may depend on the field and constructor parameter values. This means that they
+            // have to be calculated separately for each combination of those values.
+            ImmutableList.Builder<List<TestParameterValueHolder>> resultBuilder =
+                ImmutableList.builder();
+            for (List<TestParameterValueHolder> testInstanceValues :
+                testInstanceValueCombinations) {
+              resultBuilder.addAll(
+                  cartesianCombine(
+                      ImmutableList.of(testInstanceValues),
+                      calculateCartesianValueCombinations(
+                          methodExecutable,
+                          methodAnnotations,
+                          Origin.METHOD_PARAMETER,
+                          createTestInstance(testClass, testInstanceValues))));
+            }
+            return resultBuilder.build();
           });
     } catch (ExecutionException | UncheckedExecutionException e) {
       Throwables.throwIfUnchecked(e.getCause());
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Returns every concatenation of a combination in {@code firstCombinations} with a combination in
+   * {@code secondCombinations}.
+   */
+  private static List<List<TestParameterValueHolder>> cartesianCombine(
+      List<List<TestParameterValueHolder>> firstCombinations,
+      List<List<TestParameterValueHolder>> secondCombinations) {
+    ImmutableList.Builder<List<TestParameterValueHolder>> resultBuilder = ImmutableList.builder();
+    for (List<TestParameterValueHolder> firstCombination : firstCombinations) {
+      for (List<TestParameterValueHolder> secondCombination : secondCombinations) {
+        resultBuilder.add(
+            ImmutableList.<TestParameterValueHolder>builder()
+                .addAll(firstCombination)
+                .addAll(secondCombination)
+                .build());
+      }
+    }
+    return resultBuilder.build();
   }
 
   private ImmutableList<ImmutableList<TestParameterValueHolder>> getFieldValueHolders(
@@ -515,85 +567,95 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
         .toList();
   }
 
-  private ImmutableList<ImmutableList<TestParameterValueHolder>> calculateTestParameterValueList(
+  /**
+   * Returns all combinations of values for the parameters of the given executable.
+   *
+   * <p>Each element of the returned list contains exactly one value for each parameter. This is the
+   * cartesian product of the values of the individual parameters, except for Kotlin parameters with
+   * a default value, which are allowed to depend on the parameters that precede them.
+   *
+   * @param testInstance the instance that Kotlin default parameter values should be evaluated on,
+   *     or null if the given executable is a constructor or has no default parameter values.
+   */
+  private static List<List<TestParameterValueHolder>> calculateCartesianValueCombinations(
       JavaCompatibilityExecutable executable,
       List<AnnotationWithMetadata> annotationWithMetadatas,
       Origin origin,
-      Class<?> testClass) {
+      @Nullable Object testInstance) {
     if (!isValidAndContainsRelevantAnnotations(executable.getParameterAnnotations())) {
-      return ImmutableList.of();
+      return ImmutableList.of(ImmutableList.of());
     }
 
-    if (TestParameterInjectorUtils.isKotlinClass(executable.getDeclaringClass())
-        && KotlinHooksForTestParameterInjector.hasOptionalParameters(executable)) {
-
-      Object arbitraryTestInstance = null;
-      if (executable.isMethod()) {
-        try {
-          arbitraryTestInstance =
-              arbitraryTestInstanceCache.get(
-                  testClass, () -> createArbitraryTestInstance(testClass));
-        } catch (ExecutionException | UncheckedExecutionException e) {
-          Throwables.throwIfUnchecked(e.getCause());
-          throw new RuntimeException(e);
-        }
-      }
-
-      ImmutableList<ImmutableList<TestParameterValue>> valuesList =
-          KotlinHooksForTestParameterInjector.extractValuesForEachParameter(
-              arbitraryTestInstance,
-              executable,
-              /* getExplicitValuesByIndex= */ index ->
-                  getExplicitValuesFromAnnotation(annotationWithMetadatas.get(index)),
-              /* getImplicitValuesByIndex= */ index ->
-                  getObviousValuesForParameterClass(
-                      annotationWithMetadatas.get(index).paramRawType()));
+    if (hasKotlinDefaultParameters(executable)) {
       return FluentIterable.from(
-              ContiguousSet.create(
-                  Range.closedOpen(0, annotationWithMetadatas.size()), DiscreteDomain.integers()))
-          .transform(
-              index ->
-                  toValueHolders(
-                      annotationWithMetadatas.get(index),
-                      valuesList.get(index),
-                      origin,
-                      Optional.of(executable)))
+              KotlinHooksForTestParameterInjector.extractValueCombinations(
+                  testInstance,
+                  executable,
+                  /* getExplicitValuesByIndex= */ index ->
+                      getExplicitValuesFromAnnotation(annotationWithMetadatas.get(index)),
+                  /* getImplicitValuesByIndex= */ index ->
+                      getObviousValuesForParameterClass(
+                          annotationWithMetadatas.get(index).paramRawType())))
+          .transform(combination -> toValueHolders(annotationWithMetadatas, combination, origin))
           .toList();
     } else {
-      return calculateTestParameterValueList(
-          annotationWithMetadatas, origin, Optional.of(executable));
+      return Lists.cartesianProduct(
+          calculateTestParameterValueList(
+              annotationWithMetadatas, origin, Optional.of(executable)));
     }
   }
 
-  private Object createArbitraryTestInstance(Class<?> testClass) {
-    Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
-    JavaCompatibilityExecutable constructorExecutable =
-        JavaCompatibilityExecutable.create(constructor);
+  /** Returns whether at least one parameter of the given executable has a Kotlin default value. */
+  private static boolean hasKotlinDefaultParameters(JavaCompatibilityExecutable executable) {
+    return isValidAndContainsRelevantAnnotations(executable.getParameterAnnotations())
+        && TestParameterInjectorUtils.isKotlinClass(executable.getDeclaringClass())
+        && KotlinHooksForTestParameterInjector.hasOptionalParameters(executable);
+  }
 
-    List<Object> constructorParameters;
-    if (constructor.getParameterTypes().length == 0) {
-      constructorParameters = ImmutableList.of();
-    } else {
-      checkState(
-          isValidAndContainsRelevantAnnotations(constructor.getParameterAnnotations()),
-          "%s: Expected each constructor parameter to be annotated with @TestParameter",
-          testClass.getName());
-      ImmutableList<ImmutableList<TestParameterValueHolder>> valueList =
-          calculateTestParameterValueList(
-              constructorExecutable,
-              getAnnotationWithMetadataListWithType(constructorExecutable, testClass),
-              Origin.CONSTRUCTOR_PARAMETER,
-              testClass);
-      constructorParameters =
-          FluentIterable.from(valueList)
-              .transform(valueHolders -> valueHolders.get(0).unwrappedValue())
-              .toList();
-    }
+  /**
+   * Returns a new test instance with the given field and constructor parameter values, which is
+   * only meant to be used for evaluating the default parameter values of a test method.
+   */
+  private static Object createTestInstance(
+      Class<?> testClass, List<TestParameterValueHolder> testInstanceValues) {
+    Constructor<?> constructor = TestParameterInjectorUtils.getOnlyConstructor(testClass);
+    checkState(
+        constructor.getParameterTypes().length == 0
+            || isValidAndContainsRelevantAnnotations(constructor.getParameterAnnotations()),
+        "%s: Expected each constructor parameter to be annotated with @TestParameter",
+        testClass.getName());
+
+    List<Object> constructorParameters =
+        FluentIterable.from(testInstanceValues)
+            .filter(value -> value.origin() == Origin.CONSTRUCTOR_PARAMETER)
+            .transform(TestParameterValueHolder::unwrappedValue)
+            .copyInto(new ArrayList<>());
     try {
-      return constructor.newInstance(constructorParameters.toArray());
+      Object testInstance = constructor.newInstance(constructorParameters.toArray());
+      injectFieldValues(testInstance, testInstanceValues);
+      return testInstance;
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /** Converts a single combination of values (one per parameter) to value holders. */
+  private static List<TestParameterValueHolder> toValueHolders(
+      List<AnnotationWithMetadata> annotationWithMetadatas,
+      List<IndexedTestParameterValue> combination,
+      Origin origin) {
+    verify(annotationWithMetadatas.size() == combination.size());
+    ImmutableList.Builder<TestParameterValueHolder> resultBuilder = ImmutableList.builder();
+    for (int parameterIndex = 0; parameterIndex < combination.size(); parameterIndex++) {
+      IndexedTestParameterValue value = combination.get(parameterIndex);
+      resultBuilder.add(
+          TestParameterValueHolder.create(
+              origin,
+              value.getValue(),
+              value.getIndexInValueList(),
+              annotationWithMetadatas.get(parameterIndex).paramName()));
+    }
+    return resultBuilder.build();
   }
 
   private static ImmutableList<TestParameterValueHolder> toValueHolders(

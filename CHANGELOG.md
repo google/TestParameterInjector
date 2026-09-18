@@ -1,3 +1,16 @@
+## 1.23
+- Kotlin default parameters: Support for interdependent parameters:
+
+```kotlin
+@Test
+fun rangeIsValid(
+      @TestParameter start: Int = testValues(1, 2),
+      @TestParameter end: Int = testValuesIn(start..3),
+  ) {
+  // This test method is run 5 times: (1,1), (1,2), (1,3), (2,2) and (2,3)
+}
+```
+
 ## 1.22
 
 - **Kotlin default parameters**: Added support for an alternative way to specify
