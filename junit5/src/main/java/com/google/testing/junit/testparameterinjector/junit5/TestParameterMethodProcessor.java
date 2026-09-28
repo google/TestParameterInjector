@@ -587,7 +587,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
     if (hasKotlinDefaultParameters(executable)) {
       return FluentIterable.from(
-              KotlinHooksForTestParameterInjector.extractValueCombinations(
+              KotlinHooksForTestParameterInjectorImpl.INSTANCE.extractValueCombinations(
                   testInstance,
                   executable,
                   /* getExplicitValuesByIndex= */ index ->
@@ -608,7 +608,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   private static boolean hasKotlinDefaultParameters(JavaCompatibilityExecutable executable) {
     return isValidAndContainsRelevantAnnotations(executable.getParameterAnnotations())
         && TestParameterInjectorUtils.isKotlinClass(executable.getDeclaringClass())
-        && KotlinHooksForTestParameterInjector.hasOptionalParameters(executable);
+        && KotlinHooksForTestParameterInjectorImpl.INSTANCE.hasOptionalParameters(executable);
   }
 
   /**
@@ -693,7 +693,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     }
     Optional<ImmutableList<String>> maybeNamesFromKotlin =
         TestParameterInjectorUtils.isKotlinClass(executable.getDeclaringClass())
-            ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
+            ? KotlinHooksForTestParameterInjectorImpl.INSTANCE.getParameterNames(executable)
             : Optional.absent();
 
     return FluentIterable.from(executable.getParametersWithFallback(maybeNamesFromKotlin))

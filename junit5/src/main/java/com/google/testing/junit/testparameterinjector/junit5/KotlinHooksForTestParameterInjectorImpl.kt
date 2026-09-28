@@ -14,6 +14,7 @@
 
 package com.google.testing.junit.testparameterinjector.junit5
 
+import com.google.common.base.Function
 import com.google.common.base.Optional
 import com.google.common.collect.ImmutableList
 import com.google.testing.junit.testparameterinjector.junit5.TestParameterInjectorUtils.JavaCompatibilityExecutable
@@ -30,10 +31,18 @@ import kotlin.reflect.jvm.javaMethod
  */
 // Only marking as internal for the open source version because the Google version is built in
 // separate build targets.
-internal object KotlinHooksForTestParameterInjector {
+//
+// The implementation is delegated to a private object because the
+// KotlinHooksForTestParameterInjector signatures contain package-private Java types, which internal
+// declarations may not expose (see https://youtrack.jetbrains.com/issue/KTLC-271).
+internal object KotlinHooksForTestParameterInjectorImpl :
+  KotlinHooksForTestParameterInjector by KotlinHooksImpl
 
-  @JvmStatic
-  fun getParameterNames(executable: JavaCompatibilityExecutable): Optional<ImmutableList<String>> {
+private object KotlinHooksImpl : KotlinHooksForTestParameterInjector {
+
+  override fun getParameterNames(
+    executable: JavaCompatibilityExecutable
+  ): Optional<ImmutableList<String>> {
     return try {
       Optional.of(
         ImmutableList.copyOf(executableToFunction(executable).parameters.mapNotNull { it.name })
@@ -45,8 +54,7 @@ internal object KotlinHooksForTestParameterInjector {
     }
   }
 
-  @JvmStatic
-  fun hasOptionalParameters(executable: JavaCompatibilityExecutable): Boolean {
+  override fun hasOptionalParameters(executable: JavaCompatibilityExecutable): Boolean {
     return try {
       executableToFunction(executable).parameters.any {
         it.kind == KParameter.Kind.VALUE && it.isOptional
@@ -58,20 +66,11 @@ internal object KotlinHooksForTestParameterInjector {
     }
   }
 
-  /**
-   * Returns all combinations of test parameter values for the given executable.
-   *
-   * Every element of the returned list contains exactly one value for each parameter of
-   * [executable], in declaration order. The default value of a parameter is evaluated once for
-   * every combination of the parameters that precede it, which is what allows a default value to
-   * depend on those earlier parameters.
-   */
-  @JvmStatic
-  fun extractValueCombinations(
+  override fun extractValueCombinations(
     testInstance: Any?,
     executable: JavaCompatibilityExecutable,
-    getExplicitValuesByIndex: (Int) -> Optional<ImmutableList<TestParameterValue>>,
-    getImplicitValuesByIndex: (Int) -> ImmutableList<TestParameterValue>,
+    getExplicitValuesByIndex: Function<Int, Optional<ImmutableList<TestParameterValue>>>,
+    getImplicitValuesByIndex: Function<Int, ImmutableList<TestParameterValue>>,
   ): ImmutableList<ImmutableList<IndexedTestParameterValue>> {
     val function = executableToFunction(executable)
     val functionDescription = executable.humanReadableNameSummary
@@ -84,7 +83,7 @@ internal object KotlinHooksForTestParameterInjector {
     }
 
     for ((index, parameter) in parameters.withIndex()) {
-      require(!parameter.isOptional || !getExplicitValuesByIndex(index).isPresent) {
+      require(!parameter.isOptional || !getExplicitValuesByIndex.apply(index).isPresent) {
         "$functionDescription: @TestParameter annotation found on " +
           "${parameter.name} with specified value and a default value, which is not " +
           "allowed: parameter=$parameter"
@@ -99,7 +98,7 @@ internal object KotlinHooksForTestParameterInjector {
         .associate { (index, parameter) ->
           parameter to
             assertAtLeastOneValue(
-              getExplicitValuesByIndex(index).or { getImplicitValuesByIndex(index) },
+              getExplicitValuesByIndex.apply(index).or { getImplicitValuesByIndex.apply(index) },
               functionDescription,
             )
         }

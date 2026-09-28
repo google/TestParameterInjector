@@ -478,7 +478,7 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
       JavaCompatibilityExecutable executable) {
     return executable.getParametersWithFallback(
         TestParameterInjectorUtils.isKotlinClass(executable.getDeclaringClass())
-            ? KotlinHooksForTestParameterInjector.getParameterNames(executable)
+            ? KotlinHooksForTestParameterInjectorImpl.INSTANCE.getParameterNames(executable)
             : Optional.absent());
   }
 

@@ -37,7 +37,7 @@ import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 
 /** Shared utility code for TestParameterInjector (JUnit4) tests. */
-class SharedTestUtilitiesJUnit4 {
+public class SharedTestUtilitiesJUnit4 {
 
   /**
    * Runs the given test runner.
@@ -94,7 +94,7 @@ class SharedTestUtilitiesJUnit4 {
    * Base class for a test class that acts as a test case testing a single property of a
    * TestParameterInjector-run test.
    */
-  abstract static class SuccessfulTestCaseBase {
+  public abstract static class SuccessfulTestCaseBase {
 
     @Rule public TestName testName = new TestName();
 
