@@ -1,3 +1,14 @@
+## 1.24
+
+- **Breaking change:** Duplicate mapping keys in YAML parameter strings (in
+  `@TestParameters` or `@TestParameter`) are now rejected with an error instead
+  of silently ignoring all values except the last. Duplicate keys are almost
+  always copy-paste mistakes that can unintentionally reduce test coverage or
+  mask bugs.
+
+  For example, `@TestParameters("{foo: ONE, foo: TWO}")` previously ran a single
+  test case with `foo == TWO`, but will now fail with an error.
+
 ## 1.23
 - Kotlin default parameters: Support for interdependent parameters:
 

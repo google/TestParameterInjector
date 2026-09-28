@@ -91,21 +91,16 @@ final class ParameterValueParsing {
     }
   }
 
-  static boolean isValidYamlString(String yamlString) {
-    try {
-      new Yaml(new SafeConstructor(new LoaderOptions())).load(yamlString);
-      return true;
-    } catch (RuntimeException e) {
-      return false;
-    }
-  }
-
   static Object parseYamlStringToJavaType(String yamlString, Type javaType) {
     return parseYamlObjectToJavaType(parseYamlStringToObject(yamlString), TypeToken.of(javaType));
   }
 
   static Object parseYamlStringToObject(String yamlString) {
-    return new Yaml(new SafeConstructor(new LoaderOptions())).load(yamlString);
+    LoaderOptions loaderOptions = new LoaderOptions();
+    // A duplicate key in a YAML mapping is almost always a mistake (e.g. a copy-paste error in a
+    // long parameter string), so reject it instead of silently keeping only the last value.
+    loaderOptions.setAllowDuplicateKeys(false);
+    return new Yaml(new SafeConstructor(loaderOptions)).load(yamlString);
   }
 
   private static UnsignedLong parseYamlSignedLongToUnsignedLong(long number) {

@@ -20,7 +20,6 @@ import static org.junit.Assert.assertThrows;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.UnsignedLong;
 import com.google.protobuf.ByteString;
 import com.google.testing.junit.testparameterinjector.TestParameters.TestParametersValues;
@@ -29,6 +28,7 @@ import java.time.Duration;
 import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.yaml.snakeyaml.constructor.DuplicateKeyException;
 
 @RunWith(TestParameterInjector.class)
 public class ParameterValueParsingTest {
@@ -41,29 +41,15 @@ public class ParameterValueParsingTest {
   }
 
   @Test
-  @TestParameters({
-    "{yamlString: '{a: b, c: 15}', valid: true}",
-    "{yamlString: '{a: b c: 15',   valid: false}",
-    "{yamlString: 'a: b c: 15',    valid: false}",
-    // TODO: b/563287231 - This should be invalid. A duplicate mapping key is almost always a
-    // mistake, but the YAML parser silently accepts it (keeping only the last value).
-    "{yamlString: '{a: b, a: c}',  valid: true}",
-  })
-  public void isValidYamlString_success(String yamlString, boolean valid) throws Exception {
-    boolean result = ParameterValueParsing.isValidYamlString(yamlString);
-
-    assertThat(result).isEqualTo(valid);
-  }
-
-  // TODO: b/563287231 - A duplicate mapping key should cause an exception instead of silently
-  // dropping all values but the last one. This test documents the current (undesired) behavior.
-  @Test
-  public void parseYamlStringToObject_duplicateMapKey_doesNotThrow(
+  public void parseYamlStringToObject_duplicateMapKey_fails(
       @TestParameter({"{a: 1, a: 2}", "{'a': 1, a: 2}", "a: 1\na: 2"}) String yamlString)
       throws Exception {
-    Object result = ParameterValueParsing.parseYamlStringToObject(yamlString);
+    DuplicateKeyException exception =
+        assertThrows(
+            DuplicateKeyException.class,
+            () -> ParameterValueParsing.parseYamlStringToObject(yamlString));
 
-    assertThat(result).isEqualTo(ImmutableMap.of("a", 2));
+    assertThat(exception).hasMessageThat().contains("found duplicate key a");
   }
 
   enum ParseYamlValueToJavaTypeCases {
