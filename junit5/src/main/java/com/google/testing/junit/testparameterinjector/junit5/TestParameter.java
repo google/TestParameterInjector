@@ -68,6 +68,9 @@ public @interface TestParameter {
    *       "null"} for null
    *   <li>Byte array or com.google.protobuf.ByteString: Specified as an UTF8 String or YAML bytes
    *       (example: "!!binary 'ZGF0YQ=='")
+   *   <li>Records: Specified as a YAML mapping with exactly the record component names as keys.
+   *       Their values are parsed in the same way as the parameter values (example: {@code "{name:
+   *       Hermione, age: 18}"})
    * </ul>
    *
    * <p>For dynamic sets of parameters or parameter types that are not supported here, use {@link

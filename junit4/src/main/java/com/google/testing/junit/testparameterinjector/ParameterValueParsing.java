@@ -24,6 +24,7 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -31,6 +32,7 @@ import com.google.common.primitives.Primitives;
 import com.google.common.primitives.UnsignedLong;
 import com.google.common.reflect.TypeToken;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+import com.google.testing.junit.testparameterinjector.RecordReflection.RecordComponent;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -197,6 +199,10 @@ final class ParameterValueParsing {
         // Support the special case where the YAML string is "0"
         .supportParsedType(Integer.class, i -> parseDuration(String.valueOf(i)));
 
+    yamlValueTransformer
+        .ifJavaType(RecordReflection::isRecord)
+        .supportParsedType(Map.class, map -> parseYamlMapToRecord(map, javaType));
+
     // Added mainly for protocol buffer parsing
     yamlValueTransformer
         .ifJavaType(List.class)
@@ -261,6 +267,42 @@ final class ParameterValueParsing {
               entry.getValue(), getGenericParameterType(javaType, /* parameterIndex= */ 1)));
     }
     return returnedMap;
+  }
+
+  /**
+   * Maps the given YAML mapping to a record of the given type by calling its canonical constructor.
+   *
+   * <p>The keys of the YAML mapping should be exactly the names of the record components.
+   */
+  private static Object parseYamlMapToRecord(Map<?, ?> yamlMap, TypeToken<?> recordType) {
+    Class<?> recordClass = recordType.getRawType();
+    ImmutableList<RecordComponent> components = RecordReflection.getRecordComponents(recordClass);
+    ImmutableSet<String> componentNames =
+        ImmutableSet.copyOf(Lists.transform(components, RecordComponent::getName));
+    checkArgument(
+        yamlMap.keySet().equals(componentNames),
+        "Cannot map YAML mapping %s to record %s: The YAML keys %s don't match the record component"
+            + " names %s",
+        yamlMap,
+        recordClass.getSimpleName(),
+        yamlMap.keySet(),
+        componentNames);
+
+    Object[] componentValues = new Object[components.size()];
+    for (int i = 0; i < components.size(); i++) {
+      RecordComponent component = components.get(i);
+      componentValues[i] =
+          parseYamlObjectToJavaType(
+              yamlMap.get(component.getName()),
+              // Resolves type variables in case the record is generic
+              recordType.resolveType(component.getGenericType()));
+      checkArgument(
+          componentValues[i] != null || !component.getType().isPrimitive(),
+          "Cannot map null to the primitive component %s of record %s",
+          component.getName(),
+          recordClass.getSimpleName());
+    }
+    return RecordReflection.newInstance(recordClass, componentValues);
   }
 
   private static TypeToken<?> getGenericParameterType(TypeToken<?> typeToken, int parameterIndex) {

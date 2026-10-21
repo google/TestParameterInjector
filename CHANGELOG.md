@@ -1,3 +1,20 @@
+## 1.25
+
+- Added support for Java records in `@TestParameter` and `@TestParameters`. A
+  record is specified as a YAML mapping with exactly the record component names
+  as keys:
+
+```java
+record Person(String name, int age) {}
+
+@Test
+public void test(
+    @TestParameter({"{name: Hermione, age: 18}", "{name: Dumbledore, age: 115}"})
+        Person person) {
+  // ...
+}
+```
+
 ## 1.24
 
 - **Breaking change:** Duplicate mapping keys in YAML parameter strings (in

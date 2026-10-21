@@ -297,6 +297,10 @@ for more details.
 // Durations (segments of number+unit as shown below)
 @TestParameter({"1d", "2h", "3min", "4s", "5ms", "6us", "7ns"}) java.time.Duration d;
 @TestParameter({"1h30min", "-2h10min20s", "1.5h", ".5s", "0"}) java.time.Duration d;
+
+// Records (as a YAML mapping of the record components)
+record Person(String name, int age) {}
+@TestParameter({"{name: Hermione, age: 18}", "{name: Dumbledore, age: 115}"}) Person person;
 ```
 
 For non-primitive types (e.g. String, enums, bytes), `"null"` is always parsed as the `null` reference.
