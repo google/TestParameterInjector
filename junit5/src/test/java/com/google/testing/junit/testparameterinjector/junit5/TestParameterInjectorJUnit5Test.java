@@ -536,18 +536,16 @@ class TestParameterInjectorJUnit5Test {
 
   private static Stream<Class<?>> provideTestClassesThatExpectSuccess() {
     return stream(TestParameterInjectorJUnit5Test.class.getDeclaredClasses())
-        .filter(
-            cls ->
-                cls.isAnnotationPresent(RunAsTest.class)
-                    && cls.getAnnotation(RunAsTest.class).failsWithMessage().isEmpty());
+        .filter(cls ->
+            cls.isAnnotationPresent(RunAsTest.class)
+                && cls.getAnnotation(RunAsTest.class).failsWithMessage().isEmpty());
   }
 
   private static Stream<Arguments> provideTestClassesThatExpectFailure() {
     return stream(TestParameterInjectorJUnit5Test.class.getDeclaredClasses())
-        .filter(
-            cls ->
-                cls.isAnnotationPresent(RunAsTest.class)
-                    && !cls.getAnnotation(RunAsTest.class).failsWithMessage().isEmpty())
+        .filter(cls ->
+            cls.isAnnotationPresent(RunAsTest.class)
+                && !cls.getAnnotation(RunAsTest.class).failsWithMessage().isEmpty())
         .map(cls -> Arguments.of(cls, cls.getAnnotation(RunAsTest.class).failsWithMessage()));
   }
 
@@ -566,9 +564,8 @@ class TestParameterInjectorJUnit5Test {
     StringBuilder resultBuilder = new StringBuilder();
     resultBuilder.append("\n----------------------\n");
     resultBuilder.append("ImmutableMap.<String, String>builder()\n");
-    map.forEach(
-        (key, value) ->
-            resultBuilder.append(String.format("    .put(\"%s\", \"%s\")\n", key, value)));
+    map.forEach((key, value) ->
+        resultBuilder.append(String.format("    .put(\"%s\", \"%s\")\n", key, value)));
     resultBuilder.append("    .build()\n");
     resultBuilder.append("----------------------\n");
     return resultBuilder.toString();

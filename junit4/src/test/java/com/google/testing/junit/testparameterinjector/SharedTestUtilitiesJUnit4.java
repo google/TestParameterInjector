@@ -66,12 +66,10 @@ public class SharedTestUtilitiesJUnit4 {
           String.format(
               "Test failed unexpectedly:\n\n%s",
               FluentIterable.from(failures)
-                  .transform(
-                      f ->
-                          String.format(
-                              "<<%s>> %s",
-                              f.getDescription(),
-                              Throwables.getStackTraceAsString(f.getException())))
+                  .transform(f ->
+                      String.format(
+                          "<<%s>> %s",
+                          f.getDescription(), Throwables.getStackTraceAsString(f.getException())))
                   .join(Joiner.on("\n------------------------------------\n"))));
     }
   }

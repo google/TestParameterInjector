@@ -132,18 +132,16 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
             originalTest
                 .withExtraParameters(
                     FluentIterable.of(
-                            constructorParameters.transform(
-                                param ->
-                                    TestInfoParameter.create(
-                                        param.name(),
-                                        param.parametersMap(),
-                                        constructorParametersIndexCopy)),
-                            methodParameters.transform(
-                                param ->
-                                    TestInfoParameter.create(
-                                        param.name(),
-                                        param.parametersMap(),
-                                        methodParametersIndexCopy)))
+                            constructorParameters.transform(param ->
+                                TestInfoParameter.create(
+                                    param.name(),
+                                    param.parametersMap(),
+                                    constructorParametersIndexCopy)),
+                            methodParameters.transform(param ->
+                                TestInfoParameter.create(
+                                    param.name(),
+                                    param.parametersMap(),
+                                    methodParametersIndexCopy)))
                         .filter(Optional::isPresent)
                         .transform(Optional::get)
                         .toList())
@@ -270,12 +268,11 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
               + " annotation");
 
       return FluentIterable.from(executable.getAnnotation(RepeatedTestParameters.class).value())
-          .transform(
-              annotation ->
-                  toParameterValues(
-                      validateAndGetSingleValueFromRepeatedAnnotation(annotation, executable),
-                      parametersList,
-                      annotation.customName()))
+          .transform(annotation ->
+              toParameterValues(
+                  validateAndGetSingleValueFromRepeatedAnnotation(annotation, executable),
+                  parametersList,
+                  annotation.customName()))
           .toList();
     }
   }
@@ -408,21 +405,20 @@ final class TestParametersMethodProcessor implements TestMethodProcessor {
 
     testParametersValues
         .parametersMap()
-        .forEach(
-            (paramName, paramValue) -> {
-              Class<?> expectedClass = Primitives.wrap(parametersByName.get(paramName).getType());
-              if (paramValue != null) {
-                checkState(
-                    expectedClass.isInstance(paramValue),
-                    "Cannot map value '%s' (class = %s) to parameter %s (class = %s) (for"
-                        + " TestParametersValues %s)",
-                    paramValue,
-                    paramValue.getClass(),
-                    paramName,
-                    expectedClass,
-                    testParametersValues);
-              }
-            });
+        .forEach((paramName, paramValue) -> {
+          Class<?> expectedClass = Primitives.wrap(parametersByName.get(paramName).getType());
+          if (paramValue != null) {
+            checkState(
+                expectedClass.isInstance(paramValue),
+                "Cannot map value '%s' (class = %s) to parameter %s (class = %s) (for"
+                    + " TestParametersValues %s)",
+                paramValue,
+                paramValue.getClass(),
+                paramName,
+                expectedClass,
+                testParametersValues);
+          }
+        });
   }
 
   private static TestParametersValues toParameterValues(

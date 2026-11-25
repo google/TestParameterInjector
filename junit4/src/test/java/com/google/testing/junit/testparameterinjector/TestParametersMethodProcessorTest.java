@@ -664,11 +664,10 @@ public class TestParametersMethodProcessorTest {
   public static Collection<Object[]> parameters() {
     return Arrays.stream(TestParametersMethodProcessorTest.class.getClasses())
         .filter(cls -> cls.isAnnotationPresent(RunAsTest.class))
-        .map(
-            cls ->
-                new Object[] {
-                  cls.getSimpleName(), cls, cls.getAnnotation(RunAsTest.class).failsWithMessage()
-                })
+        .map(cls ->
+            new Object[] {
+              cls.getSimpleName(), cls, cls.getAnnotation(RunAsTest.class).failsWithMessage()
+            })
         .collect(toImmutableList());
   }
 

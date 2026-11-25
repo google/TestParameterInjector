@@ -156,12 +156,11 @@ public class TestInfoTest {
     TestInfo testInfoWithManyParams =
         fakeTestInfo(
             IntStream.range(0, 50)
-                .mapToObj(
-                    i ->
-                        TestInfoParameter.create(
-                            /* valueInTestName= */ "short",
-                            /* value= */ i,
-                            /* indexInValueSource= */ i))
+                .mapToObj(i ->
+                    TestInfoParameter.create(
+                        /* valueInTestName= */ "short",
+                        /* value= */ i,
+                        /* indexInValueSource= */ i))
                 .toArray(TestInfoParameter[]::new));
 
     ImmutableList<TestInfo> result =

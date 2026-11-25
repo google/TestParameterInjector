@@ -88,13 +88,12 @@ final class TestMethodProcessorList {
         .filter(Optional::isPresent)
         .transform(Optional::get)
         .first()
-        .or(
-            () -> {
-              throw new IllegalStateException(
-                  String.format(
-                      "Could not generate parameter values for %s. Did you forget an annotation?",
-                      constructor));
-            });
+        .or(() -> {
+          throw new IllegalStateException(
+              String.format(
+                  "Could not generate parameter values for %s. Did you forget an annotation?",
+                  constructor));
+        });
   }
 
   /**
@@ -108,13 +107,12 @@ final class TestMethodProcessorList {
         .filter(Optional::isPresent)
         .transform(Optional::get)
         .first()
-        .or(
-            () -> {
-              throw new IllegalStateException(
-                  String.format(
-                      "Could not generate parameter values for %s. Did you forget an annotation?",
-                      testInfo.getMethod()));
-            });
+        .or(() -> {
+          throw new IllegalStateException(
+              String.format(
+                  "Could not generate parameter values for %s. Did you forget an annotation?",
+                  testInfo.getMethod()));
+        });
   }
 
   /**

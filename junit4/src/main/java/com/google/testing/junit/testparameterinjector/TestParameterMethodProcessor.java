@@ -86,12 +86,9 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
           originalTest
               .withExtraParameters(
                   FluentIterable.from(testParameterValues)
-                      .transform(
-                          param ->
-                              TestInfoParameter.create(
-                                  param.toTestNameString(),
-                                  param.unwrappedValue(),
-                                  param.valueIndex()))
+                      .transform(param ->
+                          TestInfoParameter.create(
+                              param.toTestNameString(), param.unwrappedValue(), param.valueIndex()))
                       .toList())
               .withExtraAnnotation(
                   TestIndexHolderFactory.create(
@@ -227,10 +224,9 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     if (valueIsSet) {
       return Optional.of(
           FluentIterable.from(annotation.value())
-              .transform(
-                  v ->
-                      TestParameterValue.maybeWrap(
-                          parseStringValue(v, annotationWithMetadata.paramType())))
+              .transform(v ->
+                  TestParameterValue.maybeWrap(
+                      parseStringValue(v, annotationWithMetadata.paramType())))
               .toList());
     } else if (valuesProviderIsSet) {
       return Optional.of(
@@ -323,10 +319,9 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   private static boolean isValidAndContainsRelevantAnnotations(Annotation[][] annotationsList) {
     return annotationsList.length > 0
         && FluentIterable.from(annotationsList)
-            .allMatch(
-                annotations ->
-                    FluentIterable.from(annotations)
-                        .anyMatch(annotation -> annotation instanceof TestParameter));
+            .allMatch(annotations ->
+                FluentIterable.from(annotations)
+                    .anyMatch(annotation -> annotation instanceof TestParameter));
   }
 
   private List<TestParameterValueHolder> getParameterValuesForTest(
@@ -442,17 +437,15 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     List<AnnotationWithMetadata> annotations =
         FluentIterable.from(listWithParents(testClass))
             .transformAndConcat(c -> Arrays.asList(c.getDeclaredFields()))
-            .transformAndConcat(
-                field ->
-                    maybeGetTestParameter(field.getAnnotations())
-                        .transform(
-                            annotation ->
-                                AnnotationWithMetadata.withMetadata(
-                                    annotation,
-                                    field.getGenericType(),
-                                    Optional.of(field.getName()),
-                                    GenericParameterContext.create(field, testClass)))
-                        .asSet())
+            .transformAndConcat(field ->
+                maybeGetTestParameter(field.getAnnotations())
+                    .transform(annotation ->
+                        AnnotationWithMetadata.withMetadata(
+                            annotation,
+                            field.getGenericType(),
+                            Optional.of(field.getName()),
+                            GenericParameterContext.create(field, testClass)))
+                    .asSet())
             .toList();
 
     if (TestParameterInjectorUtils.isKotlinClass(testClass)) {
@@ -497,12 +490,11 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     for (AnnotationWithMetadata fieldAnnotation : fieldAnnotations) {
       List<AnnotationWithMetadata> matchingConstructorAnnotations =
           FluentIterable.from(constructorAnnotations)
-              .filter(
-                  constructorAnnotation ->
-                      fieldAnnotation.annotation().equals(constructorAnnotation.annotation())
-                          && fieldAnnotation
-                              .paramRawType()
-                              .equals(constructorAnnotation.paramRawType()))
+              .filter(constructorAnnotation ->
+                  fieldAnnotation.annotation().equals(constructorAnnotation.annotation())
+                      && fieldAnnotation
+                          .paramRawType()
+                          .equals(constructorAnnotation.paramRawType()))
               .toList();
 
       if (matchingConstructorAnnotations.isEmpty()) {
@@ -511,9 +503,8 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       } else {
         if (matchingConstructorAnnotations.get(0).paramName().isPresent()) {
           if (FluentIterable.from(matchingConstructorAnnotations)
-              .filter(
-                  constructorAnnotation ->
-                      fieldAnnotation.paramName().equals(constructorAnnotation.paramName()))
+              .filter(constructorAnnotation ->
+                  fieldAnnotation.paramName().equals(constructorAnnotation.paramName()))
               .isEmpty()) {
             // No suspect fields/parameters because their names don't match.
             resultBuilder.add(fieldAnnotation);
@@ -552,17 +543,14 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
           Origin origin,
           Optional<JavaCompatibilityExecutable> executable) {
     return FluentIterable.from(annotationWithMetadatas)
-        .transform(
-            annotationWithMetadata ->
-                toValueHolders(
-                    annotationWithMetadata,
-                    getExplicitValuesFromAnnotation(annotationWithMetadata)
-                        .or(
-                            () ->
-                                getObviousValuesForParameterClass(
-                                    annotationWithMetadata.paramRawType())),
-                    origin,
-                    executable))
+        .transform(annotationWithMetadata ->
+            toValueHolders(
+                annotationWithMetadata,
+                getExplicitValuesFromAnnotation(annotationWithMetadata)
+                    .or(() ->
+                        getObviousValuesForParameterClass(annotationWithMetadata.paramRawType())),
+                origin,
+                executable))
         .toList();
   }
 
@@ -676,13 +664,12 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     return FluentIterable.from(
             ContiguousSet.create(
                 Range.closedOpen(0, allParameterValues.size()), DiscreteDomain.integers()))
-        .transform(
-            valueIndex ->
-                TestParameterValueHolder.create(
-                    origin,
-                    allParameterValues.get(valueIndex),
-                    valueIndex,
-                    annotationWithMetadata.paramName()))
+        .transform(valueIndex ->
+            TestParameterValueHolder.create(
+                origin,
+                allParameterValues.get(valueIndex),
+                valueIndex,
+                annotationWithMetadata.paramName()))
         .toList();
   }
 

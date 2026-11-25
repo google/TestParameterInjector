@@ -64,12 +64,11 @@ class TestParameterInjectorUtils {
 
     constructors =
         FluentIterable.from(constructors)
-            .filter(
-                c ->
-                    // Filter out synthetic constructors introduced by the compiler. This is a
-                    // fix to cope with an extra Kotlin-introduced constructor when it has default
-                    // parameter values (with a bit mask and a DefaultConstructorMarker).
-                    !c.isSynthetic())
+            .filter(c ->
+                // Filter out synthetic constructors introduced by the compiler. This is a
+                // fix to cope with an extra Kotlin-introduced constructor when it has default
+                // parameter values (with a bit mask and a DefaultConstructorMarker).
+                !c.isSynthetic())
             .toList();
 
     if (constructors.size() == 2 && isKotlinClass(testClass)) {

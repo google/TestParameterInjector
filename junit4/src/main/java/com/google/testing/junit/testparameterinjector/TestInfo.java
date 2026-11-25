@@ -114,12 +114,11 @@ abstract class TestInfo {
         FluentIterable.from(
                 ContiguousSet.create(
                     Range.closedOpen(0, getParameters().size()), DiscreteDomain.integers()))
-            .transform(
-                parameterIndex -> {
-                  TestInfoParameter parameter = getParameters().get(parameterIndex);
-                  return parameter.withValueInTestName(
-                      parameterWithIndexToNewName.apply(parameter, parameterIndex));
-                })
+            .transform(parameterIndex -> {
+              TestInfoParameter parameter = getParameters().get(parameterIndex);
+              return parameter.withValueInTestName(
+                  parameterWithIndexToNewName.apply(parameter, parameterIndex));
+            })
             .toList(),
         getAnnotations());
   }
@@ -148,28 +147,20 @@ abstract class TestInfo {
             FluentIterable.from(
                     ContiguousSet.create(
                         Range.closedOpen(0, numberOfParameters), DiscreteDomain.integers()))
-                .filter(
-                    parameterIndex ->
-                        FluentIterable.from(testInfos)
-                            .anyMatch(
-                                info ->
-                                    info.getParameters()
-                                            .get(parameterIndex)
-                                            .getValueInTestName()
-                                            .length()
-                                        > getMaxCharactersPerParameter(info, numberOfParameters)))
+                .filter(parameterIndex ->
+                    FluentIterable.from(testInfos)
+                        .anyMatch(info ->
+                            info.getParameters().get(parameterIndex).getValueInTestName().length()
+                                > getMaxCharactersPerParameter(info, numberOfParameters)))
                 .toSet();
 
         return FluentIterable.from(testInfos)
-            .transform(
-                info ->
-                    info.withUpdatedParameterNames(
-                        (parameter, parameterIndex) ->
-                            parameterIndicesThatNeedUpdate.contains(parameterIndex)
-                                ? getShortenedName(
-                                    parameter,
-                                    getMaxCharactersPerParameter(info, numberOfParameters))
-                                : info.getParameters().get(parameterIndex).getValueInTestName()))
+            .transform(info ->
+                info.withUpdatedParameterNames((parameter, parameterIndex) ->
+                    parameterIndicesThatNeedUpdate.contains(parameterIndex)
+                        ? getShortenedName(
+                            parameter, getMaxCharactersPerParameter(info, numberOfParameters))
+                        : info.getParameters().get(parameterIndex).getValueInTestName()))
             .toList();
       }
     } else {
@@ -219,46 +210,38 @@ abstract class TestInfo {
     }
 
     return FluentIterable.from(testNameToInfo.keySet())
-        .transformAndConcat(
-            testName -> {
-              Collection<TestInfo> matchedInfos = testNameToInfo.get(testName);
-              if (matchedInfos.size() == 1) {
-                // There was only one method with this name, so no deduplication is necessary
-                return matchedInfos;
-              } else {
-                // Found tests with duplicate test names
-                int numParameters = matchedInfos.iterator().next().getParameters().size();
-                Set<Integer> indicesThatShouldGetSuffix =
-                    // Find parameter indices for which a suffix would allow the reader to
-                    // differentiate
-                    FluentIterable.from(
-                            ContiguousSet.create(
-                                Range.closedOpen(0, numParameters), DiscreteDomain.integers()))
-                        .filter(
-                            parameterIndex ->
-                                FluentIterable.from(matchedInfos)
-                                        .transform(
-                                            info ->
-                                                getTypeSuffix(
-                                                    info.getParameters()
-                                                        .get(parameterIndex)
-                                                        .getValue()))
-                                        .toSet()
-                                        .size()
-                                    > 1)
-                        .toSet();
+        .transformAndConcat(testName -> {
+          Collection<TestInfo> matchedInfos = testNameToInfo.get(testName);
+          if (matchedInfos.size() == 1) {
+            // There was only one method with this name, so no deduplication is necessary
+            return matchedInfos;
+          } else {
+            // Found tests with duplicate test names
+            int numParameters = matchedInfos.iterator().next().getParameters().size();
+            Set<Integer> indicesThatShouldGetSuffix =
+                // Find parameter indices for which a suffix would allow the reader to
+                // differentiate
+                FluentIterable.from(
+                        ContiguousSet.create(
+                            Range.closedOpen(0, numParameters), DiscreteDomain.integers()))
+                    .filter(parameterIndex ->
+                        FluentIterable.from(matchedInfos)
+                                .transform(info ->
+                                    getTypeSuffix(
+                                        info.getParameters().get(parameterIndex).getValue()))
+                                .toSet()
+                                .size()
+                            > 1)
+                    .toSet();
 
-                return FluentIterable.from(matchedInfos)
-                    .transform(
-                        testInfo ->
-                            testInfo.withUpdatedParameterNames(
-                                (parameter, parameterIndex) ->
-                                    indicesThatShouldGetSuffix.contains(parameterIndex)
-                                        ? parameter.getValueInTestName()
-                                            + getTypeSuffix(parameter.getValue())
-                                        : parameter.getValueInTestName()));
-              }
-            })
+            return FluentIterable.from(matchedInfos)
+                .transform(testInfo ->
+                    testInfo.withUpdatedParameterNames((parameter, parameterIndex) ->
+                        indicesThatShouldGetSuffix.contains(parameterIndex)
+                            ? parameter.getValueInTestName() + getTypeSuffix(parameter.getValue())
+                            : parameter.getValueInTestName()));
+          }
+        })
         .toList();
   }
 
@@ -280,14 +263,11 @@ abstract class TestInfo {
       // There are still duplicates, even after adding type suffixes. As a last resort: add a
       // counter to all parameters to guarantee that each case is unique.
       return FluentIterable.from(testInfos)
-          .transform(
-              testInfo ->
-                  testInfo.withUpdatedParameterNames(
-                      (parameter, parameterIndex) ->
-                          String.format(
-                              "%s.%s",
-                              parameter.getIndexInValueSource() + 1,
-                              parameter.getValueInTestName())))
+          .transform(testInfo ->
+              testInfo.withUpdatedParameterNames((parameter, parameterIndex) ->
+                  String.format(
+                      "%s.%s",
+                      parameter.getIndexInValueSource() + 1, parameter.getValueInTestName())))
           .toList();
     }
   }

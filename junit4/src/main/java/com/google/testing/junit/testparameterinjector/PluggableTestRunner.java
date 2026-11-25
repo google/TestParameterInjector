@@ -170,9 +170,8 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
     return FluentIterable.from(
             getTestMethodProcessors()
                 .calculateTestInfos(initialMethod.getMethod(), getTestClass().getJavaClass()))
-        .transform(
-            testInfo ->
-                (FrameworkMethod) new OverriddenFrameworkMethod(testInfo.getMethod(), testInfo))
+        .transform(testInfo ->
+            (FrameworkMethod) new OverriddenFrameworkMethod(testInfo.getMethod(), testInfo))
         .toList();
   }
 
