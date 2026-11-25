@@ -378,6 +378,8 @@ final class ParameterValueParsing {
     }
   }
 
+  private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
   static String formatTestNameString(Optional<String> parameterName, @Nullable Object value) {
     Object unwrappedValue;
     Optional<String> customName;
@@ -408,7 +410,7 @@ final class ParameterValueParsing {
         result = String.format("%s=%s", parameterName.get(), valueAsString(unwrappedValue));
       }
     }
-    return result.trim().replaceAll("\\s+", " ");
+    return WHITESPACE.matcher(result.trim()).replaceAll(" ");
   }
 
   private static String valueAsString(Object value) {
