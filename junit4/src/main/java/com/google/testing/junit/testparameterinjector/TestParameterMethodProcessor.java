@@ -22,6 +22,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.google.auto.value.AutoAnnotation;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
@@ -778,7 +779,10 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
     /**
      * Returns a String that represents this value and is fit for use in a test name (between
      * brackets).
+     *
+     * <p>Memoized because the same holder is shared by every combination that contains this value.
      */
+    @Memoized
     String toTestNameString() {
       return ParameterValueParsing.formatTestNameString(paramName(), wrappedValue());
     }
