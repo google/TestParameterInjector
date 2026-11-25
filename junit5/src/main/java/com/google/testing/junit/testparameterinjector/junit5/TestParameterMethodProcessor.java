@@ -73,6 +73,23 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
           .build(
               CacheLoader.from(
                   TestParameterMethodProcessor::calculateMethodsIncludingParentsSorted));
+  // The following two caches store isValidAndContainsRelevantAnnotations() per method and per
+  // constructor, which is checked for every test. getParameterAnnotations() parses the annotations
+  // again on every call.
+  private final LoadingCache<Method, Boolean> methodHasTestParameterOnEveryParameterCache =
+      CacheBuilder.newBuilder()
+          .maximumSize(1000)
+          .build(
+              CacheLoader.from(method ->
+                  isValidAndContainsRelevantAnnotations(method.getParameterAnnotations())));
+  private final LoadingCache<Constructor<?>, Boolean>
+      constructorHasTestParameterOnEveryParameterCache =
+          CacheBuilder.newBuilder()
+              .maximumSize(1000)
+              .build(
+                  CacheLoader.from(constructor ->
+                      isValidAndContainsRelevantAnnotations(
+                          constructor.getParameterAnnotations())));
 
   /** Calculates the cartesian product of all relevant @TestParameter values. */
   @Override
@@ -124,7 +141,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   @Override
   public Optional<List<Object>> maybeGetConstructorParameters(
       Constructor<?> constructor, TestInfo testInfo) {
-    if (isValidAndContainsRelevantAnnotations(constructor.getParameterAnnotations())) {
+    if (constructorHasTestParameterOnEveryParameterCache.getUnchecked(constructor)) {
       TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
       return Optional.of(
           FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
@@ -139,7 +156,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   @Override
   public Optional<List<Object>> maybeGetTestMethodParameters(TestInfo testInfo) {
     Method testMethod = testInfo.getMethod();
-    if (isValidAndContainsRelevantAnnotations(testMethod.getParameterAnnotations())) {
+    if (methodHasTestParameterOnEveryParameterCache.getUnchecked(testMethod)) {
       TestIndexHolder testIndexHolder = testInfo.getAnnotation(TestIndexHolder.class);
       return Optional.of(
           FluentIterable.from(getParameterValuesForTest(testIndexHolder, testInfo.getTestClass()))
