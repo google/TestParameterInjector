@@ -18,6 +18,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
@@ -57,7 +58,10 @@ abstract class TestInfo {
    */
   public abstract Class<?> getTestClass();
 
-  public final String getName() {
+  // Memoized because this is called several times per test (e.g. when shortening and deduplicating
+  // names and when JUnit describes the test), which adds up when there are many tests.
+  @Memoized
+  public String getName() {
     if (getParameters().isEmpty()) {
       return getMethod().getName();
     } else {
@@ -73,6 +77,12 @@ abstract class TestInfo {
   abstract ImmutableList<TestInfoParameter> getParameters();
 
   public abstract ImmutableList<Annotation> getAnnotations();
+
+  // Memoized because JUnit uses each test as a hash key several times (e.g. in describeChild())
+  // and hashing the annotations is relatively expensive.
+  @Memoized
+  @Override
+  public abstract int hashCode();
 
   @Nullable
   public final <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
