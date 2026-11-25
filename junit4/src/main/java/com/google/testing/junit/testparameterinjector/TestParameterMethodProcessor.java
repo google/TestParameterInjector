@@ -26,6 +26,8 @@ import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.FluentIterable;
@@ -64,6 +66,12 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
 
   private final Cache<Method, List<List<TestParameterValueHolder>>> parameterValuesCache =
       CacheBuilder.newBuilder().maximumSize(1000).build();
+  private final LoadingCache<Class<?>, ImmutableList<Method>> methodsIncludingParentsSortedCache =
+      CacheBuilder.newBuilder()
+          .maximumSize(1000)
+          .build(
+              CacheLoader.from(
+                  TestParameterMethodProcessor::calculateMethodsIncludingParentsSorted));
 
   /** Calculates the cartesian product of all relevant @TestParameter values. */
   @Override
@@ -76,6 +84,10 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
       return ImmutableList.of(originalTest);
     }
 
+    int methodIndex =
+        strictIndexOf(
+            getMethodsIncludingParentsSorted(originalTest.getTestClass()),
+            originalTest.getMethod());
     ImmutableList.Builder<TestInfo> testInfos = ImmutableList.builder();
     for (int parametersIndex = 0;
         parametersIndex < parameterValuesForMethod.size();
@@ -92,11 +104,7 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
                       .toList())
               .withExtraAnnotation(
                   TestIndexHolderFactory.create(
-                      /* methodIndex= */ strictIndexOf(
-                          getMethodsIncludingParentsSorted(originalTest.getTestClass()),
-                          originalTest.getMethod()),
-                      parametersIndex,
-                      originalTest.getTestClass().getName())));
+                      methodIndex, parametersIndex, originalTest.getTestClass().getName())));
     }
 
     return testInfos.build();
@@ -702,6 +710,10 @@ class TestParameterMethodProcessor implements TestMethodProcessor {
   }
 
   private ImmutableList<Method> getMethodsIncludingParentsSorted(Class<?> clazz) {
+    return methodsIncludingParentsSortedCache.getUnchecked(clazz);
+  }
+
+  private static ImmutableList<Method> calculateMethodsIncludingParentsSorted(Class<?> clazz) {
     ImmutableList.Builder<Method> resultBuilder = ImmutableList.builder();
     while (clazz != null) {
       resultBuilder.add(clazz.getDeclaredMethods());
