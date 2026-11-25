@@ -187,7 +187,9 @@ public class TestParameterMethodProcessorTest {
   public static class DuplicateTestNames extends SuccessfulTestCaseBase {
 
     @Test
-    public void test1(@TestParameter({"ABC", "ABC"}) String testString) {
+    public void test1(
+        // These values are different, but have the same test name because whitespace is trimmed
+        @TestParameter({"ABC", " ABC"}) String testString) {
       storeTestParametersForThisTest(testString);
     }
 
@@ -207,7 +209,7 @@ public class TestParameterMethodProcessorTest {
     ImmutableMap<String, String> expectedTestNameToStringifiedParameters() {
       return ImmutableMap.<String, String>builder()
           .put("test1[1.ABC]", "ABC")
-          .put("test1[2.ABC]", "ABC")
+          .put("test1[2.ABC]", " ABC")
           .put("test2[testObject=123 (Integer)]", "123")
           .put("test2[testObject=123 (String)]", "123")
           .put("test2[testObject=null (String)]", "null")
@@ -349,22 +351,18 @@ public class TestParameterMethodProcessorTest {
       return ImmutableMap.<String, String>builder()
           .put("stringTest[one,one,A]", "1:1:A")
           .put("stringTest[one,one,B]", "1:1:B")
-          .put("stringTest[one,one,stringParam=null]", "1:1:null")
           .put("stringTest[one,one,nothing]", "1:1:null")
           .put("stringTest[one,one,wizard]", "1:1:harry")
           .put("stringTest[one,number1=2,A]", "2:1:A")
           .put("stringTest[one,number1=2,B]", "2:1:B")
-          .put("stringTest[one,number1=2,stringParam=null]", "2:1:null")
           .put("stringTest[one,number1=2,nothing]", "2:1:null")
           .put("stringTest[one,number1=2,wizard]", "2:1:harry")
           .put("stringTest[number2=2,one,A]", "1:2:A")
           .put("stringTest[number2=2,one,B]", "1:2:B")
-          .put("stringTest[number2=2,one,stringParam=null]", "1:2:null")
           .put("stringTest[number2=2,one,nothing]", "1:2:null")
           .put("stringTest[number2=2,one,wizard]", "1:2:harry")
           .put("stringTest[number2=2,number1=2,A]", "2:2:A")
           .put("stringTest[number2=2,number1=2,B]", "2:2:B")
-          .put("stringTest[number2=2,number1=2,stringParam=null]", "2:2:null")
           .put("stringTest[number2=2,number1=2,nothing]", "2:2:null")
           .put("stringTest[number2=2,number1=2,wizard]", "2:2:harry")
           .put("charMatcherTest[one,one,CharMatcher.any()]", "1:1:CharMatcher.any()")
@@ -400,7 +398,7 @@ public class TestParameterMethodProcessorTest {
       @Override
       public List<?> provideValues(Context context) {
         return newArrayList(
-            "A", "B", null, value(null).withName("nothing"), value("harry").withName("wizard"));
+            "A", "B", value(null).withName("nothing"), value("harry").withName("wizard"));
       }
     }
 

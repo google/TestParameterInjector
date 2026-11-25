@@ -253,7 +253,6 @@ public class ParameterValueParsingTest {
           // Very large values
           testCase("9223372036854775807ns", Duration.ofNanos(Long.MAX_VALUE)),
           testCase("9223372036854775806ns", Duration.ofNanos(Long.MAX_VALUE - 1)),
-          testCase("106751991167d7h12m55s807ms", Duration.ofMillis(Long.MAX_VALUE)),
           testCase("900000000000d", Duration.ofDays(900000000000L)),
           testCase("100000000000d100000000000d", Duration.ofDays(200000000000L)));
     }

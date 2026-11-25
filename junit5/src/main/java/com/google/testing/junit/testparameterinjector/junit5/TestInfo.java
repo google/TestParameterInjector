@@ -23,6 +23,7 @@ import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Range;
@@ -218,7 +219,7 @@ abstract class TestInfo {
           } else {
             // Found tests with duplicate test names
             int numParameters = matchedInfos.iterator().next().getParameters().size();
-            Set<Integer> indicesThatShouldGetSuffix =
+            ImmutableSet<Integer> indicesThatShouldGetSuffix =
                 // Find parameter indices for which a suffix would allow the reader to
                 // differentiate
                 FluentIterable.from(
