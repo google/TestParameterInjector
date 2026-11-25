@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.internal.runners.model.ReflectiveCallable;
@@ -60,6 +61,8 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
   private static final ThreadLocal<TestInfo> currentTestInfo = new ThreadLocal<>();
 
   private TestMethodProcessorList testMethodProcessors;
+
+  @Nullable private volatile ImmutableList<FrameworkMethod> testMethodsCache;
 
   protected PluggableTestRunner(Class<?> klass) throws InitializationError {
     super(klass);
@@ -102,11 +105,20 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   @Override
   public final ImmutableList<FrameworkMethod> computeTestMethods() {
-    return sortTestMethods(
-        FluentIterable.from(getSupportedTestAnnotations())
-            .transformAndConcat(annotation -> getTestClass().getAnnotatedMethods(annotation))
-            .transformAndConcat(this::processMethod)
-            .toList());
+    // JUnit calls this method twice: once to validate that there is at least one test method, and
+    // once to get the children to run. This can be expensive when there are many parameter
+    // combinations, so the result is cached.
+    ImmutableList<FrameworkMethod> result = testMethodsCache;
+    if (result == null) {
+      result =
+          sortTestMethods(
+              FluentIterable.from(getSupportedTestAnnotations())
+                  .transformAndConcat(annotation -> getTestClass().getAnnotatedMethods(annotation))
+                  .transformAndConcat(this::processMethod)
+                  .toList());
+      testMethodsCache = result;
+    }
+    return result;
   }
 
   /**
@@ -352,10 +364,9 @@ abstract class PluggableTestRunner extends BlockJUnit4ClassRunner {
 
   @Override
   protected final void validateTestMethods(List<Throwable> errorsReturned) {
-    List<FrameworkMethod> testMethods =
+    FluentIterable<FrameworkMethod> testMethods =
         FluentIterable.from(getSupportedTestAnnotations())
-            .transformAndConcat(annotation -> getTestClass().getAnnotatedMethods(annotation))
-            .toList();
+            .transformAndConcat(annotation -> getTestClass().getAnnotatedMethods(annotation));
     for (FrameworkMethod testMethod : testMethods) {
       ExecutableValidationResult validationResult =
           getTestMethodProcessors()
